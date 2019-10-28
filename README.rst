@@ -2,7 +2,7 @@
 ContinuousFlex plugin
 =====================
 
-This plugin provides, HEMNMA and StructMap protocols, and is frequently updated.
+This plugin provides HEMNMA and StructMap protocols and is frequently updated.
 
 
 Installation
