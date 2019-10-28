@@ -1,6 +1,6 @@
-===============
-HEMNMA plugin
-===============
+=====================
+ContinuousFlex plugin
+=====================
 
 This plugin provides, HEMNMA and StructMap protocols, and is frequently updated.
 
