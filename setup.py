@@ -95,7 +95,7 @@ setup(
 
     # This should be a valid email address corresponding to the author listed
     # above.
-    author_email='slavica.jonic@upmc.fr & mohamad.harastani@upmc.fr',  # Optional
+    author_email='slavica.jonic@upmc.fr',  # Optional
 
     # Classifiers help users find your project by categorizing it.
     #
