@@ -1,0 +1,1 @@
+This is the first version of the continuousflex plugin that combines HEMNMA and StructMap protocols.
