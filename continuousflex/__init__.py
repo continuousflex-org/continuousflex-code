@@ -33,7 +33,7 @@ from continuousflex.constants import *
 class Plugin(pyworkflow.em.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
     _pathVars = [CONTINUOUSFLEX_HOME]
-    _supportedVersions = [V0_1]
+    _supportedVersions = [VV]
 
     @classmethod
     def _defineVariables(cls):
@@ -52,12 +52,12 @@ class Plugin(pyworkflow.em.Plugin):
 
     @classmethod
     def isVersionActive(cls):
-        return cls.getActiveVersion().startswith(V0_1)
+        return cls.getActiveVersion().startswith(VV)
 
     @classmethod
     def defineBinaries(cls, env):
 
-        env.addPackage('nma', version='1.2', deps=['arpack'],
+        env.addPackage('nma', version='2.0', deps=['arpack'],
                        url='scipion.cnb.csic.es/downloads/scipion/software/em/nma.tgz',
                        createBuildDir=False,
                        buildDir='nma',
