@@ -33,20 +33,20 @@ from pyworkflow.viewer import ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO
 from pyworkflow.em.viewers import ObjectView, VmdView
 
 import xmippLib
-from continuousflex.protocols import XmippProtNMA
-from continuousflex.viewers.nma_plotter import XmippNmaPlotter
+from continuousflex.protocols import FlexProtNMA
+from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 
 
 OBJCMD_NMA_PLOTDIST = "Plot distance profile"
 OBJCMD_NMA_VMD = "Display VMD animation"
 
 
-class XmippNMAViewer(ProtocolViewer):
+class FlexNMAViewer(ProtocolViewer):
     """ Visualization of results from the NMA protocol.    
         Normally, NMA modes with high collectivity and low NMA score are preferred.
     """
     _label = 'viewer nma'
-    _targets = [XmippProtNMA]
+    _targets = [FlexProtNMA]
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
 
 #     def setProtocol(self, protocol):
@@ -105,7 +105,7 @@ class XmippNMAViewer(ProtocolViewer):
 
 
 def createShiftPlot(mdFn, title, ylabel):
-    plotter = XmippNmaPlotter()
+    plotter = FlexNmaPlotter()
     plotter.createSubPlot(title, 'atom index', ylabel)
     plotter.plotMdFile(mdFn, None, xmippLib.MDL_NMA_ATOMSHIFT)
     return plotter

@@ -1,7 +1,7 @@
 # **************************************************************************
 # *
 # * Authors:  Carlos Oscar Sanchez Sorzano (coss@cnb.csic.es), March 2014
-# *           Slavica Jonic (slavica.jonic@upmc.fr)
+# * Slavica Jonic (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -33,13 +33,13 @@ from .protocol_nma_base import *
 #from ..pdb.protocol_pseudoatoms_base import *
 
 
-class XmippProtNMAChoose(XmippProtConvertToPseudoAtomsBase, XmippProtNMABase):
+class FlexrotNMAChoose(FlexProtConvertToPseudoAtomsBase, FlexProtNMABase):
     """ Protocol for choosing a volume to construct an NMA analysis """
     _label = 'choose NMA'
 
     def __init__(self, **args):
-        XmippProtConvertToPseudoAtomsBase.__init__(self, **args)
-        XmippProtNMABase.__init__(self, **args)
+        FlexProtConvertToPseudoAtomsBase.__init__(self, **args)
+        FlexrotNMABase.__init__(self, **args)
         self.stepsExecutionMode = STEPS_PARALLEL
 
     # --------------------------- DEFINE param functions --------------------------------------------
@@ -51,11 +51,11 @@ class XmippProtNMAChoose(XmippProtConvertToPseudoAtomsBase, XmippProtNMABase):
         form.addParam('alignVolumes', BooleanParam, label="Align volumes",
                       default=False,
                       help="Align deformed PDBs to volume to maximize match")
-        XmippProtConvertToPseudoAtomsBase._defineParams(self, form)
+        FlexProtConvertToPseudoAtomsBase._defineParams(self, form)
         form.addParallelSection(threads=4, mpi=1)
 
         form.addSection(label='Normal Mode Analysis')
-        XmippProtNMABase._defineParamsCommon(self, form)
+        FlexProtNMABase._defineParamsCommon(self, form)
 
     # --------------------------- INSERT steps functions --------------------------------------------
     def _insertAllSteps(self):
@@ -99,7 +99,7 @@ class XmippProtNMAChoose(XmippProtConvertToPseudoAtomsBase, XmippProtNMABase):
 
     # --------------------------- Step functions --------------------------------------------
     def convertToPseudoAtomsStep(self, inputStructure, fnIn, fnMask, prefix):
-        XmippProtConvertToPseudoAtomsBase.convertToPseudoAtomsStep(self, fnIn,
+        FlexProtConvertToPseudoAtomsBase.convertToPseudoAtomsStep(self, fnIn,
                                                                    fnMask,
                                                                    prefix)
         self.createChimeraScriptStep(inputStructure, fnIn, prefix)

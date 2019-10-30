@@ -42,7 +42,7 @@ NMA_CUTOFF_ABS = 0
 NMA_CUTOFF_REL = 1
 
 
-class XmippProtNMABase(EMProtocol):
+class FlexProtNMABase(EMProtocol):
     """ Protocol for flexible analysis using NMA. """
     _label = 'nma analysis'
 

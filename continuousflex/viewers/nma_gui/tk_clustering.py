@@ -30,9 +30,9 @@ import Tkinter as tk
 import pyworkflow.gui as gui
 from pyworkflow.gui.widgets import Button, HotButton
 
-from xmipp3.protocols.nma.data import Point
+from continuousflex.protocols.data import Point
 from . import PointSelector
-from continuousflex.viewers.nma_plotter import XmippNmaPlotter
+from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 
 
     
@@ -176,7 +176,7 @@ class ClusteringWindow(gui.Window):
                               title="Invalid input")]
             
             if self.plotter is None or self.plotter.isClosed():
-                self.plotter = XmippNmaPlotter(data=self.data)
+                self.plotter = FlexNmaPlotter(data=self.data)
 
                 doShow = True
             else:

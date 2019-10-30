@@ -30,7 +30,7 @@ This module implement the classes to create plots on xmipp.
 from pyworkflow.em.viewers.plotter import EmPlotter
 
 
-class XmippPlotterHEMNMA(EmPlotter):
+class FlexPlotter(EmPlotter):
     ''' Class to create several plots with Xmipp utilities'''
     def __init__(self, x=1, y=1, mainTitle="", **kwargs):
         EmPlotter.__init__(self, x, y, mainTitle, **kwargs)

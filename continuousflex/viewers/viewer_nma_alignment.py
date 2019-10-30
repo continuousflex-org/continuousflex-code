@@ -33,15 +33,15 @@ from pyworkflow.protocol.params import StringParam
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 import xmippLib
 
-from xmipp3.protocols.nma.data import Point, Data
-from continuousflex.viewers.nma_plotter import XmippNmaPlotter
-from continuousflex.protocols import XmippProtAlignmentNMA
+from continuousflex.protocols.data import Point, Data
+from continuousflex.viewers.nma_plotter import FlexNmaPlotter
+from continuousflex.protocols import FlexProtAlignmentNMA
         
-class XmippAlignmentNMAViewer(ProtocolViewer):
+class FlexAlignmentNMAViewer(ProtocolViewer):
     """ Visualization of results from the NMA protocol
     """
     _label = 'viewer nma alignment'
-    _targets = [XmippProtAlignmentNMA]
+    _targets = [FlexProtAlignmentNMA]
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
 
     def __init__(self, **kwargs):
@@ -105,7 +105,7 @@ class XmippAlignmentNMAViewer(ProtocolViewer):
                               title="Invalid input")]
             
             # Actually plot
-            plotter = XmippNmaPlotter(data=self.getData())
+            plotter = FlexNmaPlotter(data=self.getData())
             baseList = [basename(n) for n in modeNameList]
             
 	    self.getData().XIND = modeList[0]

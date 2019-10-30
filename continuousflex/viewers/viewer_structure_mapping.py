@@ -33,17 +33,17 @@ from pyworkflow.viewer import DESKTOP_TKINTER, WEB_DJANGO, ProtocolViewer
 from pyworkflow.gui.plotter import plt
 import pyworkflow.protocol.params as params
 
-from continuousflex.protocols import XmippProtStructureMapping
+from continuousflex.protocols import FlexProtStructureMapping
 
 
-class XmippProtStructureMappingViewer(ProtocolViewer):
+class FlexProtStructureMappingViewer(ProtocolViewer):
     """ Wrapper to visualize different type of data objects
     with the Xmipp program xmipp_showj
     """
     
     _label = 'viewer validate_overfitting'
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
-    _targets = [XmippProtStructureMapping]
+    _targets = [FlexProtStructureMapping]
         
     def _defineParams(self, form):
         form.addSection(label='Show StructMap')

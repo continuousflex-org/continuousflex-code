@@ -24,9 +24,9 @@
 # **************************************************************************
 
 import numpy as np
-from .plotter import XmippPlotterHEMNMA
+from .plotter import FlexPlotter
 
-class XmippNmaPlotter(XmippPlotterHEMNMA):
+class FlexNmaPlotter(FlexPlotter):
     """ Add some extra plot utilities to XmippPlotter class, mainly for
     NMA vectors plotting of the deformations.txt file.
     """
@@ -34,7 +34,7 @@ class XmippNmaPlotter(XmippPlotterHEMNMA):
         """ Create the plotter, 'data' should be passed in **kwargs.
         """
         self._data = kwargs.get('data')
-        XmippPlotterHEMNMA.__init__(self, **kwargs)
+        FlexPlotter.__init__(self, **kwargs)
         self.useLastPlot = False
         
     def createSubPlot(self, title, xlabel, ylabel):
@@ -44,7 +44,7 @@ class XmippNmaPlotter(XmippPlotterHEMNMA):
             ax.cla()
             ax.set_title(title)
         else:
-            ax = XmippPlotterHEMNMA.createSubPlot(self, title, xlabel, ylabel)
+            ax = FlexPlotter.createSubPlot(self, title, xlabel, ylabel)
             
         return ax
             

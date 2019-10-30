@@ -31,8 +31,8 @@ import pyworkflow.gui as gui
 from pyworkflow.utils.properties import Icon
 from pyworkflow.gui.widgets import Button, HotButton
 
-from xmipp3.protocols.nma.data import Point, PathData
-from continuousflex.viewers.nma_plotter import XmippNmaPlotter
+from continuousflex.protocols.data import Point, PathData
+from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 
 
 
@@ -199,7 +199,7 @@ class TrajectoriesWindow(gui.Window):
                               title="Invalid input")]
             
             if self.plotter is None or self.plotter.isClosed():
-                self.plotter = XmippNmaPlotter(data=self.data)
+                self.plotter = FlexNmaPlotter(data=self.data)
 
                 doShow = True
                 #self.plotter.useLastPlot = True

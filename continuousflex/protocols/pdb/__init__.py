@@ -1,8 +1,8 @@
 # **************************************************************************
 # *
-# * Authors: 
-# * J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
-# * Slavica Jonic (slavica.jonic@upmc.fr)
+# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
+# *
+# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -23,14 +23,9 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-from .protocol_nma import FlexProtNMA
-from .protocol_nma_alignment import FlexProtAlignmentNMA
-from .protocol_nma_base import NMA_CUTOFF_ABS, NMA_CUTOFF_REL
-#from .protocol_nma_choose import XmippProtNMAChoose
-from .protocol_nma_dimred import FlexProtDimredNMA
-from .protocol_batch_cluster import FlexBatchProtNMACluster
-from .protocol_structure_mapping import FlexProtStructureMapping
-from .data import *
-from .pdb import *
 
+from .protocol_convert_pdb import FlexProtConvertPdb
+#from .protocol_combine_pdb import FlexProtCombinePdb
+from .protocol_pseudoatoms import FlexProtConvertToPseudoAtoms
+from protocol_pseudoatoms_base import FlexProtConvertToPseudoAtomsBase
 

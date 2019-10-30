@@ -51,7 +51,7 @@ DIMRED_VALUES = ['PCA', 'LTSA', 'DM', 'LLTSA', 'LPP', 'kPCA', 'pPCA', 'LE', 'HLL
 DIMRED_MAPPINGS = [DIMRED_PCA, DIMRED_LLTSA, DIMRED_LPP, DIMRED_PPCA, DIMRED_NPE]
 
        
-class XmippProtDimredNMA(ProtAnalysis3D):
+class FlexProtDimredNMA(ProtAnalysis3D):
     """ This protocol will take the images with NMA deformations
     as points in a N-dimensional space (where N is the number
     of computed normal modes) and will project them in a reduced
@@ -66,7 +66,7 @@ class XmippProtDimredNMA(ProtAnalysis3D):
     #--------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
-        form.addParam('inputNMA', PointerParam, pointerClass='XmippProtAlignmentNMA',
+        form.addParam('inputNMA', PointerParam, pointerClass='FlexProtAlignmentNMA',
                       label="Conformational distribution",                        
                       help='Select a previous run of the NMA alignment.')
         

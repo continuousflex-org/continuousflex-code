@@ -41,10 +41,10 @@ from pyworkflow.utils.path import cleanPattern, copyFile, makePath
 import xmippLib
 from xmipp3.convert import getImageLocation
 # from xmipp3.base import XmippMdRow
-from xmipp3.protocols.pdb import XmippProtConvertToPseudoAtomsBase
+from continuousflex.protocols.pdb import FlexProtConvertToPseudoAtomsBase
 #from xmipp3.protocols.pdb.protocol_pseudoatoms_base import XmippProtConvertToPseudoAtomsBase
 #from ..pdb.protocol_pseudoatoms_base import XmippProtConvertToPseudoAtomsBase
-from .protocol_nma_base import XmippProtNMABase, NMA_CUTOFF_REL
+from .protocol_nma_base import FlexProtNMABase, NMA_CUTOFF_REL
 
 
 def mds(d, dimensions = 2):
@@ -70,8 +70,8 @@ def mds(d, dimensions = 2):
 
     return (Y[:,0:dimensions], S)
 
-class XmippProtStructureMapping(XmippProtConvertToPseudoAtomsBase,
-                                XmippProtNMABase):
+class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
+                                FlexProtNMABase):
     """ 
     A quantitive analysis of dissimilarities (distances) among the EM maps
     that placing the entire set of density maps in to a common space of
@@ -102,7 +102,7 @@ class XmippProtStructureMapping(XmippProtConvertToPseudoAtomsBase,
                            "produced files during rigid and elastic alignment.")        
         
         form.addSection(label='Pseudoatom')
-        XmippProtConvertToPseudoAtomsBase._defineParams(self,form)
+        FlexProtConvertToPseudoAtomsBase._defineParams(self,form)
         self.getParam("pseudoAtomRadius").setDefault(1.5)
         self.getParam("pseudoAtomTarget").setDefault(2)
         
@@ -112,7 +112,7 @@ class XmippProtStructureMapping(XmippProtConvertToPseudoAtomsBase,
                       help='Perform a rigid alignment before elastic alignment')
         form.addParam('optimizeScale', params.BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
                       label="Optimize scale", condition="rigidAlignment")
-        XmippProtNMABase._defineParamsCommon(self,form)
+        FlexProtNMABase._defineParamsCommon(self,form)
         
                
         form.addParallelSection(threads=4, mpi=1)

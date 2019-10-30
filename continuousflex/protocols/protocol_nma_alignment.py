@@ -54,7 +54,7 @@ NMA_ALIGNMENT_WAV = 0
 NMA_ALIGNMENT_PROJ = 1    
 
         
-class XmippProtAlignmentNMA(ProtAnalysis3D):
+class FlexProtAlignmentNMA(ProtAnalysis3D):
     """ Protocol for flexible angular alignment. """
     _label = 'nma alignment'
     

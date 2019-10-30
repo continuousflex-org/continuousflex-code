@@ -42,20 +42,20 @@ from pyworkflow.utils.process import runJob
 from pyworkflow.em.viewers import VmdView
 from pyworkflow.gui.browser import FileBrowserWindow
 
-from continuousflex.protocols.protocol_nma_dimred import XmippProtDimredNMA
+from continuousflex.protocols.protocol_nma_dimred import FlexProtDimredNMA
 
-from xmipp3.protocols.nma.data import Point, Data
+from continuousflex.protocols.data import Point, Data
 
-from continuousflex.viewers.nma_plotter import XmippNmaPlotter
+from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 
 from continuousflex.viewers.nma_gui import ClusteringWindow, TrajectoriesWindow
 
         
-class XmippDimredNMAViewer(ProtocolViewer):
+class FlexDimredNMAViewer(ProtocolViewer):
     """ Visualization of results from the NMA protocol
     """
     _label = 'viewer nma dimred'
-    _targets = [XmippProtDimredNMA]
+    _targets = [FlexProtDimredNMA]
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
     
     def __init__(self, **kwargs):
@@ -113,7 +113,7 @@ class XmippDimredNMAViewer(ProtocolViewer):
                               title="Invalid input")]
             
             # Actually plot
-            plotter = XmippNmaPlotter(data=self.getData())
+            plotter = FlexNmaPlotter(data=self.getData())
             baseList = [basename(n) for n in modeNameList]
             
 	    self.getData().XIND = modeList[0]
@@ -172,9 +172,9 @@ class XmippDimredNMAViewer(ProtocolViewer):
         partSet.write()
         partSet.close()
 
-        from continuousflex.protocols.protocol_batch_cluster import BatchProtNMACluster
+        from continuousflex.protocols.protocol_batch_cluster import FlexBatchProtNMACluster
         #from xmipp3.protocols.nma.protocol_batch_cluster import BatchProtNMACluster
-        newProt = project.newProtocol(BatchProtNMACluster)
+        newProt = project.newProtocol(FlexBatchProtNMACluster)
         clusterName = self.clusterWindow.getClusterName()
         if clusterName:
             newProt.setObjLabel(clusterName)

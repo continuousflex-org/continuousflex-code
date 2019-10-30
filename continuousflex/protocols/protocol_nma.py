@@ -40,11 +40,11 @@ from pyworkflow.em.data import SetOfNormalModes
 
 import xmippLib
 from xmipp3.base import XmippMdRow
-from .protocol_nma_base import XmippProtNMABase, NMA_CUTOFF_REL
+from .protocol_nma_base import FlexProtNMABase, NMA_CUTOFF_REL
 from .convert import rowToMode, getNMAEnviron
 
 
-class XmippProtNMA(XmippProtNMABase):
+class FlexProtNMA(FlexProtNMABase):
     """ Flexible angular alignment using normal modes """
     _label = 'nma analysis'
     
@@ -56,7 +56,7 @@ class XmippProtNMA(XmippProtNMABase):
                       help='The input structure can be an atomic model '
                            '(true PDB) or a pseudoatomic model\n'
                            '(an EM volume converted into pseudoatoms)')
-        XmippProtNMABase._defineParamsCommon(self,form)
+        FlexProtNMABase._defineParamsCommon(self,form)
         form.addParam('rtbBlockSize', IntParam, default=10,
                       expertLevel=LEVEL_ADVANCED,
                       label='Number of residues per RTB block (for atomic structures)',

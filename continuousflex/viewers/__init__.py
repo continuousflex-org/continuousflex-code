@@ -22,10 +22,10 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-from .viewer_nma import XmippNMAViewer
-from .viewer_nma_alignment import XmippAlignmentNMAViewer
-from .viewer_nma_dimred import XmippDimredNMAViewer
-from .viewer_structure_mapping import XmippProtStructureMappingViewer
+from .viewer_nma import FlexNMAViewer
+from .viewer_nma_alignment import FlexAlignmentNMAViewer
+from .viewer_nma_dimred import FlexDimredNMAViewer
+from .viewer_structure_mapping import FlexProtStructureMappingViewer
 
 
 

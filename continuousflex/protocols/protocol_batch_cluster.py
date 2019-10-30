@@ -32,7 +32,7 @@ from pyworkflow.em.data import SetOfParticles, Volume
 from xmipp3.convert import writeSetOfParticles
 
 
-class BatchProtNMACluster(BatchProtocol):
+class FlexBatchProtNMACluster(BatchProtocol):
     """ Protocol executed when a cluster is created
     from NMA images and theirs deformations.
     """
