@@ -82,7 +82,7 @@ class Plugin(pyworkflow.em.Plugin):
     def defineBinaries(cls, env):
 
         env.addPackage('nma', version='2.0', deps=['arpack'],
-                       url='scipion.cnb.csic.es/downloads/scipion/software/em/nma.tgz',
+                       url='http://www.impmc.upmc.fr/~jonic/Software/nma.tgz',
                        createBuildDir=False,
                        buildDir='nma',
                        target="nma",
@@ -90,7 +90,7 @@ class Plugin(pyworkflow.em.Plugin):
                                   'nma_elnemo_pdbmat'),
                                  ('cd NMA_cart; LDFLAGS=-L%s make; mv nma_* ..'
                                   % env.getLibFolder(), 'nma_diag_arpack')],
-                       neededProgs=[], default=True)
+                       neededProgs=['gfortran'], default=True)
 
 
 pyworkflow.em.Domain.registerPlugin(__name__)
