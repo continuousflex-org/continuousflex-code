@@ -23,14 +23,14 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-
 import os
 
 import pyworkflow.em
-from pyworkflow.utils import Environ, join
 from continuousflex.constants import *
 import pyworkflow.utils as pwutils
-from xmipp3.base import *
+getXmippPath = importFromPlugin("xmipp3.base", 'getXmippPath')
+
+_logo = "logo.png"
 
 class Plugin(pyworkflow.em.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME

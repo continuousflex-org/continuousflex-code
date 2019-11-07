@@ -33,13 +33,9 @@ from pyworkflow.utils import importFromPlugin
 from pyworkflow.tests.em.workflows.test_workflow import TestWorkflow
 
 from continuousflex.protocols import FlexProtNMA, FlexProtAlignmentNMA, \
-    FlexProtDimredNMA, NMA_CUTOFF_ABS
+    FlexProtDimredNMA, NMA_CUTOFF_ABS, FlexProtConvertToPseudoAtoms
 
-XmippProtConvertToPseudoAtoms = importFromPlugin('xmipp3.protocols',
-                                                 'XmippProtConvertToPseudoAtoms')
-   
-   
-   
+
 class TestNMA(TestWorkflow):
     """ Check the images are converted properly to spider format. """
     
@@ -109,7 +105,7 @@ class TestNMA(TestWorkflow):
         # Convert the Volume to Pdb
         NMA_MASK_THRE = importFromPlugin('xmipp3.protocols.pdb.protocol_pseudoatoms_base',
                                          'NMA_MASK_THRE')
-        protConvertVol = self.newProtocol(XmippProtConvertToPseudoAtoms)
+        protConvertVol = self.newProtocol(FlexProtConvertToPseudoAtoms)
         protConvertVol.inputStructure.set(protImportVol.outputVolume)
         protConvertVol.maskMode.set(NMA_MASK_THRE)
         protConvertVol.maskThreshold.set(0.2)
