@@ -274,7 +274,6 @@ class FlexProtNMABase(EMProtocol):
                 #errors.append("Check that Scipion was installed with NMA: 'scipion installb nma'")
 		errors.append("Check that Scipion was installed with NMA")
                 break
-
         from pyworkflow.utils.which import which
         if (which("csh") == "") and (which("sh") == ""):
             errors.append("Cannot find neither csh or sh in the PATH. Please install one of them, using 'sudo apt-get install csh' or 'sudo apt-get install sh'")
