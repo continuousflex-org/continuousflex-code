@@ -164,7 +164,7 @@ setup(
     # MANIFEST.in as well.
     # include_package_data=True,
     package_data={  # Optional
-       'continuousflex': ['protocols.conf'],
+       'continuousflex': ['protocols.conf', 'logo.png'],
     },
 
     # Although 'package_data' is the preferred approach, in some case you may
