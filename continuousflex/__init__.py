@@ -82,7 +82,7 @@ class Plugin(pyworkflow.em.Plugin):
     def defineBinaries(cls, env):
 
         env.addPackage('nma', version='2.0', deps=['arpack'],
-                       url='http://www.impmc.upmc.fr/~jonic/Software/nma.tgz',
+                       url='https://github.com/slajo/NMA_basic_code/raw/master/nma.tgz',
                        createBuildDir=False,
                        buildDir='nma',
                        target="nma",

@@ -200,7 +200,12 @@ class FlexProtNMABase(EMProtocol):
         fnDiag = "diagrtb.eigenfacs"
 
         if structureEM:
-            self.runJob("nma_reformatForElNemo.sh", "%d" % len(fnVec), env=getNMAEnviron())
+	    if which("csh") != "":
+            	self.runJob("nma_reformatForElNemo.csh", "%d" % len(fnVec), env=getNMAEnviron())
+	    else:
+		if which("sh") != "":
+		    self.runJob("nma_reformatForElNemo.sh", "%d" % len(fnVec), env=getNMAEnviron())
+
             fnDiag = "diag_arpack.eigenfacs"
 
         self.runJob("echo", "%s | nma_check_modes" % fnDiag, env=getNMAEnviron())
@@ -266,8 +271,13 @@ class FlexProtNMABase(EMProtocol):
         for prog in nma_programs:
             if not exists(join(nmaBin, prog)):
                 errors.append("Some NMA programs are missing in the NMA folder.")
-                errors.append("Check that Scipion was installed with NMA: 'scipion installb nma'")
+                #errors.append("Check that Scipion was installed with NMA: 'scipion installb nma'")
+		            errors.append("Check that Scipion was installed with NMA")
                 break
+
+        from pyworkflow.utils.which import which
+        if (which("csh") == "") and (which("sh") == ""):
+            errors.append("Cannot find neither csh or sh in the PATH. Please install one of them, using 'sudo apt-get install csh' or 'sudo apt-get install sh'")
 
         return errors
 
