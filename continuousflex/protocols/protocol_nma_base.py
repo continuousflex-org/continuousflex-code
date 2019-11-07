@@ -272,7 +272,7 @@ class FlexProtNMABase(EMProtocol):
             if not exists(join(nmaBin, prog)):
                 errors.append("Some NMA programs are missing in the NMA folder.")
                 #errors.append("Check that Scipion was installed with NMA: 'scipion installb nma'")
-		            errors.append("Check that Scipion was installed with NMA")
+		errors.append("Check that Scipion was installed with NMA")
                 break
 
         from pyworkflow.utils.which import which
