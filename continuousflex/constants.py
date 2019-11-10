@@ -32,7 +32,7 @@ CONTINUOUSFLEX_HOME = 'CONTINUOUSFLEX_HOME'
 NMA_HOME = 'NMA_HOME'
 
 # Supported versions
-VV = '0.4'
+VV = '0.5'
 
 
 
