@@ -203,7 +203,7 @@ class FlexProtNMABase(EMProtocol):
 	    if which("csh") != "":
             	self.runJob("nma_reformatForElNemo.csh", "%d" % len(fnVec), env=getNMAEnviron())
 	    else:
-		if which("sh") != "":
+		if which("bash") != "":
 		    self.runJob("nma_reformatForElNemo.sh", "%d" % len(fnVec), env=getNMAEnviron())
 
             fnDiag = "diag_arpack.eigenfacs"
@@ -275,8 +275,8 @@ class FlexProtNMABase(EMProtocol):
 		errors.append("Check that Scipion was installed with NMA")
                 break
         from pyworkflow.utils.which import which
-        if (which("csh") == "") and (which("sh") == ""):
-            errors.append("Cannot find neither csh or sh in the PATH. Please install one of them, using 'sudo apt-get install csh' or 'sudo apt-get install sh'")
+        if (which("csh") == "") and (which("bash") == ""):
+            errors.append("Please install csh (can be a link to tcsh) or bash (e.g., on Ubuntu 'sudo apt-get install csh' or 'sudo apt-get install bash')")
 
         return errors
 
