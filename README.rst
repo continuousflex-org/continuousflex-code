@@ -39,7 +39,7 @@ Note: Xmipp plugin should be installed to run continuousflex.
 Supported versions
 ------------------
 
-0.4
+0.6
 
 Protocols
 ---------
