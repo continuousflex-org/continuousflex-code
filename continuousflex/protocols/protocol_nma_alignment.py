@@ -31,17 +31,17 @@
 
 from os.path import basename
 
-from pyworkflow.em.convert.atom_struct import cifToPdb
+from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import replaceBaseExt
 
 from pyworkflow.utils import isPower2, getListFromRangeString
 from pyworkflow.utils.path import copyFile, cleanPath 
 import pyworkflow.protocol.params as params
-from pyworkflow.em.protocol import ProtAnalysis3D
+from pwem.protocols import ProtAnalysis3D
 
 from pyworkflow.protocol.params import NumericRangeParam
-import pyworkflow.em as em
-import pyworkflow.em.metadata as md
+import pwem as em
+import pwem.metadata as md
 
 from xmipp3.base import XmippMdRow
 from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
