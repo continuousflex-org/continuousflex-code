@@ -28,7 +28,7 @@ import os
 # from glob import glob
 import numpy as np
 
-import pwem.metadata as md
+import pwem.emlib.metadata as md
 import pwem as em
 from pwem.protocols import EMProtocol
 import pyworkflow.protocol.params as params

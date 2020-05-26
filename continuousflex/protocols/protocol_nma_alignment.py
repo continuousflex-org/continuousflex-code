@@ -41,7 +41,7 @@ from pwem.protocols import ProtAnalysis3D
 
 from pyworkflow.protocol.params import NumericRangeParam
 import pwem as em
-import pwem.metadata as md
+import pwem.emlib.metadata as md
 
 from xmipp3.base import XmippMdRow
 from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
