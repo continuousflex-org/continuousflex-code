@@ -29,7 +29,7 @@
 
 
 import xmippLib
-from pyworkflow.em import *
+from pwem import *
 from pyworkflow.protocol.params import IntParam, FloatParam, EnumParam
 from pyworkflow.utils import *
 from pyworkflow.utils.path import makePath, cleanPath, moveFile
@@ -42,7 +42,7 @@ NMA_CUTOFF_ABS = 0
 NMA_CUTOFF_REL = 1
 
 
-class FlexProtNMABase(EMProtocol):
+class FlexProtNMABase(pwem.protocols.EMProtocol):
     """ Protocol for flexible analysis using NMA. """
     _label = 'nma analysis'
 
@@ -95,7 +95,7 @@ class FlexProtNMABase(EMProtocol):
         the function should be called inside the working dir."""
         fWarn = open("warnings.xmd", 'wa')
         for l in lines:
-            print >> fWarn, l
+            print( fWarn, l)
         fWarn.close()
 
     def computeModesStep(self, fnPseudoatoms, numberOfModes, cutoffStr):
@@ -188,23 +188,21 @@ class FlexProtNMABase(EMProtocol):
             msg += "However, the protocol allows only up to 200 modes as 20-100 modes are usually enough. If the number of"
             msg += "modes is below the minimum between these two numbers, consider increasing cut-off distance."
             self._printWarnings(redStr(msg % (len(fnVec), numberOfModes)))
-            print redStr('Warning: There are only %d modes instead of %d.' % (len(fnVec), numberOfModes))
-            print redStr("Check the number of modes you asked to compute and/or consider increasing cut-off distance.")
-            print redStr("The maximum number of modes allowed by the method for atomic normal mode analysis is 6 times")
-            print redStr(
-                "the number of RTB blocks and for pseudoatomic normal mode analysis 3 times the number of pseudoatoms.")
-            print redStr(
-                "However, the protocol allows only up to 200 modes as 20-100 modes are usually enough. If the number of")
-            print redStr("modes is below the minimum between these two numbers, consider increasing cut-off distance.")
+            print(redStr('Warning: There are only %d modes instead of %d.' % (len(fnVec), numberOfModes)))
+            print(redStr("Check the number of modes you asked to compute and/or consider increasing cut-off distance."))
+            print(redStr("The maximum number of modes allowed by the method for atomic normal mode analysis is 6 times"))
+            print(redStr("the number of RTB blocks and for pseudoatomic normal mode analysis 3 times the number of pseudoatoms."))
+            print(redStr("However, the protocol allows only up to 200 modes as 20-100 modes are usually enough. If the number of"))
+            print(redStr("modes is below the minimum between these two numbers, consider increasing cut-off distance."))
 
         fnDiag = "diagrtb.eigenfacs"
 
         if structureEM:
-	    if which("csh") != "":
-            	self.runJob("nma_reformatForElNemo.csh", "%d" % len(fnVec), env=getNMAEnviron())
-	    else:
-		if which("bash") != "":
-		    self.runJob("nma_reformatForElNemo.sh", "%d" % len(fnVec), env=getNMAEnviron())
+            if which("csh") != "":
+                self.runJob("nma_reformatForElNemo.csh", "%d" % len(fnVec), env=getNMAEnviron())
+            else:
+                if which("bash") != "":
+                    self.runJob("nma_reformatForElNemo.sh", "%d" % len(fnVec), env=getNMAEnviron())
 
             fnDiag = "diag_arpack.eigenfacs"
 
@@ -272,7 +270,7 @@ class FlexProtNMABase(EMProtocol):
             if not exists(join(nmaBin, prog)):
                 errors.append("Some NMA programs are missing in the NMA folder.")
                 #errors.append("Check that Scipion was installed with NMA: 'scipion installb nma'")
-		errors.append("Check that Scipion was installed with NMA")
+                errors.append("Check that Scipion was installed with NMA")
                 break
         from pyworkflow.utils.which import which
         if (which("csh") == "") and (which("bash") == ""):

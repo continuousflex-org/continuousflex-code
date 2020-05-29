@@ -34,8 +34,8 @@ from pyworkflow.object import String
 from pyworkflow.utils import cleanPattern, moveFile
 from pyworkflow.protocol.params import EnumParam, PointerParam, FloatParam
 from pyworkflow.protocol.constants import LEVEL_ADVANCED
-from pyworkflow.em.protocol import Prot3D #this is not an error
-from pyworkflow.em.viewers.viewer_chimera import Chimera
+from pwem.protocols import Prot3D #this is not an error
+from pwem.viewers.viewer_chimera import Chimera
 from xmipp3.convert import getImageLocation
 
 
@@ -98,7 +98,7 @@ class FlexProtConvertToPseudoAtomsBase(Prot3D):
         targetErr = self.pseudoAtomTarget.get()
         #volume-to-pseudoatom conversion was not MPI-parallelized and the number of MPIs was removed from the gui
         #nthreads = self.numberOfThreads.get() * self.numberOfMpi.get()
-	nthreads = self.numberOfThreads.get()
+        nthreads = self.numberOfThreads.get()
 
         params = "-i %(inputFn)s -o %(outputFn)s --sigma %(sigma)f --thr " \
                  "%(nthreads)d "

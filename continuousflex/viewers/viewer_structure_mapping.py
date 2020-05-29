@@ -108,21 +108,21 @@ class FlexProtStructureMappingViewer(ProtocolViewer):
                 
         else:         
             fig = figure()
-	    ax = Axes3D(fig)
+            ax = Axes3D(fig)
 
             for i in range(len(coordinates[:, 0])):
-		ax.scatter(coordinates[i, 0], coordinates[i, 1], coordinates[i, 2], marker = 'o', s=50, c='g')
-		ax.text(coordinates[i,0],coordinates[i,1],coordinates[i,2], '  %s' % (labels[i]), size=15, zorder=1, color='k')
+                ax.scatter(coordinates[i, 0], coordinates[i, 1], coordinates[i, 2], marker = 'o', s=50, c='g')
+                ax.text(coordinates[i,0],coordinates[i,1],coordinates[i,2], '  %s' % (labels[i]), size=15, zorder=1, color='k')
 
- 	    ax.set_xlabel('Dimension 1', fontsize=15)
+            ax.set_xlabel('Dimension 1', fontsize=15)
             ax.set_ylabel('Dimension 2', fontsize=15)
             ax.set_zlabel('Dimension 3', fontsize=15)
-	    ax.xaxis.labelpad = 10
-	    ax.yaxis.labelpad = 10
-	    ax.zaxis.labelpad = 10
+            ax.xaxis.labelpad = 10
+            ax.yaxis.labelpad = 10
+            ax.zaxis.labelpad = 10
             ax.text2D(0.05, 0.95, "StructMap", transform=ax.transAxes, fontsize=15)
 
-	    plt.show() 
+            plt.show()
         
         return plot
         

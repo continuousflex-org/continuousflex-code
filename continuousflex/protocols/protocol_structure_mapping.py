@@ -28,9 +28,9 @@ import os
 # from glob import glob
 import numpy as np
 
-import pyworkflow.em.metadata as md
-import pyworkflow.em as em
-from pyworkflow.em.protocol import EMProtocol
+import pwem.emlib.metadata as md
+import pwem as em
+from pwem.protocols import EMProtocol
 import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
 from pyworkflow.protocol.constants import LEVEL_ADVANCED, STEPS_PARALLEL

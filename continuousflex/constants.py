@@ -25,8 +25,6 @@
 # *
 # **************************************************************************
 
-from pyworkflow.utils import importFromPlugin
-
 
 CONTINUOUSFLEX_HOME = 'CONTINUOUSFLEX_HOME'
 NMA_HOME = 'NMA_HOME'

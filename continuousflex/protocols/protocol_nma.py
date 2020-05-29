@@ -31,12 +31,12 @@ import os
 import math
 from os.path import basename, exists, join
 
-from pyworkflow.em.convert.atom_struct import cifToPdb
+from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import redStr, replaceBaseExt
 from pyworkflow.utils.path import copyFile, createLink, makePath, cleanPath, moveFile
 from pyworkflow.protocol.params import (PointerParam, IntParam, FloatParam, 
                                         LEVEL_ADVANCED)
-from pyworkflow.em.data import SetOfNormalModes
+from pwem.objects import SetOfNormalModes
 
 import xmippLib
 from xmipp3.base import XmippMdRow
@@ -116,16 +116,15 @@ class FlexProtNMA(FlexProtNMABase):
                 first_line = fh.readline()
                 second_line = fh.readline()
                 self.pseudoAtomRadius = float(second_line.split()[2])
-	    if self.cutoffMode == NMA_CUTOFF_REL:
+            if self.cutoffMode == NMA_CUTOFF_REL:
                 params = '-i %s --operation distance_histogram %s' \
                      % (localFn, self._getExtraPath('pseudoatoms_distance.hist'))
                 self._insertRunJobStep("xmipp_pdb_analysis", params)
             self._insertFunctionStep('computeModesStep', localFn, n, cutoffStr)
             self._insertFunctionStep('reformatOutputStep',"pseudoatoms.pdb")
         else:
-	    if self.cutoffMode == NMA_CUTOFF_REL:
-                params = '-i %s --operation distance_histogram %s' \
-                     % (localFn, self._getExtraPath('atoms_distance.hist'))
+            if self.cutoffMode == NMA_CUTOFF_REL:
+                params = '-i %s --operation distance_histogram %s' % (localFn, self._getExtraPath('atoms_distance.hist'))
                 self._insertRunJobStep("xmipp_pdb_analysis", params)
             self._insertFunctionStep('computePdbModesStep', n,
                                      self.rtbBlockSize.get(),
@@ -160,8 +159,8 @@ class FlexProtNMA(FlexProtNMABase):
         rc = self._getRc(self._getExtraPath('atoms_distance.hist'))
                 
         self._enterWorkingDir()
-	# For atoms, the interaction force constant was set to 10 as ElNemo RTB code may ask for its value \
-	# (the RTBForceConstant entry was removed from gui as the value does not change the ENM computed normal modes).
+        # For atoms, the interaction force constant was set to 10 as ElNemo RTB code may ask for its value \
+	    # (the RTBForceConstant entry was removed from gui as the value does not change the ENM computed normal modes).
         self.runJob('nma_record_info_PDB.py', "%d %d atoms.pdb %f %f"
                     % (numberOfModes, RTBblockSize, rc, 10.0),
                     env=getNMAEnviron())

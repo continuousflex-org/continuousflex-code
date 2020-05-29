@@ -25,14 +25,14 @@
 # **************************************************************************
 import os
 
-import pyworkflow.em
+import pwem
 from continuousflex.constants import *
 import pyworkflow.utils as pwutils
-getXmippPath = importFromPlugin("xmipp3.base", 'getXmippPath')
+getXmippPath = pwem.Domain.importFromPlugin("xmipp3.base", 'getXmippPath')
 
 _logo = "logo.png"
 
-class Plugin(pyworkflow.em.Plugin):
+class Plugin(pwem.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
     _pathVars = [CONTINUOUSFLEX_HOME]
     _supportedVersions = [VV]
@@ -81,7 +81,26 @@ class Plugin(pyworkflow.em.Plugin):
     @classmethod
     def defineBinaries(cls, env):
 
-        env.addPackage('nma', version='2.0', deps=['arpack'],
+        lapack = env.addLibrary(
+            'lapack',
+            tar='lapack-3.5.0.tgz',
+            flags=['-DBUILD_SHARED_LIBS:BOOL=ON',
+                   '-DLAPACKE:BOOL=ON'],
+            cmake=True,
+            neededProgs=['gfortran'],
+            default=False)
+
+        arpack = env.addLibrary(
+            'arpack',
+            tar='arpack-96.tgz',
+            neededProgs=['gfortran'],
+            commands=[('cd ' + env.getBinFolder() + '; ln -s $(which gfortran) f77',
+                       env.getBinFolder() + '/f77'),
+                      ('cd ' + env.getTmpFolder() + '/arpack-96; make all',
+                       env.getLibFolder() + '/libarpack.a')])
+        # See http://modb.oce.ulg.ac.be/mediawiki/index.php/How_to_compile_ARPACK
+
+        env.addPackage('nma', version='2.0', deps=[arpack, lapack],
                        url='https://github.com/slajo/NMA_basic_code/raw/master/nma.tgz',
                        createBuildDir=False,
                        buildDir='nma',
@@ -93,7 +112,6 @@ class Plugin(pyworkflow.em.Plugin):
                        neededProgs=['gfortran'], default=True)
 
 
-pyworkflow.em.Domain.registerPlugin(__name__)
 
 
 

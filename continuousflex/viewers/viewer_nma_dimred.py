@@ -22,7 +22,7 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-from xmipp3.protocols.nma.data import PathData
+from continuousflex.protocols.data import PathData
 """
 This module implement the wrappers aroung Xmipp CL2D protocol
 visualization program.
@@ -31,15 +31,15 @@ visualization program.
 from os.path import basename, join, exists
 import numpy as np
 
-from pyworkflow.em.convert.atom_struct import cifToPdb
+from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import replaceBaseExt
 
 from pyworkflow.utils.path import cleanPath, makePath, cleanPattern
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.protocol.params import StringParam, LabelParam
-from pyworkflow.em.data import SetOfParticles
+from pwem.objects import SetOfParticles
 from pyworkflow.utils.process import runJob
-from pyworkflow.em.viewers import VmdView
+from pwem.viewers import VmdView
 from pyworkflow.gui.browser import FileBrowserWindow
 
 from continuousflex.protocols.protocol_nma_dimred import FlexProtDimredNMA
@@ -116,7 +116,7 @@ class FlexDimredNMAViewer(ProtocolViewer):
             plotter = FlexNmaPlotter(data=self.getData())
             baseList = [basename(n) for n in modeNameList]
             
-	    self.getData().XIND = modeList[0]
+            self.getData().XIND = modeList[0]
             if dim == 1:
                 plotter.plotArray1D("Histogram of normal-mode amplitudes in low-dimensional space: %s" % baseList[0], 
                                     "Amplitude", "Number of images")
