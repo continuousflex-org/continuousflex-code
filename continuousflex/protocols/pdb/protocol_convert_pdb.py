@@ -33,12 +33,12 @@ import sys
 
 import pyworkflow.protocol.params as params
 import pyworkflow.protocol.constants as const
-import pyworkflow.em as em
-from pyworkflow.em.convert.atom_struct import cifToPdb
+import pwem as em
+from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import replaceBaseExt, removeExt, getExt
 
 
-class FlexProtConvertPdb(em.ProtInitialVolume):
+class FlexProtConvertPdb(em.protocols.ProtInitialVolume):
     """ Convert a PDB file into a volume.  """
     _label = 'convert a PDB'
     IMPORT_FROM_ID = 0
@@ -153,7 +153,7 @@ class FlexProtConvertPdb(em.ProtInitialVolume):
         errors = []
         if self.inputPdbData == self.IMPORT_FROM_ID:
             lenStr = len(self.pdbId.get())
-            if lenStr <> 4:
+            if lenStr != 4:
                 errors = ["Pdb id is composed only by four alphanumeric characters"]
         
         return errors

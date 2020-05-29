@@ -27,7 +27,7 @@
 This module implement the classes to create plots on xmipp.
 """
 
-from pyworkflow.em.viewers.plotter import EmPlotter
+from pwem.viewers.plotter import EmPlotter
 
 
 class FlexPlotter(EmPlotter):

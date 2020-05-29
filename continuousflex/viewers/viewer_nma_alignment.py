@@ -108,7 +108,7 @@ class FlexAlignmentNMAViewer(ProtocolViewer):
             plotter = FlexNmaPlotter(data=self.getData())
             baseList = [basename(n) for n in modeNameList]
             
-	    self.getData().XIND = modeList[0]
+            self.getData().XIND = modeList[0]
             if dim == 1:
                 plotter.plotArray1D("Histogram of normal-mode amplitudes: %s" % baseList[0], 
                                     "Amplitude", "Number of images")

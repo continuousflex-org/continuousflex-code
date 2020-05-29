@@ -30,7 +30,7 @@ import os
 from collections import OrderedDict
 
 from pyworkflow.utils import Environ
-from pyworkflow.em.data import NormalMode
+from pwem.objects import NormalMode
 
 import xmippLib
 from xmipp3.convert import rowToObject, objectToRow

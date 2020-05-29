@@ -25,7 +25,7 @@
 # **************************************************************************
 
 from os.path import basename
-import Tkinter as tk
+import tkinter as tk
 
 import pyworkflow.gui as gui
 from pyworkflow.gui.widgets import Button, HotButton
