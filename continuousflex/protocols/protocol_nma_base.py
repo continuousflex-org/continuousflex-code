@@ -28,8 +28,9 @@
 # **************************************************************************
 
 
-import xmippLib
 from pwem import *
+import pwem.emlib.lib
+from pwem.protocols import EMProtocol
 from pyworkflow.protocol.params import IntParam, FloatParam, EnumParam
 from pyworkflow.utils import *
 from pyworkflow.utils.path import makePath, cleanPath, moveFile
@@ -42,7 +43,7 @@ NMA_CUTOFF_ABS = 0
 NMA_CUTOFF_REL = 1
 
 
-class FlexProtNMABase(pwem.protocols.EMProtocol):
+class FlexProtNMABase(EMProtocol):
     """ Protocol for flexible analysis using NMA. """
     _label = 'nma analysis'
 

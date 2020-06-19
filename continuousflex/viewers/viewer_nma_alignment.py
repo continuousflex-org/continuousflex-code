@@ -29,9 +29,9 @@ visualization program.
 
 from os.path import basename
 
+from pwem.emlib import MetaData, MDL_ORDER
 from pyworkflow.protocol.params import StringParam
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
-import xmippLib
 
 from continuousflex.protocols.data import Point, Data
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
@@ -89,9 +89,9 @@ class FlexAlignmentNMAViewer(ProtocolViewer):
             
             for modeNumber in components:
                 found = False
-                md = xmippLib.MetaData(self.protocol._getExtraPath('modes.xmd'))
+                md = MetaData(self.protocol._getExtraPath('modes.xmd'))
                 for i, objId in enumerate(md):
-                    modeId = md.getValue(xmippLib.MDL_ORDER, objId)
+                    modeId = md.getValue(MDL_ORDER, objId)
                     if modeNumber == modeId:
                         modeNameList.append('Mode %d' % modeNumber)
                         modeList.append(i)
