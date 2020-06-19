@@ -29,15 +29,13 @@ import os
 import numpy as np
 
 import pwem.emlib.metadata as md
-import pwem as em
 from pwem.emlib import MetaData, MDL_IMAGE
+from pwem.objects import Volume, SetOfVolumes
 from pwem.protocols import EMProtocol
 import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
 from pyworkflow.protocol.constants import LEVEL_ADVANCED, STEPS_PARALLEL
 from pyworkflow.utils.path import cleanPattern, copyFile, makePath
-# from pyworkflow.object import String
-# from pyworkflow.em.data import SetOfNormalModes
 
 from xmipp3.convert import getImageLocation
 # from xmipp3.base import XmippMdRow
@@ -311,10 +309,10 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
             if item is None:
                 break
             itemId = item.getObjId()
-            if isinstance(item, em.Volume):
+            if isinstance(item, Volume):
                 item.outputName = self._getExtraPath('output_vol%06d.vol' % itemId)
                 yield item
-            elif isinstance(item, em.SetOfVolumes):
+            elif isinstance(item, SetOfVolumes):
                 for vol in item:
                     vol.outputName = self._getExtraPath('output_vol%06d_%03d.vol' %
                                                          (itemId, vol.getObjId()))
