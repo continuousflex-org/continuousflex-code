@@ -188,7 +188,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
             # Conside the index is the id in the input set
             particle = inputSet[index]
             mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
-            mdImgs.setValue(md.MDL_ITEM_ID, long(particle.getObjId()), objId)
+            mdImgs.setValue(md.MDL_ITEM_ID, particle.getObjId(), objId)
         mdImgs.write(self.imgsFn)
         
     def performNmaStep(self, atomsFn, modesFn):
@@ -220,7 +220,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
             # Conside the index is the id in the input set
             particle = inputSet[index]
             mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
-            mdImgs.setValue(md.MDL_ITEM_ID, long(particle.getObjId()), objId)
+            mdImgs.setValue(md.MDL_ITEM_ID, particle.getObjId(), objId)
         mdImgs.write(self.imgsFn)
     
     def createOutputStep(self):
