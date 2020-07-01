@@ -78,7 +78,7 @@ class FlexAlignmentNMAViewer(ProtocolViewer):
         
     def _doViewRawDeformation(self, components):
 #        components = map(int, self.displayRawDeformation.get().split())
-        components = map(int, components.split())
+        components = list(map(int, components.split()))
         dim = len(components)
         views = []
         
@@ -131,7 +131,7 @@ class FlexAlignmentNMAViewer(ProtocolViewer):
         
         data = Data()
         for i, particle in enumerate(particles):
-            pointData = map(float, particle._xmipp_nmaDisplacements)
+            pointData = list(map(float, particle._xmipp_nmaDisplacements))
             data.addPoint(Point(pointId=particle.getObjId(),
                                 data=pointData,
                                 weight=particle._xmipp_cost.get()))

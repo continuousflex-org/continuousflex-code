@@ -221,7 +221,7 @@ class FlexProtNMABase(pwem.protocols.EMProtocol):
             objId = mdOut.addObject()
             modefile = self._getPath("modes", "vec.%d" % (n + 1))
             mdOut.setValue(xmippLib.MDL_NMA_MODEFILE, modefile, objId)
-            mdOut.setValue(xmippLib.MDL_ORDER, long(n + 1), objId)
+            mdOut.setValue(xmippLib.MDL_ORDER, n + 1, objId)
 
             if n >= 6:
                 mdOut.setValue(xmippLib.MDL_ENABLED, 1, objId)

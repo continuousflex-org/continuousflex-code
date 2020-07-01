@@ -53,7 +53,7 @@ def rowToMode(row):
 
 def modeToRow(mode, row):
     """ Write the MetaData row from a given NormalMode object. """
-    row.setValue(xmippLib.MDL_ORDER, long(mode.getObjId()))
+    row.setValue(xmippLib.MDL_ORDER, mode.getObjId())
     objectToRow(mode, row, MODE_DICT)
     
     
