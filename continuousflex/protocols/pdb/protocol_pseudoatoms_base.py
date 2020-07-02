@@ -37,7 +37,10 @@ from pyworkflow.protocol.constants import LEVEL_ADVANCED
 from pwem.protocols import Prot3D #this is not an error
 from pwem.viewers.viewer_chimera import Chimera
 from xmipp3.convert import getImageLocation
-
+try:
+    from chimera.constants import CHIMERAX
+except:
+    CHIMERAX = False
 
 NMA_MASK_NONE = 0
 NMA_MASK_THRE = 1
@@ -126,7 +129,10 @@ class FlexProtConvertToPseudoAtomsBase(Prot3D):
         store the location of the script.
         """
         pseudoatoms = pdb.getFileName()
-        scriptFile = pseudoatoms + '_chimera.cxc'
+        if CHIMERAX:
+            scriptFile = pseudoatoms + '_chimera.cxc'
+        else:
+            scriptFile = pseudoatoms + '_chimera.cmd'
         pdb._chimeraScript = String(scriptFile)
         sampling = volume.getSamplingRate()
         radius = sampling * self.pseudoAtomRadius.get()
@@ -145,26 +151,29 @@ class FlexProtConvertToPseudoAtomsBase(Prot3D):
                                  sampling=sampling)
         fhCmd = open(scriptFile, 'w')
         fhCmd.write("open %s\n" % basename(pseudoatoms))
-        fhCmd.write("color by bfactor target a range 0,0.5\n")
-        # fhCmd.write("color by bfactor,a 0 white 1 red\n")
-        fhCmd.write("setattr a radius %f\n" % radius)
-        fhCmd.write("style #1 sphere\n")
+        if CHIMERAX:
+            fhCmd.write("color by bfactor target a range 0,0.5\n")
+            fhCmd.write("setattr a radius %f\n" % radius)
+            fhCmd.write("style #1 sphere\n")
+            modelID = 1
+        else:
+            fhCmd.write("rangecol bfactor,a 0 white 1 red\n")
+            fhCmd.write("setattr a radius %f\n" % radius)
+            fhCmd.write("represent sphere\n")
+            modelID = 0
 
         fhCmd.write("open %s\n" % abspath(fnIn))
         threshold = 0.01
         if self.maskMode == NMA_MASK_THRE:
             self.maskThreshold.get()
         # set sampling
-        fhCmd.write("volume #2 level %f transparency 0.5 voxelSize %f origin "
+        fhCmd.write("volume #%d level %f transparency 0.5 voxelSize %f origin "
                     "%0.2f,%0.2f,%0.2f\n"
-                    % (threshold, sampling, x, y, z))
+                    % (modelID + 1, threshold, sampling, x, y, z))
         fhCmd.write("open %s\n" % bildFileName)
-        #fhCmd.write("move %0.2f,%0.2f,%0.2f model #0 coord #2\n"
-        #            % ((xx / 2. * sampling) - xv,
-        #               (yy / 2. * sampling) - yv,
-        #               (zz / 2. * sampling) - zv))
-        fhCmd.write("move %0.2f,%0.2f,%0.2f model #1 coord #3\n"
+        fhCmd.write("move %0.2f,%0.2f,%0.2f model #%d coord #%d\n"
                     % (x + (xx / 2. * sampling),
                        y + (yy / 2. * sampling),
-                       z + (zz / 2. * sampling)))
+                       z + (zz / 2. * sampling),
+                       modelID, modelID + 2))
         fhCmd.close()
