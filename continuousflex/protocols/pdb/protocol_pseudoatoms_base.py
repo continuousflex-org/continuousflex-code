@@ -126,7 +126,7 @@ class FlexProtConvertToPseudoAtomsBase(Prot3D):
         store the location of the script.
         """
         pseudoatoms = pdb.getFileName()
-        scriptFile = pseudoatoms + '_chimera.cmd'
+        scriptFile = pseudoatoms + '_chimera.cxc'
         pdb._chimeraScript = String(scriptFile)
         sampling = volume.getSamplingRate()
         radius = sampling * self.pseudoAtomRadius.get()
@@ -145,16 +145,17 @@ class FlexProtConvertToPseudoAtomsBase(Prot3D):
                                  sampling=sampling)
         fhCmd = open(scriptFile, 'w')
         fhCmd.write("open %s\n" % basename(pseudoatoms))
-        fhCmd.write("rangecol bfactor,a 0 white 1 red\n")
+        fhCmd.write("color by bfactor target a range 0,0.5\n")
+        # fhCmd.write("color by bfactor,a 0 white 1 red\n")
         fhCmd.write("setattr a radius %f\n" % radius)
-        fhCmd.write("represent sphere\n")
+        fhCmd.write("style #1 sphere\n")
 
         fhCmd.write("open %s\n" % abspath(fnIn))
         threshold = 0.01
         if self.maskMode == NMA_MASK_THRE:
             self.maskThreshold.get()
         # set sampling
-        fhCmd.write("volume #1 level %f transparency 0.5 voxelSize %f origin "
+        fhCmd.write("volume #2 level %f transparency 0.5 voxelSize %f origin "
                     "%0.2f,%0.2f,%0.2f\n"
                     % (threshold, sampling, x, y, z))
         fhCmd.write("open %s\n" % bildFileName)
@@ -162,7 +163,7 @@ class FlexProtConvertToPseudoAtomsBase(Prot3D):
         #            % ((xx / 2. * sampling) - xv,
         #               (yy / 2. * sampling) - yv,
         #               (zz / 2. * sampling) - zv))
-        fhCmd.write("move %0.2f,%0.2f,%0.2f model #0 coord #2\n"
+        fhCmd.write("move %0.2f,%0.2f,%0.2f model #1 coord #3\n"
                     % (x + (xx / 2. * sampling),
                        y + (yy / 2. * sampling),
                        z + (zz / 2. * sampling)))
