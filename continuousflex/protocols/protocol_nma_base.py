@@ -93,7 +93,7 @@ class FlexProtNMABase(pwem.protocols.EMProtocol):
     def _printWarnings(self, *lines):
         """ Print some warning lines to 'warnings.xmd', 
         the function should be called inside the working dir."""
-        fWarn = open("warnings.xmd", 'wa')
+        fWarn = open("warnings.xmd", 'a')
         for l in lines:
             print( fWarn, l)
         fWarn.close()
