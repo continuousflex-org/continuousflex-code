@@ -24,8 +24,12 @@
 # **************************************************************************
 
 
-from xmippLib import MetaData, MDL_NMA, MDL_ENABLED, MDL_NMA_MINRANGE, \
-    MDL_NMA_MAXRANGE
+from pwem.emlib import (MetaData, MDL_NMA, MDL_ENABLED, MDL_NMA_MINRANGE,
+                        MDL_NMA_MAXRANGE)
+from pwem.objects import AtomStruct
+from pyworkflow.protocol import STEPS_PARALLEL, PointerParam, BooleanParam
+from xmipp3.convert import getImageLocation
+from . import FlexProtConvertToPseudoAtomsBase
 from .protocol_nma_base import *
 
 

@@ -32,7 +32,7 @@ from pyworkflow.protocol.params import LabelParam, IntParam
 from pyworkflow.viewer import ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO
 from pwem.viewers import ObjectView, VmdView
 
-import xmippLib
+import pwem.emlib.lib
 from continuousflex.protocols import FlexProtNMA
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 
