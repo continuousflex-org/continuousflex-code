@@ -25,15 +25,14 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-
-
-from pyworkflow.em.protocol import ProtImportPdb, ProtImportVolumes, ProtImportParticles
+from pwem.protocols import ProtImportPdb, ProtImportParticles, ProtImportVolumes
+from pwem.tests.workflows import TestWorkflow
+from pwem import Domain
 from pyworkflow.tests import setupTestProject, DataSet
-from pyworkflow.utils import importFromPlugin
-from pyworkflow.tests.em.workflows.test_workflow import TestWorkflow
 
-from continuousflex.protocols import FlexProtNMA, FlexProtAlignmentNMA, \
-    FlexProtDimredNMA, NMA_CUTOFF_ABS, FlexProtConvertToPseudoAtoms
+from continuousflex.protocols import (FlexProtNMA, FlexProtAlignmentNMA,
+                                      FlexProtDimredNMA, NMA_CUTOFF_ABS,
+                                      FlexProtConvertToPseudoAtoms)
 
 
 class TestNMA(TestWorkflow):
@@ -103,7 +102,7 @@ class TestNMA(TestWorkflow):
         self.launchProtocol(protImportVol)
         
         # Convert the Volume to Pdb
-        NMA_MASK_THRE = importFromPlugin('xmipp3.protocols.pdb.protocol_pseudoatoms_base',
+        NMA_MASK_THRE = Domain.importFromPlugin('xmipp3.protocols.pdb.protocol_pseudoatoms_base',
                                          'NMA_MASK_THRE')
         protConvertVol = self.newProtocol(FlexProtConvertToPseudoAtoms)
         protConvertVol.inputStructure.set(protImportVol.outputVolume)
