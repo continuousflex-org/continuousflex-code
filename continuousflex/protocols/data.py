@@ -29,7 +29,7 @@ Define some classes to store Data points for clustering.
 """
 
 
-class Point():
+class Point:
     """ Return x, y 2d coordinates and some other properties
     such as weight and state.
     """

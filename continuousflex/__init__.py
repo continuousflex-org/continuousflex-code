@@ -80,7 +80,7 @@ class Plugin(pwem.Plugin):
 
     @classmethod
     def defineBinaries(cls, env):
-
+        os.environ['PATH'] += os.pathsep + env.getBinFolder()
         lapack = env.addLibrary(
             'lapack',
             tar='lapack-3.5.0.tgz',

@@ -28,8 +28,10 @@
 # **************************************************************************
 
 
-import xmippLib
 from pwem import *
+from pwem.emlib import (MetaData, MDL_X, MDL_COUNT, MDL_NMA_MODEFILE, MDL_ORDER,
+                        MDL_ENABLED, MDL_NMA_COLLECTIVITY, MDL_NMA_SCORE)
+from pwem.protocols import EMProtocol
 from pyworkflow.protocol.params import IntParam, FloatParam, EnumParam
 from pyworkflow.utils import *
 from pyworkflow.utils.path import makePath, cleanPath, moveFile
@@ -42,7 +44,7 @@ NMA_CUTOFF_ABS = 0
 NMA_CUTOFF_REL = 1
 
 
-class FlexProtNMABase(pwem.protocols.EMProtocol):
+class FlexProtNMABase(EMProtocol):
     """ Protocol for flexible analysis using NMA. """
     _label = 'nma analysis'
 
@@ -93,7 +95,7 @@ class FlexProtNMABase(pwem.protocols.EMProtocol):
     def _printWarnings(self, *lines):
         """ Print some warning lines to 'warnings.xmd', 
         the function should be called inside the working dir."""
-        fWarn = open("warnings.xmd", 'wa')
+        fWarn = open("warnings.xmd", 'a')
         for l in lines:
             print( fWarn, l)
         fWarn.close()
@@ -128,9 +130,9 @@ class FlexProtNMABase(pwem.protocols.EMProtocol):
         return rc
 
     def _computeCutoff(self, fnHist, rcPercentage):
-        mdHist = xmippLib.MetaData(fnHist)
-        distances = mdHist.getColumnValues(xmippLib.MDL_X)
-        distanceCount = mdHist.getColumnValues(xmippLib.MDL_COUNT)
+        mdHist = MetaData(fnHist)
+        distances = mdHist.getColumnValues(MDL_X)
+        distanceCount = mdHist.getColumnValues(MDL_COUNT)
         # compute total number of distances
         nCounts = 0
         for count in distanceCount:
@@ -210,7 +212,7 @@ class FlexProtNMABase(pwem.protocols.EMProtocol):
         cleanPath(fnDiag)
 
         fh = open("Chkmod.res")
-        mdOut = xmippLib.MetaData()
+        mdOut = MetaData()
         collectivityList = []
 
         for n in range(len(fnVec)):
@@ -220,17 +222,17 @@ class FlexProtNMABase(pwem.protocols.EMProtocol):
 
             objId = mdOut.addObject()
             modefile = self._getPath("modes", "vec.%d" % (n + 1))
-            mdOut.setValue(xmippLib.MDL_NMA_MODEFILE, modefile, objId)
-            mdOut.setValue(xmippLib.MDL_ORDER, long(n + 1), objId)
+            mdOut.setValue(MDL_NMA_MODEFILE, modefile, objId)
+            mdOut.setValue(MDL_ORDER, int(n + 1), objId)
 
             if n >= 6:
-                mdOut.setValue(xmippLib.MDL_ENABLED, 1, objId)
+                mdOut.setValue(MDL_ENABLED, 1, objId)
             else:
-                mdOut.setValue(xmippLib.MDL_ENABLED, -1, objId)
-            mdOut.setValue(xmippLib.MDL_NMA_COLLECTIVITY, collectivity, objId)
+                mdOut.setValue(MDL_ENABLED, -1, objId)
+            mdOut.setValue(MDL_NMA_COLLECTIVITY, collectivity, objId)
 
             if collectivity < collectivityThreshold:
-                mdOut.setValue(xmippLib.MDL_ENABLED, -1, objId)
+                mdOut.setValue(MDL_ENABLED, -1, objId)
         fh.close()
         idxSorted = [i[0] for i in sorted(enumerate(collectivityList), key=lambda x: x[1], reverse=True)]
 
@@ -250,7 +252,7 @@ class FlexProtNMABase(pwem.protocols.EMProtocol):
         i = 0
         for objId in mdOut:
             score_i = float(score[i]) / (2.0 * l)
-            mdOut.setValue(xmippLib.MDL_NMA_SCORE, score_i, objId)
+            mdOut.setValue(MDL_NMA_SCORE, score_i, objId)
             i += 1
         mdOut.write("modes%s.xmd" % suffix)
         cleanPath("Chkmod.res")
