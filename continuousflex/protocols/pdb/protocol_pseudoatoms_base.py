@@ -126,14 +126,13 @@ class FlexProtConvertToPseudoAtomsBase(Prot3D):
         store the location of the script.
         """
         pseudoatoms = pdb.getFileName()
-        scriptFile = pseudoatoms + '_chimera.cmd'
+        scriptFile = pseudoatoms + '_chimera.cxc'
         pdb._chimeraScript = String(scriptFile)
         sampling = volume.getSamplingRate()
         radius = sampling * self.pseudoAtomRadius.get()
         fnIn = getImageLocation(volume)
         if fnIn.endswith(":mrc"):
             fnIn = fnIn[:-4]
-
 
         x, y, z = volume.getOrigin(force=True).getShifts()
         xx, yy, zz = volume.getDim()
@@ -143,27 +142,24 @@ class FlexProtConvertToPseudoAtomsBase(Prot3D):
         Chimera.createCoordinateAxisFile(dim,
                                  bildFileName=bildFileName,
                                  sampling=sampling)
-        fhCmd = open(scriptFile, 'w')
-        fhCmd.write("open %s\n" % basename(pseudoatoms))
-        fhCmd.write("rangecol bfactor,a 0 white 1 red\n")
-        fhCmd.write("setattr a radius %f\n" % radius)
-        fhCmd.write("represent sphere\n")
-
-        fhCmd.write("open %s\n" % abspath(fnIn))
+        fhCxc = open(scriptFile, 'w')
+        fhCxc.write("open %s\n" % basename(pseudoatoms))
+        fhCxc.write("color by bfactor target a range 0,0.5\n")
+        fhCxc.write("setattr a radius %f\n" % radius)
+        fhCxc.write("style #1 sphere\n")
+        modelID = 1
+        fhCxc.write("open %s\n" % abspath(fnIn))
         threshold = 0.01
         if self.maskMode == NMA_MASK_THRE:
             self.maskThreshold.get()
         # set sampling
-        fhCmd.write("volume #1 level %f transparency 0.5 voxelSize %f origin "
+        fhCxc.write("volume #%d level %f transparency 0.5 voxelSize %f origin "
                     "%0.2f,%0.2f,%0.2f\n"
-                    % (threshold, sampling, x, y, z))
-        fhCmd.write("open %s\n" % bildFileName)
-        #fhCmd.write("move %0.2f,%0.2f,%0.2f model #0 coord #2\n"
-        #            % ((xx / 2. * sampling) - xv,
-        #               (yy / 2. * sampling) - yv,
-        #               (zz / 2. * sampling) - zv))
-        fhCmd.write("move %0.2f,%0.2f,%0.2f model #0 coord #2\n"
+                    % (modelID + 1, threshold, sampling, x, y, z))
+        fhCxc.write("open %s\n" % bildFileName)
+        fhCxc.write("move %0.2f,%0.2f,%0.2f model #%d coord #%d\n"
                     % (x + (xx / 2. * sampling),
                        y + (yy / 2. * sampling),
-                       z + (zz / 2. * sampling)))
-        fhCmd.close()
+                       z + (zz / 2. * sampling),
+                       modelID, modelID + 2))
+        fhCxc.close()
