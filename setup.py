@@ -45,6 +45,9 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 # Arguments marked as "Required" below must be included for upload to PyPI.
 # Fields marked as "Optional" may be commented out.
+# Load requirements.txt
+with open('requirements.txt') as f:
+    requirements = f.read().splitlines()
 
 setup(
     # This is the name of your project. The first time you publish this
@@ -142,7 +145,7 @@ setup(
     #
     # For an analysis of "install_requires" vs pip's requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    #install_requires=['peppercorn'],  # Optional
+    install_requires=[requirements],  # Optional
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). Users will be able to install these using the "extras"
