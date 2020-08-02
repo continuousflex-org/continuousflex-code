@@ -41,6 +41,7 @@ class Plugin(pwem.Plugin):
     def _defineVariables(cls):
         cls._defineEmVar(CONTINUOUSFLEX_HOME, 'xmipp')
         cls._defineEmVar(NMA_HOME,'nma')
+        cls._defineVar(VMD_HOME,'/usr/local/lib/vmd')
 
     #   @classmethod
     #   def getEnviron(cls):
