@@ -70,7 +70,7 @@ class PointSelector():
         if event.inaxes != self.rectangle_selection.axes: 
             return
         # ignore click event if toolbar is active
-        if self.ax.get_navigate_mode() is not None and self.ax.get_navigate_mode() != '':
+        if self.ax.get_navigate_mode():
             return
         
         self.press = True
@@ -95,7 +95,7 @@ class PointSelector():
         If addSelected is True, update the data selection.
         """
         # ignore click event if toolbar is active
-        if self.ax.get_navigate_mode() is not None and self.ax.get_navigate_mode() != '':
+        if self.ax.get_navigate_mode():
             return
         ox, oy = self.originX, self.originY
         ex, ey = event.xdata, event.ydata
