@@ -102,7 +102,7 @@ class Plugin(pwem.Plugin):
         # See http://modb.oce.ulg.ac.be/mediawiki/index.php/How_to_compile_ARPACK
 
         env.addPackage('nma', version='2.0', deps=[arpack, lapack],
-                       url='https://github.com/slajo/NMA_basic_code/raw/master/nma.tgz',
+                       url='https://github.com/slajo/NMA_basic_code/raw/master/nma_v3.tar',
                        createBuildDir=False,
                        buildDir='nma',
                        target="nma",
