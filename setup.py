@@ -199,7 +199,7 @@ setup(
     # maintainers, and where to support the project financially. The key is
     # what's used to render the link text on PyPI.
     project_urls={  # Optional
-        'Bug Reports': 'slavica.jonic@upmc.fr',
+        'Bug Reports': 'https://github.com/scipion-em/scipion-em-continuousflex/issues',
         'Source': 'https://github.com/scipion-em/scipion-em-continuousflex/',
     },
 )
