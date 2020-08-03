@@ -31,14 +31,14 @@ import os
 import math
 from os.path import basename, exists, join
 
-from pyworkflow.em.convert.atom_struct import cifToPdb
+from pwem.convert.atom_struct import cifToPdb
+from pwem.emlib import MetaData, MDL_NMA_ATOMSHIFT, MDL_NMA_MODEFILE
 from pyworkflow.utils import redStr, replaceBaseExt
 from pyworkflow.utils.path import copyFile, createLink, makePath, cleanPath, moveFile
 from pyworkflow.protocol.params import (PointerParam, IntParam, FloatParam, 
                                         LEVEL_ADVANCED)
-from pyworkflow.em.data import SetOfNormalModes
+from pwem.objects import SetOfNormalModes
 
-import xmippLib
 from xmipp3.base import XmippMdRow
 from .protocol_nma_base import FlexProtNMABase, NMA_CUTOFF_REL
 from .convert import rowToMode, getNMAEnviron
@@ -116,16 +116,15 @@ class FlexProtNMA(FlexProtNMABase):
                 first_line = fh.readline()
                 second_line = fh.readline()
                 self.pseudoAtomRadius = float(second_line.split()[2])
-	    if self.cutoffMode == NMA_CUTOFF_REL:
+            if self.cutoffMode == NMA_CUTOFF_REL:
                 params = '-i %s --operation distance_histogram %s' \
                      % (localFn, self._getExtraPath('pseudoatoms_distance.hist'))
                 self._insertRunJobStep("xmipp_pdb_analysis", params)
             self._insertFunctionStep('computeModesStep', localFn, n, cutoffStr)
             self._insertFunctionStep('reformatOutputStep',"pseudoatoms.pdb")
         else:
-	    if self.cutoffMode == NMA_CUTOFF_REL:
-                params = '-i %s --operation distance_histogram %s' \
-                     % (localFn, self._getExtraPath('atoms_distance.hist'))
+            if self.cutoffMode == NMA_CUTOFF_REL:
+                params = '-i %s --operation distance_histogram %s' % (localFn, self._getExtraPath('atoms_distance.hist'))
                 self._insertRunJobStep("xmipp_pdb_analysis", params)
             self._insertFunctionStep('computePdbModesStep', n,
                                      self.rtbBlockSize.get(),
@@ -160,8 +159,8 @@ class FlexProtNMA(FlexProtNMABase):
         rc = self._getRc(self._getExtraPath('atoms_distance.hist'))
                 
         self._enterWorkingDir()
-	# For atoms, the interaction force constant was set to 10 as ElNemo RTB code may ask for its value \
-	# (the RTBForceConstant entry was removed from gui as the value does not change the ENM computed normal modes).
+        # For atoms, the interaction force constant was set to 10 as ElNemo RTB code may ask for its value \
+	    # (the RTBForceConstant entry was removed from gui as the value does not change the ENM computed normal modes).
         self.runJob('nma_record_info_PDB.py', "%d %d atoms.pdb %f %f"
                     % (numberOfModes, RTBblockSize, rc, 10.0),
                     env=getNMAEnviron())
@@ -264,7 +263,7 @@ class FlexProtNMA(FlexProtNMABase):
             fnVec = self._getPath("modes", "vec.%d" % n)
             if exists(fnVec):
                 fhIn = open(fnVec)
-                md = xmippLib.MetaData()
+                md = MetaData()
                 atomCounter = 0
                 for line in fhIn:
                     x, y, z = map(float, line.split())
@@ -277,23 +276,23 @@ class FlexProtNMA(FlexProtNMABase):
                             maxShift[atomCounter]=d
                             maxShiftMode[atomCounter]=n
                     atomCounter+=1
-                    md.setValue(xmippLib.MDL_NMA_ATOMSHIFT,d,md.addObject())
+                    md.setValue(MDL_NMA_ATOMSHIFT,d,md.addObject())
                 md.write(join(fnOutDir,"vec%d.xmd" % n))
                 fhIn.close()
-        md = xmippLib.MetaData()
+        md = MetaData()
         for i, _ in enumerate(maxShift):
             fnVec = self._getPath("modes", "vec.%d" % (maxShiftMode[i]+1))
             if exists(fnVec):
                 objId = md.addObject()
-                md.setValue(xmippLib.MDL_NMA_ATOMSHIFT, maxShift[i],objId)
-                md.setValue(xmippLib.MDL_NMA_MODEFILE, fnVec, objId)
+                md.setValue(MDL_NMA_ATOMSHIFT, maxShift[i],objId)
+                md.setValue(MDL_NMA_MODEFILE, fnVec, objId)
         md.write(self._getExtraPath('maxAtomShifts.xmd'))
                                                       
     def createOutputStep(self):
         fnSqlite = self._getPath('modes.sqlite')
         nmSet = SetOfNormalModes(filename=fnSqlite)
 
-        md = xmippLib.MetaData(self._getPath('modes.xmd'))
+        md = MetaData(self._getPath('modes.xmd'))
         row = XmippMdRow()
         
         for objId in md:

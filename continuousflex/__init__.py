@@ -25,14 +25,15 @@
 # **************************************************************************
 import os
 
-import pyworkflow.em
+import pwem
 from continuousflex.constants import *
 import pyworkflow.utils as pwutils
-getXmippPath = importFromPlugin("xmipp3.base", 'getXmippPath')
+getXmippPath = pwem.Domain.importFromPlugin("xmipp3.base", 'getXmippPath')
 
 _logo = "logo.png"
+__version__ = "3.0.0b1"
 
-class Plugin(pyworkflow.em.Plugin):
+class Plugin(pwem.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
     _pathVars = [CONTINUOUSFLEX_HOME]
     _supportedVersions = [VV]
@@ -41,6 +42,7 @@ class Plugin(pyworkflow.em.Plugin):
     def _defineVariables(cls):
         cls._defineEmVar(CONTINUOUSFLEX_HOME, 'xmipp')
         cls._defineEmVar(NMA_HOME,'nma')
+        cls._defineVar(VMD_HOME,'/usr/local/lib/vmd')
 
     #   @classmethod
     #   def getEnviron(cls):
@@ -80,9 +82,28 @@ class Plugin(pyworkflow.em.Plugin):
 
     @classmethod
     def defineBinaries(cls, env):
+        os.environ['PATH'] += os.pathsep + env.getBinFolder()
+        lapack = env.addLibrary(
+            'lapack',
+            tar='lapack-3.5.0.tgz',
+            flags=['-DBUILD_SHARED_LIBS:BOOL=ON',
+                   '-DLAPACKE:BOOL=ON'],
+            cmake=True,
+            neededProgs=['gfortran'],
+            default=False)
 
-        env.addPackage('nma', version='2.0', deps=['arpack'],
-                       url='https://github.com/slajo/NMA_basic_code/raw/master/nma.tgz',
+        arpack = env.addLibrary(
+            'arpack',
+            tar='arpack-96.tgz',
+            neededProgs=['gfortran'],
+            commands=[('cd ' + env.getBinFolder() + '; ln -s $(which gfortran) f77',
+                       env.getBinFolder() + '/f77'),
+                      ('cd ' + env.getTmpFolder() + '/arpack-96; make all',
+                       env.getLibFolder() + '/libarpack.a')])
+        # See http://modb.oce.ulg.ac.be/mediawiki/index.php/How_to_compile_ARPACK
+
+        env.addPackage('nma', version='2.0', deps=[arpack, lapack],
+                       url='https://github.com/slajo/NMA_basic_code/raw/master/nma_v3.tar',
                        createBuildDir=False,
                        buildDir='nma',
                        target="nma",
@@ -93,7 +114,6 @@ class Plugin(pyworkflow.em.Plugin):
                        neededProgs=['gfortran'], default=True)
 
 
-pyworkflow.em.Domain.registerPlugin(__name__)
 
 
 

@@ -25,11 +25,10 @@
 # *
 # **************************************************************************
 
-from pyworkflow.utils import importFromPlugin
-
 
 CONTINUOUSFLEX_HOME = 'CONTINUOUSFLEX_HOME'
 NMA_HOME = 'NMA_HOME'
+VMD_HOME = 'VMD_HOME'
 
 # Supported versions
 VV = '0.6'

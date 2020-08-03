@@ -22,7 +22,7 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-from xmipp3.protocols.nma.data import PathData
+from continuousflex.protocols.data import PathData
 """
 This module implement the wrappers aroung Xmipp CL2D protocol
 visualization program.
@@ -31,15 +31,15 @@ visualization program.
 from os.path import basename, join, exists
 import numpy as np
 
-from pyworkflow.em.convert.atom_struct import cifToPdb
+from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import replaceBaseExt
 
 from pyworkflow.utils.path import cleanPath, makePath, cleanPattern
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.protocol.params import StringParam, LabelParam
-from pyworkflow.em.data import SetOfParticles
+from pwem.objects import SetOfParticles
 from pyworkflow.utils.process import runJob
-from pyworkflow.em.viewers import VmdView
+from pwem.viewers import VmdView
 from pyworkflow.gui.browser import FileBrowserWindow
 
 from continuousflex.protocols.protocol_nma_dimred import FlexProtDimredNMA
@@ -99,7 +99,7 @@ class FlexDimredNMAViewer(ProtocolViewer):
         
     def _doViewRawDeformation(self, components):
 #        components = map(int, self.displayRawDeformation.get().split())
-        components = map(int, components.split())
+        components = list(map(int, components.split()))
         dim = len(components)
         views = []
         
@@ -116,7 +116,7 @@ class FlexDimredNMAViewer(ProtocolViewer):
             plotter = FlexNmaPlotter(data=self.getData())
             baseList = [basename(n) for n in modeNameList]
             
-	    self.getData().XIND = modeList[0]
+            self.getData().XIND = modeList[0]
             if dim == 1:
                 plotter.plotArray1D("Histogram of normal-mode amplitudes in low-dimensional space: %s" % baseList[0], 
                                     "Amplitude", "Number of images")
@@ -182,6 +182,7 @@ class FlexDimredNMAViewer(ProtocolViewer):
         newProt.sqliteFile.set(fnSqlite)
         
         project.launchProtocol(newProt)
+        project.getRunsGraph()
         
     def _loadAnimationData(self, obj):
         prot = self.protocol
@@ -263,8 +264,8 @@ class FlexDimredNMAViewer(ProtocolViewer):
         # iterating going up and down through all points
         # 1 2 3 ... n-2 n-1 n n-1 n-2 ... 3, 2
         n = len(deformations)
-        r1 = range(1, n+1)
-        r2 = range(2, n) # Skip 1 at the end
+        r1 = list(range(1, n+1))
+        r2 = list(range(2, n)) # Skip 1 at the end
         r2.reverse()
         loop = r1 + r2
         

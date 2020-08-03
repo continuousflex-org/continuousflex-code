@@ -28,8 +28,10 @@
 # **************************************************************************
 
 
-import xmippLib
-from pyworkflow.em import *
+from pwem import *
+from pwem.emlib import (MetaData, MDL_X, MDL_COUNT, MDL_NMA_MODEFILE, MDL_ORDER,
+                        MDL_ENABLED, MDL_NMA_COLLECTIVITY, MDL_NMA_SCORE)
+from pwem.protocols import EMProtocol
 from pyworkflow.protocol.params import IntParam, FloatParam, EnumParam
 from pyworkflow.utils import *
 from pyworkflow.utils.path import makePath, cleanPath, moveFile
@@ -93,9 +95,9 @@ class FlexProtNMABase(EMProtocol):
     def _printWarnings(self, *lines):
         """ Print some warning lines to 'warnings.xmd', 
         the function should be called inside the working dir."""
-        fWarn = open("warnings.xmd", 'wa')
+        fWarn = open("warnings.xmd", 'a')
         for l in lines:
-            print >> fWarn, l
+            print( fWarn, l)
         fWarn.close()
 
     def computeModesStep(self, fnPseudoatoms, numberOfModes, cutoffStr):
@@ -128,9 +130,9 @@ class FlexProtNMABase(EMProtocol):
         return rc
 
     def _computeCutoff(self, fnHist, rcPercentage):
-        mdHist = xmippLib.MetaData(fnHist)
-        distances = mdHist.getColumnValues(xmippLib.MDL_X)
-        distanceCount = mdHist.getColumnValues(xmippLib.MDL_COUNT)
+        mdHist = MetaData(fnHist)
+        distances = mdHist.getColumnValues(MDL_X)
+        distanceCount = mdHist.getColumnValues(MDL_COUNT)
         # compute total number of distances
         nCounts = 0
         for count in distanceCount:
@@ -188,23 +190,21 @@ class FlexProtNMABase(EMProtocol):
             msg += "However, the protocol allows only up to 200 modes as 20-100 modes are usually enough. If the number of"
             msg += "modes is below the minimum between these two numbers, consider increasing cut-off distance."
             self._printWarnings(redStr(msg % (len(fnVec), numberOfModes)))
-            print redStr('Warning: There are only %d modes instead of %d.' % (len(fnVec), numberOfModes))
-            print redStr("Check the number of modes you asked to compute and/or consider increasing cut-off distance.")
-            print redStr("The maximum number of modes allowed by the method for atomic normal mode analysis is 6 times")
-            print redStr(
-                "the number of RTB blocks and for pseudoatomic normal mode analysis 3 times the number of pseudoatoms.")
-            print redStr(
-                "However, the protocol allows only up to 200 modes as 20-100 modes are usually enough. If the number of")
-            print redStr("modes is below the minimum between these two numbers, consider increasing cut-off distance.")
+            print(redStr('Warning: There are only %d modes instead of %d.' % (len(fnVec), numberOfModes)))
+            print(redStr("Check the number of modes you asked to compute and/or consider increasing cut-off distance."))
+            print(redStr("The maximum number of modes allowed by the method for atomic normal mode analysis is 6 times"))
+            print(redStr("the number of RTB blocks and for pseudoatomic normal mode analysis 3 times the number of pseudoatoms."))
+            print(redStr("However, the protocol allows only up to 200 modes as 20-100 modes are usually enough. If the number of"))
+            print(redStr("modes is below the minimum between these two numbers, consider increasing cut-off distance."))
 
         fnDiag = "diagrtb.eigenfacs"
 
         if structureEM:
-	    if which("csh") != "":
-            	self.runJob("nma_reformatForElNemo.csh", "%d" % len(fnVec), env=getNMAEnviron())
-	    else:
-		if which("bash") != "":
-		    self.runJob("nma_reformatForElNemo.sh", "%d" % len(fnVec), env=getNMAEnviron())
+            if which("csh") != "":
+                self.runJob("nma_reformatForElNemo.csh", "%d" % len(fnVec), env=getNMAEnviron())
+            else:
+                if which("bash") != "":
+                    self.runJob("nma_reformatForElNemo.sh", "%d" % len(fnVec), env=getNMAEnviron())
 
             fnDiag = "diag_arpack.eigenfacs"
 
@@ -212,7 +212,7 @@ class FlexProtNMABase(EMProtocol):
         cleanPath(fnDiag)
 
         fh = open("Chkmod.res")
-        mdOut = xmippLib.MetaData()
+        mdOut = MetaData()
         collectivityList = []
 
         for n in range(len(fnVec)):
@@ -222,17 +222,17 @@ class FlexProtNMABase(EMProtocol):
 
             objId = mdOut.addObject()
             modefile = self._getPath("modes", "vec.%d" % (n + 1))
-            mdOut.setValue(xmippLib.MDL_NMA_MODEFILE, modefile, objId)
-            mdOut.setValue(xmippLib.MDL_ORDER, long(n + 1), objId)
+            mdOut.setValue(MDL_NMA_MODEFILE, modefile, objId)
+            mdOut.setValue(MDL_ORDER, int(n + 1), objId)
 
             if n >= 6:
-                mdOut.setValue(xmippLib.MDL_ENABLED, 1, objId)
+                mdOut.setValue(MDL_ENABLED, 1, objId)
             else:
-                mdOut.setValue(xmippLib.MDL_ENABLED, -1, objId)
-            mdOut.setValue(xmippLib.MDL_NMA_COLLECTIVITY, collectivity, objId)
+                mdOut.setValue(MDL_ENABLED, -1, objId)
+            mdOut.setValue(MDL_NMA_COLLECTIVITY, collectivity, objId)
 
             if collectivity < collectivityThreshold:
-                mdOut.setValue(xmippLib.MDL_ENABLED, -1, objId)
+                mdOut.setValue(MDL_ENABLED, -1, objId)
         fh.close()
         idxSorted = [i[0] for i in sorted(enumerate(collectivityList), key=lambda x: x[1], reverse=True)]
 
@@ -252,7 +252,7 @@ class FlexProtNMABase(EMProtocol):
         i = 0
         for objId in mdOut:
             score_i = float(score[i]) / (2.0 * l)
-            mdOut.setValue(xmippLib.MDL_NMA_SCORE, score_i, objId)
+            mdOut.setValue(MDL_NMA_SCORE, score_i, objId)
             i += 1
         mdOut.write("modes%s.xmd" % suffix)
         cleanPath("Chkmod.res")
@@ -272,7 +272,7 @@ class FlexProtNMABase(EMProtocol):
             if not exists(join(nmaBin, prog)):
                 errors.append("Some NMA programs are missing in the NMA folder.")
                 #errors.append("Check that Scipion was installed with NMA: 'scipion installb nma'")
-		errors.append("Check that Scipion was installed with NMA")
+                errors.append("Check that Scipion was installed with NMA")
                 break
         from pyworkflow.utils.which import which
         if (which("csh") == "") and (which("bash") == ""):

@@ -30,9 +30,8 @@ visualization program.
 from pyworkflow.gui.project import ProjectWindow
 from pyworkflow.protocol.params import LabelParam, IntParam
 from pyworkflow.viewer import ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO
-from pyworkflow.em.viewers import ObjectView, VmdView
-
-import xmippLib
+from pwem.viewers import ObjectView, VmdView
+from pwem.emlib import MDL_NMA_ATOMSHIFT
 from continuousflex.protocols import FlexProtNMA
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 
@@ -107,7 +106,7 @@ class FlexNMAViewer(ProtocolViewer):
 def createShiftPlot(mdFn, title, ylabel):
     plotter = FlexNmaPlotter()
     plotter.createSubPlot(title, 'atom index', ylabel)
-    plotter.plotMdFile(mdFn, None, xmippLib.MDL_NMA_ATOMSHIFT)
+    plotter.plotMdFile(mdFn, None, MDL_NMA_ATOMSHIFT)
     return plotter
 
 

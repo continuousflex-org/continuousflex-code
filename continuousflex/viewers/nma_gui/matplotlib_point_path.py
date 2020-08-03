@@ -86,7 +86,7 @@ class PointPath():
         if event.inaxes!=self.ax: 
             return
         # ignore click event if toolbar is active
-        if self.ax.figure.canvas.manager.toolbar._active is not None: 
+        if self.ax.get_navigate_mode():
             return
         
         doubleClick = event.dblclick
@@ -142,7 +142,7 @@ class PointPath():
         if self.dragIndex is None or self.drawing < 2: 
             return
         # ignore click event if toolbar is active
-        if self.ax.figure.canvas.manager.toolbar._active is not None: 
+        if self.ax.get_navigate_mode(): 
             return
         
         ex, ey = event.xdata, event.ydata
