@@ -1,8 +1,7 @@
 # **************************************************************************
 # *
-# * Authors:
-# * J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es), Nov 2014
-# * Slavica Jonic (slavica.jonic@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -26,8 +25,8 @@
 
 
 from pyworkflow.object import String
-from pyworkflow.protocol.params import (PointerParam, StringParam, EnumParam,
-                                        IntParam, LEVEL_ADVANCED)
+from pyworkflow.protocol.params import (PointerParam, StringParam, EnumParam, IntParam,
+                                        LEVEL_ADVANCED)
 from pwem.protocols import ProtAnalysis3D
 
 
@@ -50,12 +49,12 @@ DIMRED_VALUES = ['PCA', 'LTSA', 'DM', 'LLTSA', 'LPP', 'kPCA', 'pPCA', 'LE', 'HLL
 DIMRED_MAPPINGS = [DIMRED_PCA, DIMRED_LLTSA, DIMRED_LPP, DIMRED_PPCA, DIMRED_NPE]
 
        
-class FlexProtDimredNMA(ProtAnalysis3D):
-    """ This protocol will take the images with NMA deformations
+class FlexProtDimredNMAVol(ProtAnalysis3D):
+    """ This protocol will take the volumes with NMA deformations
     as points in a N-dimensional space (where N is the number
     of computed normal modes) and will project them onto a reduced space
     """
-    _label = 'nma dimred'
+    _label = 'nma vol dimred'
     
     def __init__(self, **kwargs):
         ProtAnalysis3D.__init__(self, **kwargs)
@@ -64,9 +63,9 @@ class FlexProtDimredNMA(ProtAnalysis3D):
     #--------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
-        form.addParam('inputNMA', PointerParam, pointerClass='FlexProtAlignmentNMA',
+        form.addParam('inputNMA', PointerParam, pointerClass='FlexProtAlignmentNMAVol',
                       label="Conformational distribution",                        
-                      help='Select a previous run of the NMA alignment.')
+                      help='Select a previous run of the NMA alignment Vol.')
         
         form.addParam('dimredMethod', EnumParam, default=DIMRED_PCA,
                       choices=['Principal Component Analysis (PCA)',
@@ -137,7 +136,7 @@ class FlexProtDimredNMA(ProtAnalysis3D):
     #--------------------------- STEPS functions --------------------------------------------   
     
     def convertInputStep(self, deformationFile, inputId):
-        """ Iterate through the images and write the 
+        """ Iterate through the volumes and write the
         plain deformation.txt file that will serve as 
         input for dimensionality reduction.
         """
@@ -166,6 +165,9 @@ class FlexProtDimredNMA(ProtAnalysis3D):
             args += " --saveMapping %(mappingFile)s"
             self.mappingFile.set(mappingFile)
         self.runJob("xmipp_matrix_dimred", args % locals())
+
+
+
         
     def createOutputStep(self):
         pass

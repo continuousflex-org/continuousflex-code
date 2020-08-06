@@ -1,8 +1,7 @@
 # **************************************************************************
 # *
-# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
-# *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -31,11 +30,11 @@ import pyworkflow.gui as gui
 from pyworkflow.gui.widgets import Button, HotButton
 
 from continuousflex.protocols.data import Point
-from . import PointSelector
-from continuousflex.viewers.nma_plotter import FlexNmaPlotter
+from . import PointSelectorVol
+from continuousflex.viewers.plotter_vol import FlexNmaVolPlotter
 
 
-class ClusteringWindow(gui.Window):
+class ClusteringWindowVol(gui.Window):
     """ This class creates a Window that will display some Point's
     contained in a Data object.
     It will allow to launch 1D, 2D and 3D plots by selecting any
@@ -165,7 +164,7 @@ class ClusteringWindow(gui.Window):
         dim = len(components)
 
         if not dim:
-            self.showWarning("Please select some Axis before update plots.")
+            self.showWarning("Please select some Axis before updating plots.")
         else:
             modeList = components
             modeNameList = ['x%d' % (m + 1) for m in components]
@@ -176,8 +175,7 @@ class ClusteringWindow(gui.Window):
                                           title="Invalid input")]
 
             if self.plotter is None or self.plotter.isClosed():
-                self.plotter = FlexNmaPlotter(data=self.data)
-
+                self.plotter = FlexNmaVolPlotter(data=self.data)
                 doShow = True
             else:
                 self.plotter.clear()
@@ -190,15 +188,19 @@ class ClusteringWindow(gui.Window):
 
             if dim == 1:
                 self.plotter.plotArray1D("Histogram for %s" % baseList[0],
-                                         "Deformation value", "Number of images")
+                                         "Deformation value", "Number of volumes")
             else:
                 self.data.YIND = modeList[1]
                 if dim == 2:
                     self._evalExpression()
                     self._updateSelectionLabel()
-                    ax = self.plotter.createSubPlot("Click and drag to add points to the Cluster",
+                    ax = self.plotter.createSubPlot("Click and drag to add some points to the Cluster",
                                                     *baseList)
-                    self.ps = PointSelector(ax, self.data, callback=self._updateSelectionLabel)
+
+                    # ax = self.plotter.plotArray2D("Click and drag to add some points to the Cluster",
+                    #                                *baseList)
+                    self.ps = PointSelectorVol(ax, self.data, callback=self._updateSelectionLabel)
+                    # self.ps = PointSelector(ax, self.data, callback=None)
                 elif dim == 3:
                     del self.ps  # Remove PointSelector
                     self.data.ZIND = modeList[2]
