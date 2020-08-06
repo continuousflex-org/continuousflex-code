@@ -185,6 +185,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         newProt.sqliteFile.set(fnSqlite)
         newProt.angleYflag.set(flag)
         project.launchProtocol(newProt)
+        project.getRunsGraph()
 
     def _loadAnimationData(self, obj):
         prot = self.protocol
