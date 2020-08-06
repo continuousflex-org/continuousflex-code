@@ -46,7 +46,7 @@ import pwem.emlib.metadata as md
 from xmipp3.base import XmippMdRow
 from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
                             getImageLocation, createItemMatrix,
-                            setXmippAttributes,setOfParticlesToMd)
+                            setXmippAttributes)
 from .convert import modeToRow
 
 NMA_ALIGNMENT_WAV = 0
@@ -117,6 +117,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
         atomsFn = self.getInputPdb().getFileName()
         # Define some outputs filenames
         self.imgsFn = self._getExtraPath('images.xmd')
+        self.imgsFn_backup = self._getExtraPath('images_backup.xmd')
         self.modesFn = self._getExtraPath('modes.xmd')
         self.structureEM = self.inputModes.get().getPdb().getPseudoAtoms()
         if self.structureEM:
@@ -145,6 +146,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
         # Write a metadata with the normal modes information
         # to launch the nma alignment programs
         writeSetOfParticles(self.inputParticles.get(), self.imgsFn)
+        writeSetOfParticles(self.inputParticles.get(),self.imgsFn_backup)
 
 
     def writeModesMetaData(self):
@@ -177,15 +179,12 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             index, fn = xmippToLocation(imgPath)
-            # Conside the index is the id in the input set
-            particle = inputSet[index]
             if(index): # case the input is a stack
                 # Conside the index is the id in the input set
                 particle = inputSet[index]
             else: # input is not a stack
                 # convert the inputSet to metadata:
-                mdtemp = md.MetaData()
-                setOfParticlesToMd(inputSet,mdtemp)
+                mdtemp = md.MetaData(self.imgsFn_backup)
                 # Loop and find the index based on the basename:
                 bn_retrieved = basename(imgPath)
                 for searched_index in mdtemp:
@@ -225,15 +224,12 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             index, fn = xmippToLocation(imgPath)
-            # Conside the index is the id in the input set
-            particle = inputSet[index]
             if(index): # case the input is a stack
                 # Conside the index is the id in the input set
                 particle = inputSet[index]
             else: # input is not a stack
                 # convert the inputSet to metadata:
-                mdtemp = md.MetaData()
-                setOfParticlesToMd(inputSet,mdtemp)
+                mdtemp = md.MetaData(self.imgsFn_backup)
                 # Loop and find the index based on the basename:
                 bn_retrieved = basename(imgPath)
                 for searched_index in mdtemp:

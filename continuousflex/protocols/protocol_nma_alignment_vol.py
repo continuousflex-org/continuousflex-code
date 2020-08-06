@@ -24,6 +24,7 @@
 # **************************************************************************
 
 from os.path import basename
+
 from pyworkflow.utils import getListFromRangeString
 from pwem.protocols import ProtAnalysis3D
 from xmipp3.convert import (writeSetOfVolumes, xmippToLocation, createItemMatrix,
@@ -138,7 +139,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         atomsFn = self.getInputPdb().getFileName()
         # Define some outputs filenames
         self.imgsFn = self._getExtraPath('volumes.xmd')
-        self.copy = self._getExtraPath('copy.xmd')
+        self.imgsFn_backup = self._getExtraPath('volumes_backup.xmd')
         self.modesFn = self._getExtraPath('modes.xmd')
         self.structureEM = self.inputModes.get().getPdb().getPseudoAtoms()
         if self.structureEM:
@@ -167,7 +168,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         # Write a metadata with the normal modes information
         # to launch the nma alignment programs
         writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
-        writeSetOfVolumes(self.inputVolumes.get(), self.copy)
+        writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn_backup)
         # Copy the atoms file to current working dir
         # copyFile(atomsFn, self.atomsFn)
 
@@ -198,20 +199,17 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         copyFile(deformationMd, self.imgsFn)
         # We update the volume paths based on volume names (if computed on another computer or imported from another
         # project), and we need to set the item_id for each volume
-        inputSet = md.MetaData(self.copy)
+        inputSet = self.inputVolumes.get()
         mdImgs = md.MetaData(self.imgsFn)
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             index, fn = xmippToLocation(imgPath)
-            # Conside the index is the id in the input set
-            particle = inputSet[index]
             if(index): # case the input is a stack
                 # Conside the index is the id in the input set
                 particle = inputSet[index]
             else: # input is not a stack
                 # convert the inputSet to metadata:
-                mdtemp = md.MetaData()
-                setOfParticlesToMd(inputSet,mdtemp)
+                mdtemp = md.MetaData(self.imgsFn_backup)
                 # Loop and find the index based on the basename:
                 bn_retrieved = basename(imgPath)
                 for searched_index in mdtemp:
@@ -260,23 +258,18 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
 
         cleanPath(self._getPath('nmaTodo.xmd'))
 
-        inputSet = md.MetaData(self.copy)
-        # inputSet = self.inputVolumes.get()
-        # print(inputSet)
+        inputSet = self.inputVolumes.get()
         mdImgs = md.MetaData(self.imgsFn)
 
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             index, fn = xmippToLocation(imgPath)
-            # Conside the index is the id in the input set
-            particle = inputSet[index]
             if(index): # case the input is a stack
                 # Conside the index is the id in the input set
                 particle = inputSet[index]
             else: # input is not a stack
                 # convert the inputSet to metadata:
-                mdtemp = md.MetaData()
-                setOfParticlesToMd(inputSet,mdtemp)
+                mdtemp = md.MetaData(self.imgsFn_backup)
                 # Loop and find the index based on the basename:
                 bn_retrieved = basename(imgPath)
                 for searched_index in mdtemp:
