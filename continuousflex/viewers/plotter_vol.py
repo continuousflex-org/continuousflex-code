@@ -68,9 +68,9 @@ class FlexNmaVolPlotter(FlexPlotter):
 
     def plotArray2D(self, title, xlabel, ylabel):
         ax = self.createSubPlot(title, xlabel, ylabel)
-        if self._xlimlow != None and self._xlimhigh != None:
+        if self._xlimlow.get():
             ax.set_xlim([self._xlimlow.get(), self._xlimhigh.get()])
-        if self._ylimlow != None and self._ylimhigh != None:
+        if self._ylimlow.get():
             ax.set_ylim([self._ylimlow.get(), self._ylimhigh.get()])
         plotArray2D(ax, self._data, self._limitlow, self._limitup)
         return ax
@@ -87,11 +87,11 @@ class FlexNmaVolPlotter(FlexPlotter):
         zdata = self._data.getZData()
         weights = self._data.getWeights()
 
-        if self._xlimlow != None and self._xlimhigh != None:
+        if self._xlimlow.get():
             ax.set_xlim([self._xlimlow.get(), self._xlimhigh.get()])
-        if self._ylimlow != None and self._ylimhigh != None:
+        if self._ylimlow.get():
             ax.set_ylim([self._ylimlow.get(), self._ylimhigh.get()])
-        if self._zlimlow != None and self._zlimhigh != None:
+        if self._zlimlow.get():
             ax.set_zlim([self._zlimlow.get(), self._zlimhigh.get()])
 
         if self._limitlow == None or self._limitup == None:
@@ -121,12 +121,11 @@ def plotArray2D(ax, data, vvmin=None, vvmax=None):
     xdata = data.getXData()
     ydata = data.getYData()
     weights = data.getWeights()
-    if vvmin == None or vvmax == None:
-        cax = ax.scatter(xdata, ydata, c= np.ones(len(weights)) - weights)
+    if vvmin:
+        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights, vmin=vvmin.get(), vmax=vvmax.get())
         #plot_kwds = {'alpha': 0.25, 's': 150, 'linewidths': 0}
         #cax = ax.scatter(xdata, ydata, c='b',**plot_kwds)
-
     else:
-        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights, vmin=vvmin.get(), vmax=vvmax.get())
+        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights)
     cb = ax.figure.colorbar(cax)
     cb.set_label('1- Cross Correlation')
