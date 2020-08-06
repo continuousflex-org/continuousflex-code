@@ -261,8 +261,8 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         # iterating going up and down through all points
         # 1 2 3 ... n-2 n-1 n n-1 n-2 ... 3, 2
         n = len(deformations)
-        r1 = range(1, n + 1)
-        r2 = range(2, n)  # Skip 1 at the end
+        r1 = list(range(1, n + 1))
+        r2 = list(range(2, n))  # Skip 1 at the end
         r2.reverse()
         loop = r1 + r2
 
