@@ -43,6 +43,9 @@ DIMRED_HLLE = 8
 DIMRED_SPE = 9
 DIMRED_NPE = 10
 
+USE_PDBS = 0
+USE_NMA_AMP = 1
+
 # Values to be passed to the program
 DIMRED_VALUES = ['PCA', 'LTSA', 'DM', 'LLTSA', 'LPP', 'kPCA', 'pPCA', 'LE', 'HLLE', 'SPE', 'NPE']
 
@@ -67,7 +70,14 @@ class FlexProtDimredNMA(ProtAnalysis3D):
         form.addParam('inputNMA', PointerParam, pointerClass='FlexProtAlignmentNMA',
                       label="Conformational distribution",                        
                       help='Select a previous run of the NMA alignment.')
-        
+
+        form.addParam('analyzeChoice', EnumParam, default=USE_PDBS,
+                      choices=['Use the fitted PDBs (recommended)',
+                               'Use normal mode amplitudes'],
+                      label='Data to analyze',
+                      help='Choosing to analyze the fitted PDBs is slower but more accurate.'
+                           ' You can choose to use normal mode amplitudes for preliminary results.')
+
         form.addParam('dimredMethod', EnumParam, default=DIMRED_PCA,
                       choices=['Principal Component Analysis (PCA)',
                                'Local Tangent Space Alignment',

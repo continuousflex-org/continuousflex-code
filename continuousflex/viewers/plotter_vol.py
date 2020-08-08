@@ -68,10 +68,19 @@ class FlexNmaVolPlotter(FlexPlotter):
 
     def plotArray2D(self, title, xlabel, ylabel):
         ax = self.createSubPlot(title, xlabel, ylabel)
-        if self._xlimlow.get():
+
+        lowx = lowy = None
+        try:
+            lowx = self._xlimlow.get()
+            lowy = self._ylimlow.get()
+        except:
+            pass
+
+        if lowx:
             ax.set_xlim([self._xlimlow.get(), self._xlimhigh.get()])
-        if self._ylimlow.get():
+        if lowy:
             ax.set_ylim([self._ylimlow.get(), self._ylimhigh.get()])
+
         plotArray2D(ax, self._data, self._limitlow, self._limitup)
         return ax
 
@@ -87,11 +96,19 @@ class FlexNmaVolPlotter(FlexPlotter):
         zdata = self._data.getZData()
         weights = self._data.getWeights()
 
-        if self._xlimlow.get():
+        lowx = lowy = lowz = None
+        try:
+            lowx = self._xlimlow.get()
+            lowy = self._ylimlow.get()
+            lowz = self._zlimlow.get()
+        except:
+            pass
+
+        if lowx:
             ax.set_xlim([self._xlimlow.get(), self._xlimhigh.get()])
-        if self._ylimlow.get():
+        if lowy:
             ax.set_ylim([self._ylimlow.get(), self._ylimhigh.get()])
-        if self._zlimlow.get():
+        if lowz:
             ax.set_zlim([self._zlimlow.get(), self._zlimhigh.get()])
 
         if self._limitlow == None or self._limitup == None:
