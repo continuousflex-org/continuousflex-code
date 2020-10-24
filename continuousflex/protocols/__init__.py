@@ -36,6 +36,7 @@ from .protocol_nma_alignment_vol import FlexProtAlignmentNMAVol
 from .protocol_nma_dimred_vol import FlexProtDimredNMAVol
 from .protocol_subtomogram_averaging import FlexProtSubtomogramAveraging
 from .protocol_missing_wedge_filling import FlexProtMissingWedgeFilling
+from .protocol_apply_volumeset_alignment import FlexProtApplyVolSetAlignment
 
 from .data import *
 from .pdb import *
