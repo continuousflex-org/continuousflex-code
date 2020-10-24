@@ -23,7 +23,7 @@
 
 import os
 from pwem.protocols import ProtAnalysis3D
-from xmipp3.convert import writeSetOfVolumes, xmippToLocation, createItemMatrix, setXmippAttributes, readSetOfVolumes
+import xmipp3.convert
 import pwem as em
 from pwem.objects import Volume, SetOfVolumes
 import pwem.emlib.metadata as md
@@ -34,6 +34,7 @@ from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
 from .utilities.spider_files3 import save_volume, open_volume
 from pyworkflow.utils import replaceBaseExt
 import numpy as np
+from xmippLib import createEmptyFile
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
@@ -99,19 +100,16 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         self.imgsFn = self._getExtraPath('volumes.xmd')
         makePath(self._getExtraPath()+'/mw_filled')
 
-
         self._insertFunctionStep('convertInputStep')
         self._insertFunctionStep('doAlignmentStep')
         if self.applyParams.get():
             self._insertFunctionStep('applyAlignment')
         self._insertFunctionStep('createOutputStep')
-        if self.applyParams.get():
-            self._insertFunctionStep('createOutput2Step')
 
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
         # Write a metadata with the volumes
-        writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
+        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self._getExtraPath('input.xmd'))
 
     def doAlignmentStep(self):
         tempdir = self._getTmpPath()
@@ -129,21 +127,21 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         if AlignmentParameters == REFERENCE_STA:
             MetaDataSTA = self.MetaDataSTA.get()._getExtraPath('final_md.xmd')
             MetaDataFile = MetaDataSTA
-        copyFile(MetaDataSTA,imgFn)
+        copyFile(MetaDataFile,imgFn)
 
         tiltLow = self.tiltLow.get()
         tiltHigh = self.tiltHigh.get()
 
-        print('tempdir is ', tempdir)
-        print('imgFn is ', imgFn)
-        print('StartingReference is ', StartingReference)
-        print('ReferenceVolume is ', ReferenceVolume)
-        print('STAVolume is ', STAVolume)
-        print('AlignmentParameters is ', AlignmentParameters)
-        print('MetaDataFile is ', MetaDataFile)
-        print('MetaDataSTA is ', MetaDataSTA)
-        print('tiltLow is ', tiltLow)
-        print('tiltHigh is ', tiltHigh)
+        # print('tempdir is ', tempdir)
+        # print('imgFn is ', imgFn)
+        # print('StartingReference is ', StartingReference)
+        # print('ReferenceVolume is ', ReferenceVolume)
+        # print('STAVolume is ', STAVolume)
+        # print('AlignmentParameters is ', AlignmentParameters)
+        # print('MetaDataFile is ', MetaDataFile)
+        # print('MetaDataSTA is ', MetaDataSTA)
+        # print('tiltLow is ', tiltLow)
+        # print('tiltHigh is ', tiltHigh)
 
         # creating a missing-wedge mask:
         start_ang = tiltLow
@@ -169,19 +167,46 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         fnmask = self._getExtraPath('Mask.spi')
         save_volume(np.float32(MW_mask),fnmask)
         self.runJob('xmipp_transform_geometry','-i '+fnmask+' --rotate_volume euler 0 90 0')
-
-
         mdImgs = md.MetaData(imgFn)
+        # in case of metadata from an external file, it has to be updated with the proper filenames from 'input.xmd'
+        inputSet = self.inputVolumes.get()
+
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            index, fn = xmipp3.convert.xmippToLocation(imgPath)
+            if (index):  # case the input is a stack
+                # Conside the index is the id in the input set
+                particle = inputSet[index]
+            else:  # input is not a stack
+                # convert the inputSet to metadata:
+                mdtemp = md.MetaData(self._getExtraPath('input.xmd'))
+                # Loop and find the index based on the basename:
+                bn_retrieved = basename(imgPath)
+                for searched_index in mdtemp:
+                    imgPath_temp = mdtemp.getValue(md.MDL_IMAGE, searched_index)
+                    bn_searched = basename(imgPath_temp)
+                    if bn_searched == bn_retrieved:
+                        index = searched_index
+                        particle = inputSet[index]
+                        break
+            mdImgs.setValue(md.MDL_IMAGE, xmipp3.convert.getImageLocation(particle), objId)
+            mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
+        mdImgs.write(self.imgsFn)
+
+        for objId in mdImgs:
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            index, fname = xmipp3.convert.xmippToLocation(imgPath)
+            new_imgPath = self._getExtraPath() + '/mw_filled/'
+            if index: #case of stack
+                new_imgPath += str(index).zfill(6) + '.spi'
+            else:
+                new_imgPath += basename(replaceBaseExt(basename(imgPath), 'spi'))
             # Get a copy of the volume converted to spider format
-            new_imgPath = self._getExtraPath() + '/mw_filled/' + basename(replaceBaseExt(basename(imgPath), 'spi'))
             params = '-i ' + imgPath + ' -o ' + new_imgPath + ' --type vol'
             self.runJob('xmipp_image_convert',params)
             # print('xmipp_image_convert',params)
             # update the name in the metadata file
             mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
-
             # Align the reference with the subtomogram:
             rot = str(mdImgs.getValue(md.MDL_ANGLE_ROT, objId))
             tilt = str(mdImgs.getValue(md.MDL_ANGLE_TILT, objId))
@@ -200,7 +225,6 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             params += '--rotate_volume euler 0 -90 0 '
             # print('xmipp_transform_geometry',params)
             self.runJob('xmipp_transform_geometry', params)
-
             #Now the STA is aligned, add the missing wedge region to the subtomogram:
             v = open_volume(new_imgPath)
             I = fft(v)
@@ -250,21 +274,18 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         mdImgs.write(self.fnaligned)
 
 
-
-
     def createOutputStep(self):
         partSet = self._createSetOfVolumes('not_aligned')
-        readSetOfVolumes(self._getExtraPath('volumes.xmd'), partSet)
+        xmipp3.convert.readSetOfVolumes(self._getExtraPath('volumes.xmd'), partSet)
         partSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
         self._defineOutputs(outputVolumes=partSet)
+        if self.applyParams.get():
+            partSet2 = self._createSetOfVolumes('aligned')
+            xmipp3.convert.readSetOfVolumes(self.fnaligned, partSet2)
+            partSet2.setSamplingRate(self.inputVolumes.get().getSamplingRate())
+            self._defineOutputs(outputParticles=partSet2)
         # self._defineTransformRelation(self.inputVolumes, partSet)
 
-    def createOutput2Step(self):
-        partSet2 = self._createSetOfVolumes('aligned')
-        readSetOfVolumes(self.fnaligned, partSet2)
-        partSet2.setSamplingRate(self.inputVolumes.get().getSamplingRate())
-        self._defineOutputs(outputParticles=partSet2)
-        # self._defineTransformRelation(self.inputVolumes, partSet2)
 
 
     # --------------------------- INFO functions --------------------------------------------
@@ -290,5 +311,5 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
     def _updateParticle(self, item, row):
         # setXmippAttributes(item, row, md.MDL_ANGLE_ROT, md.MDL_ANGLE_TILT, md.MDL_ANGLE_PSI, md.MDL_SHIFT_X,
         #                    md.MDL_SHIFT_Y, md.MDL_SHIFT_Z, md.MDL_MAXCC, md.MDL_ANGLE_Y)
-        setXmippAttributes(item, row)
+        xmipp3.convert.setXmippAttributes(item, row)
         # createItemMatrix(item, row, align=em.ALIGN_PROJ)
