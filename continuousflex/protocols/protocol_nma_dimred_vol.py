@@ -27,7 +27,9 @@ from pyworkflow.protocol.params import (PointerParam, StringParam, EnumParam, In
                                         LEVEL_ADVANCED)
 from pwem.protocols import ProtAnalysis3D
 from pwem.convert import cifToPdb
-from pyworkflow.utils.path import makePath
+from pyworkflow.utils.path import makePath, copyFile
+
+
 
 import numpy as np
 import glob
@@ -51,7 +53,7 @@ USE_PDBS = 0
 USE_NMA_AMP = 1
 
 # Values to be passed to the program
-DIMRED_VALUES = ['PCA', 'LTSA', 'DM', 'LLTSA', 'LPP', 'kPCA', 'pPCA', 'LE', 'HLLE', 'SPE', 'NPE', 'sklearn_PCA']
+DIMRED_VALUES = ['PCA', 'LTSA', 'DM', 'LLTSA', 'LPP', 'kPCA', 'pPCA', 'LE', 'HLLE', 'SPE', 'NPE', 'sklearn_PCA','None']
 
 # Methods that allows mapping
 DIMRED_MAPPINGS = [DIMRED_PCA, DIMRED_LLTSA, DIMRED_LPP, DIMRED_PPCA, DIMRED_NPE]
@@ -96,7 +98,8 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
                                'Hessian Locally Linear Embedding',
                                'Stochastic Proximity Embedding',
                                'Neighborhood Preserving Embedding',
-                               'Scikit-Learn PCA (for large PDBs)'],
+                               'Scikit-Learn PCA (for large PDBs)',
+                               "Don't reduce dimensions"],
                       label='Dimensionality reduction method',
                       help=""" Choose among the following dimensionality reduction methods:
     PCA
@@ -206,6 +209,9 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
                           rows, reducedDim):
         outputMatrix = self.getOutputMatrixFile()
         methodName = DIMRED_VALUES[method]
+        if methodName == 'None':
+            copyFile(deformationsFile,outputMatrix)
+            return
         # Get number of columes in deformation files
         # it can be a subset of inputModes
         f = open(deformationsFile)
