@@ -80,6 +80,10 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
                       condition='AlignmentParameters==%d' % REFERENCE_STA,
                       label="Subtomogram averaging run",
                       help='Alignment parameters, typically from a STA previous run')
+        form.addParam('applyParams', params.BooleanParam,
+                      default=True,
+                      label='Apply alignment after filling the wedge?',
+                      help='Both aligned and none aligned versions will be kept')
         form.addSection(label='Missing-wedge parameters')
         form.addParam('tiltLow', params.IntParam, default=-60,
                       label='Lower tilt value',
@@ -94,12 +98,15 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         # Define some outputs filenames
         self.imgsFn = self._getExtraPath('volumes.xmd')
         makePath(self._getExtraPath()+'/mw_filled')
-        # self.outputVolume = self._getExtraPath('final_average.mrc')
-        # self.outputMD = self._getExtraPath('final_md.xmd')
+
 
         self._insertFunctionStep('convertInputStep')
         self._insertFunctionStep('doAlignmentStep')
+        if self.applyParams.get():
+            self._insertFunctionStep('applyAlignment')
         self._insertFunctionStep('createOutputStep')
+        if self.applyParams.get():
+            self._insertFunctionStep('createOutput2Step')
 
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
@@ -214,20 +221,51 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
 
         mdImgs.write(self.imgsFn)
 
+    def applyAlignment(self):
+        makePath(self._getExtraPath()+'/mw_filled_aligned')
+        tempdir = self._getTmpPath()
+        mdImgs = md.MetaData(self.imgsFn)
+        for objId in mdImgs:
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            new_imgPath = self._getExtraPath()+'/mw_filled_aligned/' + basename(imgPath)
+            mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
+            rot = str(mdImgs.getValue(md.MDL_ANGLE_ROT, objId))
+            tilt = str(mdImgs.getValue(md.MDL_ANGLE_TILT, objId))
+            psi = str(mdImgs.getValue(md.MDL_ANGLE_PSI, objId))
+            shiftx = str(mdImgs.getValue(md.MDL_SHIFT_X, objId))
+            shifty = str(mdImgs.getValue(md.MDL_SHIFT_Y, objId))
+            shiftz = str(mdImgs.getValue(md.MDL_SHIFT_Z, objId))
+            # rotate 90 around y, align, then rotate -90 to get to neutral
+            params = '-i ' + imgPath + ' -o ' + tempdir + '/temp.vol '
+            params += '--rotate_volume euler 0 90 0 '
+            self.runJob('xmipp_transform_geometry', params)
+            params = '-i ' + tempdir + '/temp.vol -o ' + new_imgPath + ' '
+            params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
+            params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
+            # print('xmipp_transform_geometry',params)
+            self.runJob('xmipp_transform_geometry', params)
+            params = '-i ' + new_imgPath + ' --rotate_volume euler 0 90 0 '
+            self.runJob('xmipp_transform_geometry', params)
+        self.fnaligned = self._getExtraPath('volumes_aligned.xmd')
+        mdImgs.write(self.fnaligned)
+
+
 
 
     def createOutputStep(self):
-        partSet = self._createSetOfVolumes()
-        readSetOfVolumes(self.imgsFn, partSet)
+        partSet = self._createSetOfVolumes('not_aligned')
+        readSetOfVolumes(self._getExtraPath('volumes.xmd'), partSet)
         partSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
-        # partSet.copyInfo(self.imgsFn)
+        self._defineOutputs(outputVolumes=partSet)
+        # self._defineTransformRelation(self.inputVolumes, partSet)
 
-        # partSet.setAlignmentProj()
-        # partSet.copyItems(inputSet,
-        #                   updateItemCallback=self._updateParticle,
-        #                   itemDataIterator=md.iterRows(self.imgsFn, sortByLabel=md.MDL_ITEM_ID))
-        self._defineOutputs(outputParticles=partSet)
-        self._defineTransformRelation(self.inputVolumes, partSet)
+    def createOutput2Step(self):
+        partSet2 = self._createSetOfVolumes('aligned')
+        readSetOfVolumes(self.fnaligned, partSet2)
+        partSet2.setSamplingRate(self.inputVolumes.get().getSamplingRate())
+        self._defineOutputs(outputParticles=partSet2)
+        # self._defineTransformRelation(self.inputVolumes, partSet2)
+
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
