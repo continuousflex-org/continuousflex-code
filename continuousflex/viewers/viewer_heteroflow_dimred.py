@@ -48,7 +48,7 @@ from continuousflex.protocols.data import Point, Data
 from .plotter_vol import FlexNmaVolPlotter
 from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVol
 from continuousflex.viewers.nma_vol_gui import ClusteringWindowVol
-from joblib import load
+from joblib import load, dump
 from continuousflex.protocols.utilities.spider_files3 import open_volume, save_volume
 import farneback3d
 
@@ -273,19 +273,30 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         for objId in mdImgs:
             N += 1
 
-        # reading back all oprtical flows
+        # reading back all optical flows
         bigmat = []
-        for j in range(1, N+1):
-            flowj = self.read_optical_flow_by_number(j)
-            flowj = np.reshape(flowj, [3 * np.shape(flowj)[1] * np.shape(flowj)[2] * np.shape(flowj)[3]])
-            bigmat.append(flowj)
-        bigmat = np.array(bigmat)
-        rname = self.protocol._getExtraPath('bigmat.txt')
-        print(rname)
-        np.savetxt(rname,bigmat)
+        if(isfile(self.protocol._getExtraPath('bigmat_inverse.pkl'))):
+            print('bigmat_inverse.txt found')
+            # bigmat_pinv = np.loadtxt(self.protocol._getExtraPath('bigmat_inverse.txt'))
+            bigmat_pinv = load(self.protocol._getExtraPath('bigmat_inverse.pkl'))
+        else:
+            if(isfile(self.protocol._getExtraPath('bigmat.pkl'))):
+                bigmat = load(self.protocol._getExtraPath('bigmat.pkl'))
+            else:
+                for j in range(1, N+1):
+                    flowj = self.read_optical_flow_by_number(j)
+                    flowj = np.reshape(flowj, [3 * np.shape(flowj)[1] * np.shape(flowj)[2] * np.shape(flowj)[3]])
+                    bigmat.append(flowj)
+                bigmat = np.array(bigmat)
+                # np.savetxt(self.protocol._getExtraPath('bigmat.txt'),bigmat)
+                dump(bigmat,self.protocol._getExtraPath('bigmat.pkl'))
+            bigmat_pinv = np.linalg.pinv(bigmat)
+            bigmat = None  # removing it from the memory
+            # np.savetxt(self.protocol._getExtraPath('bigmat_inverse.txt'),bigmat_pinv)
+            dump(bigmat_pinv,self.protocol._getExtraPath('bigmat_inverse.pkl'))
 
-        bigmat_pinv = np.linalg.pinv(bigmat)
         line = np.matmul(bigmat_pinv, np.transpose(deformations))
+        bigmat_pinv = None # removing if from the memory
         fnref = self.protocol._getExtraPath('reference.spi')
         shape = np.shape(open_volume(fnref))
 
@@ -321,7 +332,7 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
             data.addPoint(Point(pointId=particle.getObjId(),
                                 data=pointData,
                                 weight=0))
-            print(pointData)
+            # print(pointData)
         return data
 
     def _validate(self):
