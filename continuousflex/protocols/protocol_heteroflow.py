@@ -147,11 +147,15 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
         for objId in mdImgs:
             N += 1
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            # getting a copy converted to spider format to solve the problem with stacks or mrc files
+            tmp = self._getTmpPath('tmp.spi')
+            self.runJob('xmipp_image_convert','-i ' + imgPath + ' -o ' + tmp + ' --type vol')
+
             print('processing optical flow for volume ', objId)
             path_flowx = of_root + str(objId).zfill(6) + '_opflowx.spi'
             path_flowy = of_root + str(objId).zfill(6) + '_opflowy.spi'
             path_flowz = of_root + str(objId).zfill(6) + '_opflowz.spi'
-            path_vol_i = imgPath
+            path_vol_i = tmp
             volumes_op_flowi = self.opflow_vols(path_vol0, path_vol_i, pyr_scale, levels, winsize, iterations, poly_n,
                                                 poly_sigma, factor1, factor2, path_flowx, path_flowy, path_flowz)
 

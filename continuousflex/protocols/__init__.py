@@ -38,6 +38,9 @@ from .protocol_subtomogram_averaging import FlexProtSubtomogramAveraging
 from .protocol_missing_wedge_filling import FlexProtMissingWedgeFilling
 from .protocol_apply_volumeset_alignment import FlexProtApplyVolSetAlignment
 from .protocol_heteroflow import FlexProtHeteroFlow
+from .protocol_heteroflow_dimred import FlexProtDimredHeteroFlow
+from .protocol_batch_cluster_heteroflow import FlexBatchProtHeteroFlowCluster
+
 from .data import *
 from .pdb import *
 
