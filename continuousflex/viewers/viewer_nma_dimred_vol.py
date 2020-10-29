@@ -47,6 +47,7 @@ from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVol
 from continuousflex.viewers.nma_vol_gui import ClusteringWindowVol
 from joblib import load
 
+
 class FlexDimredNMAVolViewer(ProtocolViewer):
     """ Visualization of results from the NMA protocol
     """
@@ -245,7 +246,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
 
         if isfile(projectorFile):
             M = np.loadtxt(projectorFile)
-            if prot.getMethodName()=='sklearn_PCA':
+            if prot.getMethodName() == 'sklearn_PCA':
                 pca = load(prot._getExtraPath('pca_pickled.txt'))
                 deformations = pca.inverse_transform(trajectoryPoints)
             else:
@@ -264,14 +265,16 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
             modesFn = prot.inputNMA.get()._getExtraPath('modes.xmd')
             for i, d in enumerate(deformations):
                 atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i + 1)
-                cmd = '-o %s --pdb %s --nma %s --deformations %s' % (atomsFn, pdbFile, modesFn, str(d)[1:-1])
+                cmd = '-o %s --pdb %s --nma %s --deformations ' % (atomsFn, pdbFile, modesFn)
+                for l in d:
+                    cmd += str(l) + ' '
                 # because it doesn't have an independent protocol we don't use self.runJob
                 runJob(None, 'xmipp_pdb_nma_deform', cmd, env=prot._getEnviron())
 
         elif prot.getDataChoice() == 'PDBs':
             # There is incompatibility issue with the rest of the code, we have to use the fahterPDB as one of the
             # deformed PDBs (the first one)
-            #fatherPDB = prot._getExtraPath('pdb_file.pdb')
+            # fatherPDB = prot._getExtraPath('pdb_file.pdb')
             fatherPDB = prot._getExtraPath('generated_pdbs/000001.pdb')
             lines_father = self.readPDB(fatherPDB)
             list_father = self.PDB2List(lines_father)

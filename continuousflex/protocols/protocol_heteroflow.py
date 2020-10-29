@@ -37,6 +37,7 @@ import time
 import PIL
 import os
 from .utilities.OF_plots import plot_quiver_3d
+from os.path import basename, join, exists, isfile
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
@@ -156,15 +157,20 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
             path_flowy = of_root + str(objId).zfill(6) + '_opflowy.spi'
             path_flowz = of_root + str(objId).zfill(6) + '_opflowz.spi'
             path_vol_i = tmp
-            volumes_op_flowi = self.opflow_vols(path_vol0, path_vol_i, pyr_scale, levels, winsize, iterations, poly_n,
-                                                poly_sigma, factor1, factor2, path_flowx, path_flowy, path_flowz)
+            if(isfile(path_flowx)):
+                continue
+            else:
+                volumes_op_flowi = self.opflow_vols(path_vol0, path_vol_i, pyr_scale, levels, winsize, iterations, poly_n,
+                                                    poly_sigma, factor1, factor2, path_flowx, path_flowy, path_flowz)
+
 
         metric_mat = np.zeros([N, N])
 
         for i in range(1, N + 1):
-            print('finding the values for row ', i)
+            print('finding the correlation matrix row ', i)
             flowi = self.read_optical_flow_by_number(i)
             for j in range(1, N + 1):
+                print('        column',j)
                 flowj = self.read_optical_flow_by_number(j)
                 metric_mat[i - 1, j - 1] = self.metric_opflow_vols(flowi, flowj)
         correlation_matrix = self._getExtraPath('data.csv')

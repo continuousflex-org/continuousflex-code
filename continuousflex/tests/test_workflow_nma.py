@@ -33,6 +33,7 @@ from pyworkflow.tests import setupTestProject, DataSet
 from continuousflex.protocols import (FlexProtNMA, FlexProtAlignmentNMA,
                                       FlexProtDimredNMA, NMA_CUTOFF_ABS,
                                       FlexProtConvertToPseudoAtoms)
+from continuousflex.protocols.pdb.protocol_pseudoatoms_base import NMA_MASK_THRE
 
 
 class TestNMA(TestWorkflow):
@@ -102,8 +103,8 @@ class TestNMA(TestWorkflow):
         self.launchProtocol(protImportVol)
         
         # Convert the Volume to Pdb
-        NMA_MASK_THRE = Domain.importFromPlugin('xmipp3.protocols.pdb.protocol_pseudoatoms_base',
-                                         'NMA_MASK_THRE')
+        # NMA_MASK_THRE = Domain.importFromPlugin('xmipp3.protocols.pdb.protocol_pseudoatoms_base',
+        #                                  'NMA_MASK_THRE')
         protConvertVol = self.newProtocol(FlexProtConvertToPseudoAtoms)
         protConvertVol.inputStructure.set(protImportVol.outputVolume)
         protConvertVol.maskMode.set(NMA_MASK_THRE)

@@ -288,8 +288,10 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
                     flowj = np.reshape(flowj, [3 * np.shape(flowj)[1] * np.shape(flowj)[2] * np.shape(flowj)[3]])
                     bigmat.append(flowj)
                 bigmat = np.array(bigmat)
+                print('bigmat created successfully')
                 # np.savetxt(self.protocol._getExtraPath('bigmat.txt'),bigmat)
                 dump(bigmat,self.protocol._getExtraPath('bigmat.pkl'))
+                print('bigmat.pkl saved successfully')
             bigmat_pinv = np.linalg.pinv(bigmat)
             bigmat = None  # removing it from the memory
             # np.savetxt(self.protocol._getExtraPath('bigmat_inverse.txt'),bigmat_pinv)
@@ -307,9 +309,12 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
             ref = open_volume(fnref)
             ref = farneback3d.warp_by_flow(ref, np.float32(flowi))
             save_volume(ref, pathi)
-        fn_cxc = self.protocol._getExtraPath('chimera.cxc')
+            # command = '-i ' + pathi + ' --select below 0.6 --substitute value 0'
+            # runJob(None,'xmipp_transform_threshold',command)
+        fn_cxc = self.protocol._getExtraPath('chimera_%s.cxc' % animation)
         # cxc_command = 'open ' + animationPath + '/*.vol vseries true\n'
-        cxc_command = 'open animation_/*.vol vseries true\n'
+        cxc_command = 'open animation_%s/*.vol vseries true\n' % animation
+        cxc_command += 'volume #1 style surface level 0.7\n'
         cxc_command += 'vseries play #1 loop true maxFrameRate 5 direction oscillate'
         with open(fn_cxc, 'w') as f:
             print(cxc_command, file=f)

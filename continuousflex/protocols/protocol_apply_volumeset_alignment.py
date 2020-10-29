@@ -141,8 +141,8 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
             # print('xmipp_transform_geometry',params)
             self.runJob('xmipp_transform_geometry', params)
-            params = '-i ' + new_imgPath + ' --rotate_volume euler 0 90 0 '
-            self.runJob('xmipp_transform_geometry', params)
+            # params = '-i ' + new_imgPath + ' --rotate_volume euler 0 -90 0 '
+            # self.runJob('xmipp_transform_geometry', params)
         self.fnaligned = self._getExtraPath('volumes_aligned.xmd')
         mdImgs.write(self.fnaligned)
 
