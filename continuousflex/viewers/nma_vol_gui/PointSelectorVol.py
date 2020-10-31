@@ -24,6 +24,7 @@
 # **************************************************************************
 
 from continuousflex.viewers.plotter_vol import plotArray2D
+from continuousflex.viewers.plotter_vol import plotArray2D_xy
 
 
 class PointSelectorVol():
@@ -47,7 +48,9 @@ class PointSelectorVol():
             'motion_notify_event', self.onMotion)
 
     def createPlots(self, ax):
-        plotArray2D(ax, self.data)
+        # plotArray2D(ax, self.data)
+        # To avoid plotting the sidebar twice
+        plotArray2D_xy(ax, self.data)
         self.createSelectionPlot(ax)
 
     def getSelectedData(self):

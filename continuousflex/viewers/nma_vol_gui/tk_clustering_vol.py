@@ -33,6 +33,8 @@ from continuousflex.protocols.data import Point
 from . import PointSelectorVol
 from continuousflex.viewers.plotter_vol import FlexNmaVolPlotter
 
+FIGURE_LIMIT_NONE = 0
+FIGURE_LIMITS = 1
 
 class ClusteringWindowVol(gui.Window):
     """ This class creates a Window that will display some Point's
@@ -52,6 +54,18 @@ class ClusteringWindowVol(gui.Window):
         self.data = kwargs.get('data')
         self.callback = kwargs.get('callback', None)
         self.plotter = None
+
+        # Adding figure limits option
+        self.limits_modes = kwargs.get('limits_mode')
+        self.LimitLow = kwargs.get('LimitL')
+        self.LimitHigh = kwargs.get('LimitH')
+        self.xlim_low = kwargs.get('xlim_low')
+        self.xlim_high = kwargs.get('xlim_high')
+        self.ylim_low = kwargs.get('ylim_low')
+        self.ylim_high = kwargs.get('ylim_high')
+        self.zlim_low = kwargs.get('zlim_low')
+        self.zlim_high = kwargs.get('zlim_high')
+
 
         content = tk.Frame(self.root)
         self._createContent(content)
@@ -175,7 +189,19 @@ class ClusteringWindowVol(gui.Window):
                                           title="Invalid input")]
 
             if self.plotter is None or self.plotter.isClosed():
-                self.plotter = FlexNmaVolPlotter(data=self.data)
+                # self.plotter = FlexNmaVolPlotter(data=self.data)
+                # Actually plot
+                if self.limits_modes == FIGURE_LIMIT_NONE:
+                    self.plotter = FlexNmaVolPlotter(data=self.data,
+                                                xlim_low=self.xlim_low, xlim_high=self.xlim_high,
+                                                ylim_low=self.ylim_low, ylim_high=self.ylim_high,
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                else:
+                    self.plotter = FlexNmaVolPlotter(data=self.data,
+                                                LimitL=self.LimitLow, LimitH=self.LimitHigh,
+                                                xlim_low=self.xlim_low, xlim_high=self.xlim_high,
+                                                ylim_low=self.ylim_low, ylim_high=self.ylim_high,
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
                 doShow = True
             else:
                 self.plotter.clear()
@@ -194,13 +220,13 @@ class ClusteringWindowVol(gui.Window):
                 if dim == 2:
                     self._evalExpression()
                     self._updateSelectionLabel()
-                    ax = self.plotter.createSubPlot("Click and drag to add some points to the Cluster",
-                                                    *baseList)
+                    # ax = self.plotter.createSubPlot("Click and drag to add some points to the Cluster",
+                    #                                 *baseList)
 
-                    # ax = self.plotter.plotArray2D("Click and drag to add some points to the Cluster",
-                    #                                *baseList)
+                    ax = self.plotter.plotArray2D("Click and drag to add some points to the Cluster",
+                                                   *baseList)
                     self.ps = PointSelectorVol(ax, self.data, callback=self._updateSelectionLabel)
-                    # self.ps = PointSelector(ax, self.data, callback=None)
+                    # self.ps = PointSelectorVol(ax, self.data, callback=None)
                 elif dim == 3:
                     del self.ps  # Remove PointSelector
                     self.data.ZIND = modeList[2]
