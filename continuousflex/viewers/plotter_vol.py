@@ -84,6 +84,24 @@ class FlexNmaVolPlotter(FlexPlotter):
         plotArray2D(ax, self._data, self._limitlow, self._limitup)
         return ax
 
+    def plotArray2D_xy(self, title, xlabel, ylabel):
+        ax = self.createSubPlot(title, xlabel, ylabel)
+
+        lowx = lowy = None
+        try:
+            lowx = self._xlimlow.get()
+            lowy = self._ylimlow.get()
+        except:
+            pass
+
+        if lowx:
+            ax.set_xlim([self._xlimlow.get(), self._xlimhigh.get()])
+        if lowy:
+            ax.set_ylim([self._ylimlow.get(), self._ylimhigh.get()])
+
+        plotArray2D_xy(ax, self._data, self._limitlow, self._limitup)
+        return ax
+
     def plotArray3D(self, title, xlabel, ylabel, zlabel):
         import mpl_toolkits.mplot3d.axes3d as p3
         ax = p3.Axes3D(self.figure)
@@ -116,8 +134,6 @@ class FlexNmaVolPlotter(FlexPlotter):
         else:
             cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights, vmin=self._limitlow.get(),
                                vmax=self._limitup.get())
-
-
         x2, y2, z2 = [], [], []
         for point in self._data:
             if point.getState() == 1:
@@ -127,6 +143,51 @@ class FlexNmaVolPlotter(FlexPlotter):
         ax.scatter(x2, y2, z2, color='yellow', alpha=0.4, s=8)
         cb = ax.figure.colorbar(cax)
         cb.set_label('1- Cross Correlation')
+        # Disable tight_layout that is not available for 3D
+        self.tightLayoutOn = False
+        return ax
+
+    def plotArray3D_xyz(self, title, xlabel, ylabel, zlabel):
+        import mpl_toolkits.mplot3d.axes3d as p3
+        ax = p3.Axes3D(self.figure)
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_zlabel(zlabel)
+        xdata = self._data.getXData()
+        ydata = self._data.getYData()
+        zdata = self._data.getZData()
+        weights = self._data.getWeights()
+
+        lowx = lowy = lowz = None
+        try:
+            lowx = self._xlimlow.get()
+            lowy = self._ylimlow.get()
+            lowz = self._zlimlow.get()
+        except:
+            pass
+
+        if lowx:
+            ax.set_xlim([self._xlimlow.get(), self._xlimhigh.get()])
+        if lowy:
+            ax.set_ylim([self._ylimlow.get(), self._ylimhigh.get()])
+        if lowz:
+            ax.set_zlim([self._zlimlow.get(), self._zlimhigh.get()])
+
+        if self._limitlow == None or self._limitup == None:
+            cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights)
+        else:
+            cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights, vmin=self._limitlow.get(),
+                               vmax=self._limitup.get())
+        x2, y2, z2 = [], [], []
+        for point in self._data:
+            if point.getState() == 1:
+                x2.append(point.getX())
+                y2.append(point.getY())
+                z2.append(point.getZ())
+        ax.scatter(x2, y2, z2, color='yellow', alpha=0.4, s=8)
+        # cb = ax.figure.colorbar(cax)
+        # cb.set_label('1- Cross Correlation')
         # Disable tight_layout that is not available for 3D
         self.tightLayoutOn = False
         return ax

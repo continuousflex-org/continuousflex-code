@@ -207,7 +207,6 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         #                                    data=self.getData(),
         #                                    callback=self._createCluster
         #                                    )
-        print(self.limits_modes,self.LimitLow,self.xlim_low,self.ylim_high)
         self.clusterWindow = self.tkWindow(ClusteringWindowVol,
                                            title='Volume Clustering Tool',
                                            dim=self.protocol.reducedDim.get(),
