@@ -29,8 +29,11 @@ This module implement the wrappers around Xmipp CL2D protocol
 visualization program.
 """
 
+import os
 from os.path import basename, join, exists, isfile
 import numpy as np
+
+import pwem.emlib.metadata as md
 
 from pyworkflow.utils.path import cleanPath, makePath, cleanPattern
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
@@ -40,12 +43,19 @@ from pwem.objects import SetOfParticles
 from pyworkflow.utils.process import runJob
 from pwem.viewers import VmdView
 from pyworkflow.gui.browser import FileBrowserWindow
-from continuousflex.protocols.protocol_nma_dimred_vol import FlexProtDimredNMAVol
+from continuousflex.protocols.protocol_heteroflow_dimred import FlexProtDimredHeteroFlow
 from continuousflex.protocols.data import Point, Data
 from .plotter_vol import FlexNmaVolPlotter
 from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVol
 from continuousflex.viewers.nma_vol_gui import ClusteringWindowVol
-from joblib import load
+from continuousflex.viewers.nma_vol_gui import ClusteringWindowVolHeteroFlow
+from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVolHeteroFlow
+
+from joblib import load, dump
+from continuousflex.protocols.utilities.spider_files3 import open_volume, save_volume
+import farneback3d
+
+from pwem.viewers.viewer_chimera import Chimera, ChimeraView
 from pyworkflow.protocol import params
 
 FIGURE_LIMIT_NONE = 0
@@ -59,11 +69,11 @@ Z_LIMITS_NONE = 0
 Z_LIMITS = 1
 
 
-class FlexDimredNMAVolViewer(ProtocolViewer):
+class FlexDimredHeteroFlowViewer(ProtocolViewer):
     """ Visualization of results from the NMA protocol
     """
-    _label = 'viewer nma vol dimred'
-    _targets = [FlexProtDimredNMAVol]
+    _label = 'viewer heteroflow dimred'
+    _targets = [FlexProtDimredHeteroFlow]
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
 
     def __init__(self, **kwargs):
@@ -79,12 +89,12 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         form.addSection(label='Visualization')
         form.addParam('displayRawDeformation', StringParam, default='1',
                       label='Display raw deformation',
-                      help='Type 1 to see the histogram of normal-mode amplitudes in the low-dimensional space, '
+                      help='Type 1 to see the histogram of reduced dimensions, '
                            'using axis 1; \n '
-                           'Type 2 to see the histogram of normal-mode amplitudes in the low-dimensional space, '
+                           'Type 2 to see the histogram of reduced dimensions, '
                            'using axis 2; etc. \n '
-                           'Type 1 2 to see normal-mode amplitudes in the low-dimensional space, using axes 1 and 2; \n'
-                           'Type 1 2 3 to see normal-mode amplitudes in the low-dimensional space, using axes 1, 2, '
+                           'Type 1 2 to see the histogram of reduced dimensions, using axes 1 and 2; \n'
+                           'Type 1 2 3 to see the histogram of reduced dimensions, using axes 1, 2, '
                            'and 3; etc. '
                       )
 
@@ -169,6 +179,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
                                           title="Invalid input")]
 
             # Actually plot
+            # plotter = FlexNmaVolPlotter(data=self.getData())
             if self.limits_modes == FIGURE_LIMIT_NONE:
                 plotter = FlexNmaVolPlotter(data=self.getData(),
                                             xlim_low=self.xlim_low, xlim_high=self.xlim_high,
@@ -181,6 +192,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
                                             ylim_low=self.ylim_low, ylim_high=self.ylim_high,
                                             zlim_low=self.zlim_low, zlim_high=self.zlim_high)
 
+
             baseList = [basename(n) for n in modeNameList]
 
             self.getData().XIND = modeList[0]
@@ -190,11 +202,15 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
             else:
                 self.getData().YIND = modeList[1]
                 if dim == 2:
-                    plotter.plotArray2D("%s vs %s" % tuple(baseList),
+                    # plotter.plotArray2D("Reduced dimensions deformation amplitudes: %s vs %s" % tuple(baseList),
+                    #                     *baseList)
+                    plotter.plotArray2D_xy("%s vs %s" % tuple(baseList),
                                         *baseList)
                 elif dim == 3:
                     self.getData().ZIND = modeList[2]
-                    plotter.plotArray3D("%s %s %s" % tuple(baseList),
+                    # plotter.plotArray3D("%s %s %s" % tuple(baseList),
+                    #                     *baseList)
+                    plotter.plotArray3D_xyz("%s %s %s" % tuple(baseList),
                                         *baseList)
             views.append(plotter)
 
@@ -207,7 +223,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         #                                    data=self.getData(),
         #                                    callback=self._createCluster
         #                                    )
-        self.clusterWindow = self.tkWindow(ClusteringWindowVol,
+        self.clusterWindow = self.tkWindow(ClusteringWindowVolHeteroFlow,
                                            title='Volume Clustering Tool',
                                            dim=self.protocol.reducedDim.get(),
                                            data=self.getData(),
@@ -233,7 +249,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         #                                         loadCallback=self._loadAnimation,
         #                                         numberOfPoints=10
         #                                         )
-        self.trajectoriesWindow = self.tkWindow(TrajectoriesWindowVol,
+        self.trajectoriesWindow = self.tkWindow(TrajectoriesWindowVolHeteroFlow,
                                                 title='Trajectories Tool',
                                                 dim=self.protocol.reducedDim.get(),
                                                 data=self.getData(),
@@ -261,7 +277,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         # Write the particles
         prot = self.protocol
         project = prot.getProject()
-        inputSet = prot.getInputParticles()
+        inputSet = prot.getInputParticles().get()
         fnSqlite = prot._getTmpPath('cluster_particles.sqlite')
         cleanPath(fnSqlite)
         partSet = SetOfParticles(filename=fnSqlite)
@@ -271,54 +287,55 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
             if point.getState() == Point.SELECTED:
                 particle = inputSet[point.getId()]
                 partSet.append(particle)
-                if first:
-                    flag = particle._xmipp_angleY.get()
-                    first = False
         partSet.write()
         partSet.close()
 
-        from continuousflex.protocols.protocol_batch_cluster_vol import FlexBatchProtNMAClusterVol
+        from continuousflex.protocols.protocol_batch_cluster_heteroflow import FlexBatchProtHeteroFlowCluster
 
-        newProt = project.newProtocol(FlexBatchProtNMAClusterVol)
+        newProt = project.newProtocol(FlexBatchProtHeteroFlowCluster)
         clusterName = self.clusterWindow.getClusterName()
         if clusterName:
             newProt.setObjLabel(clusterName)
-        newProt.inputNmaDimred.set(prot)
+        newProt.inputHeteroFlowDimred.set(prot)
         newProt.sqliteFile.set(fnSqlite)
-        newProt.angleYflag.set(flag)
         project.launchProtocol(newProt)
         project.getRunsGraph()
 
+
+
+
     def _loadAnimationData(self, obj):
-        prot = self.protocol
-        animationName = obj.getFileName()  # assumes that obj.getFileName is the folder of animation
-        animationPath = prot._getExtraPath(animationName)
-        # animationName = animationPath.split('animation_')[-1]
-        animationRoot = join(animationPath, animationName)
-
-        animationSuffixes = ['.vmd', '.pdb', 'trajectory.txt']
-        for s in animationSuffixes:
-            f = animationRoot + s
-            if not exists(f):
-                self.errorMessage('Animation file "%s" not found. ' % f)
-                return
-
-        # Load animation trajectory points
-        trajectoryPoints = np.loadtxt(animationRoot + 'trajectory.txt')
-        data = PathData(dim=trajectoryPoints.shape[1])
-
-        for i, row in enumerate(trajectoryPoints):
-            data.addPoint(Point(pointId=i + 1, data=list(row), weight=1))
-
-        self.trajectoriesWindow.setPathData(data)
-        self.trajectoriesWindow.setAnimationName(animationName)
-        self.trajectoriesWindow._onUpdateClick()
-
-        def _showVmd():
-            vmdFn = animationRoot + '.vmd'
-            VmdView(' -e %s' % vmdFn).show()
-
-        self.getTkRoot().after(500, _showVmd)
+        pass
+        # prot = self.protocol
+        # animationName = obj.getFileName()  # assumes that obj.getFileName is the folder of animation
+        # animationPath = prot._getExtraPath(animationName)
+        # # animationName = animationPath.split('animation_')[-1]
+        # animationRoot = join(animationPath, animationName)
+        #
+        # animationSuffixes = ['.vmd', '.pdb', 'trajectory.txt']
+        # for s in animationSuffixes:
+        #     f = animationRoot + s
+        #     if not exists(f):
+        #         self.errorMessage('Animation file "%s" not found. ' % f)
+        #         return
+        #
+        # # Load animation trajectory points
+        # trajectoryPoints = np.loadtxt(animationRoot + 'trajectory.txt')
+        # data = PathData(dim=trajectoryPoints.shape[1])
+        #
+        # for i, row in enumerate(trajectoryPoints):
+        #     data.addPoint(Point(pointId=i + 1, data=list(row), weight=1))
+        #
+        # self.trajectoriesWindow.setPathData(data)
+        # self.trajectoriesWindow.setAnimationName(animationName)
+        # self.trajectoriesWindow._onUpdateClick()
+        #
+        # def _showVmd():
+        #     vmdFn = animationRoot + '.vmd'
+        #     VmdView(' -e %s' % vmdFn).show()
+        #
+        # self.getTkRoot().after(500, _showVmd)
+        pass
 
     def _loadAnimation(self):
         prot = self.protocol
@@ -347,7 +364,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
 
         if isfile(projectorFile):
             M = np.loadtxt(projectorFile)
-            if prot.getMethodName() == 'sklearn_PCA':
+            if prot.getMethodName()=='sklearn_PCA':
                 pca = load(prot._getExtraPath('pca_pickled.txt'))
                 deformations = pca.inverse_transform(trajectoryPoints)
             else:
@@ -360,127 +377,100 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
             # Find closest points in deformations
             deformations = [X[np.argmin(np.sum((Y - p) ** 2, axis=1))] for p in trajectoryPoints]
 
-        if prot.getDataChoice() == 'NMAs':
-            pdb = prot.getInputPdb()
-            pdbFile = pdb.getFileName()
-            modesFn = prot.inputNMA.get()._getExtraPath('modes.xmd')
-            for i, d in enumerate(deformations):
-                atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i + 1)
-                cmd = '-o %s --pdb %s --nma %s --deformations ' % (atomsFn, pdbFile, modesFn)
-                for l in d:
-                    cmd += str(l) + ' '
-                # because it doesn't have an independent protocol we don't use self.runJob
-                runJob(None, 'xmipp_pdb_nma_deform', cmd, env=prot._getEnviron())
+        # get the original size of the input:
+        mdImgs = md.MetaData(self.protocol.inputOpFlow.get()._getExtraPath('volumes.xmd'))
+        N = 0
+        for objId in mdImgs:
+            N += 1
 
-        elif prot.getDataChoice() == 'PDBs':
-            # There is incompatibility issue with the rest of the code, we have to use the fahterPDB as one of the
-            # deformed PDBs (the first one)
-            # fatherPDB = prot._getExtraPath('pdb_file.pdb')
-            fatherPDB = prot._getExtraPath('generated_pdbs/000001.pdb')
-            lines_father = self.readPDB(fatherPDB)
-            list_father = self.PDB2List(lines_father)
-            i = 0
-            for line in deformations:
-                # reshaped pdb xyz coordinates
-                list_xyz = np.reshape(line, np.shape(list_father))
-                lines_i = self.list2PDBlines(list_xyz, lines_father)
-                atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i + 1)
-                self.writePDB(lines_i, atomsFn)
-                i += 1
-            pass
+        # reading back all optical flows
+        bigmat = []
+        if(isfile(self.protocol._getExtraPath('bigmat_inverse.pkl'))):
+            print('bigmat_inverse.txt found')
+            # bigmat_pinv = np.loadtxt(self.protocol._getExtraPath('bigmat_inverse.txt'))
+            bigmat_pinv = load(self.protocol._getExtraPath('bigmat_inverse.pkl'))
+        else:
+            if(isfile(self.protocol._getExtraPath('bigmat.pkl'))):
+                bigmat = load(self.protocol._getExtraPath('bigmat.pkl'))
+            else:
+                for j in range(1, N+1):
+                    flowj = self.read_optical_flow_by_number(j)
+                    flowj = np.reshape(flowj, [3 * np.shape(flowj)[1] * np.shape(flowj)[2] * np.shape(flowj)[3]])
+                    bigmat.append(flowj)
+                bigmat = np.array(bigmat)
+                print('bigmat created successfully')
+                # np.savetxt(self.protocol._getExtraPath('bigmat.txt'),bigmat)
+                dump(bigmat,self.protocol._getExtraPath('bigmat.pkl'))
+                print('bigmat.pkl saved successfully')
+            bigmat_pinv = np.linalg.pinv(bigmat)
+            bigmat = None  # removing it from the memory
+            # np.savetxt(self.protocol._getExtraPath('bigmat_inverse.txt'),bigmat_pinv)
+            dump(bigmat_pinv,self.protocol._getExtraPath('bigmat_inverse.pkl'))
 
-        # Join all deformations in a single pdb
-        # iterating going up and down through all points
-        # 1 2 3 ... n-2 n-1 n n-1 n-2 ... 3, 2
-        n = len(deformations)
-        r1 = list(range(1, n + 1))
-        r2 = list(range(2, n))  # Skip 1 at the end
-        r2.reverse()
-        loop = r1 + r2
+        line = np.matmul(bigmat_pinv, np.transpose(deformations))
+        bigmat_pinv = None # removing if from the memory
+        fnref = self.protocol._getExtraPath('reference.spi')
+        shape = np.shape(open_volume(fnref))
 
-        trajFn = animationRoot + '.pdb'
-        trajFile = open(trajFn, 'w')
+        for i, trash in enumerate(deformations):
+            flowi = np.transpose(line[:, i])
+            flowi = np.reshape(flowi, [3, shape[0], shape[1], shape[2]])
+            pathi = animationRoot + str(i).zfill(3) + 'deformed_by_opflow.vol'
+            ref = open_volume(fnref)
+            ref = farneback3d.warp_by_flow(ref, np.float32(flowi))
+            save_volume(ref, pathi)
+            # command = '-i ' + pathi + ' --select below 0.6 --substitute value 0'
+            # runJob(None,'xmipp_transform_threshold',command)
+        fn_cxc = self.protocol._getExtraPath('chimera_%s.cxc' % animation)
+        # cxc_command = 'open ' + animationPath + '/*.vol vseries true\n'
+        cxc_command = 'open animation_%s/*.vol vseries true\n' % animation
+        cxc_command += 'volume #1 style surface level 8.0\n'
+        cxc_command += 'vseries play #1 loop true maxFrameRate 5 direction oscillate'
+        with open(fn_cxc, 'w') as f:
+            print(cxc_command, file=f)
+        # ChimeraView(fn_cxc)
+        command = '$SCIPION_HOME/$CHIMERA_HOME/bin/ChimeraX ' + fn_cxc
+        os.system(command)
 
-        for i in loop:
-            atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % i
-            atomsFile = open(atomsFn)
-            for line in atomsFile:
-                trajFile.write(line)
-            trajFile.write('TER\nENDMDL\n')
-            atomsFile.close()
 
-        trajFile.close()
-        # Delete temporary atom files
-        # cleanPattern(animationRoot + 'atomsDeformed_??.pdb')
 
-        # Generate the vmd script
-        vmdFn = animationRoot + '.vmd'
-        vmdFile = open(vmdFn, 'w')
-        vmdFile.write("""
-        mol new %s
-        animate style Loop
-        display projection Orthographic
-        mol modcolor 0 0 Index
-        mol modstyle 0 0 Beads 1.000000 8.000000
-        animate speed 0.5
-        animate forward
-        """ % trajFn)
-        vmdFile.close()
-
-        VmdView(' -e ' + vmdFn).show()
 
     def loadData(self):
-        """ Iterate over the volumes and the output matrix txt file
-        and create a Data object with theirs Points.
+        """ Iterate over the images and their deformations
+        to create a Data object with theirs Points.
         """
-        matrix = np.loadtxt(self.protocol.getOutputMatrixFile())
-        particles = self.protocol.getInputParticles()
-
+        particles = self.protocol.getInputParticles().get()
+        mat = np.loadtxt(self.protocol._getExtraPath('output_matrix.txt'))
         data = Data()
         for i, particle in enumerate(particles):
+            pointData = mat[i,:]
             data.addPoint(Point(pointId=particle.getObjId(),
-                                data=matrix[i, :],
-                                weight=particle._xmipp_maxCC.get()))
-
+                                data=pointData,
+                                weight=0))
+            # print(pointData)
         return data
 
-    def readPDB(self, fnIn):
-        with open(fnIn) as f:
-            lines = f.readlines()
-        return lines
+    def _validate(self):
+        errors = []
+        return errors
 
-    def PDB2List(self, lines):
-        newlines = []
-        for line in lines:
-            if line.startswith("ATOM "):
-                try:
-                    x = float(line[30:38])
-                    y = float(line[38:46])
-                    z = float(line[46:54])
-                    newline = [x, y, z]
-                    newlines.append(newline)
-                except:
-                    pass
-        return newlines
+    def read_optical_flow(self, path_flowx, path_flowy, path_flowz):
+        x = open_volume(path_flowx)
+        y = open_volume(path_flowy)
+        z = open_volume(path_flowz)
+        l = np.shape(x)
+        # print(l)
+        flow = np.zeros([3, l[0], l[1], l[2]])
+        flow[0, :, :, :] = x
+        flow[1, :, :, :] = y
+        flow[2, :, :, :] = z
+        return flow
 
-    def list2PDBlines(self, list, lines):
-        newLines = []
-        i = 0
-        for line in lines:
-            if line.startswith("ATOM "):
-                try:
-                    x = list[i][0]
-                    y = list[i][1]
-                    z = list[i][2]
-                    newLine = line[0:30] + "%8.3f%8.3f%8.3f" % (x, y, z) + line[54:]
-                    i += 1
-                except:
-                    pass
-            else:
-                newLine = line
-            newLines.append(newLine)
-        return newLines
-
-    def writePDB(self, lines, fnOut):
-        with open(fnOut, mode='w') as f:
-            f.writelines(lines)
+    def read_optical_flow_by_number(self, num):
+        op_path = self.protocol.inputOpFlow.get()._getExtraPath()+'/optical_flows/'
+        # op_path = self._getExtraPath() + '/optical_flows/'
+        path_flowx = op_path + str(num).zfill(6) + '_opflowx.spi'
+        path_flowy = op_path + str(num).zfill(6) + '_opflowy.spi'
+        path_flowz = op_path + str(num).zfill(6) + '_opflowz.spi'
+        flow = self.read_optical_flow(path_flowx, path_flowy, path_flowz)
+        return flow

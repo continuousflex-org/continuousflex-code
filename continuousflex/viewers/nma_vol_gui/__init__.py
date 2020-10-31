@@ -25,5 +25,5 @@
 
 from .PointSelectorVol import PointSelectorVol
 from .PointPathVol import PointPathVol
-from .tk_clustering_vol import ClusteringWindowVol
-from .tk_trajectories_vol import TrajectoriesWindowVol
+from .tk_clustering_vol import ClusteringWindowVol, ClusteringWindowVolHeteroFlow
+from .tk_trajectories_vol import TrajectoriesWindowVol, TrajectoriesWindowVolHeteroFlow
