@@ -228,7 +228,10 @@ class ClusteringWindowVol(gui.Window):
                     self.ps = PointSelectorVol(ax, self.data, callback=self._updateSelectionLabel)
                     # self.ps = PointSelectorVol(ax, self.data, callback=None)
                 elif dim == 3:
-                    del self.ps  # Remove PointSelector
+                    try:
+                        del self.ps  # Remove PointSelector
+                    except:
+                        pass
                     self.data.ZIND = modeList[2]
                     self.plotter.plotArray3D("%s %s %s" % tuple(baseList), *baseList)
 
