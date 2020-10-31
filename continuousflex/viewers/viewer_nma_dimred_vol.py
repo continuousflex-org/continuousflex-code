@@ -206,7 +206,6 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         #                                    data=self.getData(),
         #                                    callback=self._createCluster
         #                                    )
-        print(self.limits_modes,self.LimitLow,self.xlim_low,self.ylim_high)
         self.clusterWindow = self.tkWindow(ClusteringWindowVol,
                                            title='Volume Clustering Tool',
                                            dim=self.protocol.reducedDim.get(),
@@ -366,7 +365,9 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
             modesFn = prot.inputNMA.get()._getExtraPath('modes.xmd')
             for i, d in enumerate(deformations):
                 atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i + 1)
-                cmd = '-o %s --pdb %s --nma %s --deformations %s' % (atomsFn, pdbFile, modesFn, str(d)[1:-1])
+                cmd = '-o %s --pdb %s --nma %s --deformations ' % (atomsFn, pdbFile, modesFn)
+                for l in d:
+                    cmd += str(l) + ' '
                 # because it doesn't have an independent protocol we don't use self.runJob
                 runJob(None, 'xmipp_pdb_nma_deform', cmd, env=prot._getEnviron())
 

@@ -253,8 +253,8 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
             # print('xmipp_transform_geometry',params)
             self.runJob('xmipp_transform_geometry', params)
-            params = '-i ' + new_imgPath + ' --rotate_volume euler 0 90 0 '
-            self.runJob('xmipp_transform_geometry', params)
+            # params = '-i ' + new_imgPath + ' --rotate_volume euler 0 90 0 '
+            # self.runJob('xmipp_transform_geometry', params)
         self.fnaligned = self._getExtraPath('volumes_aligned.xmd')
         mdImgs.write(self.fnaligned)
 
@@ -263,12 +263,12 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         partSet = self._createSetOfVolumes('not_aligned')
         xmipp3.convert.readSetOfVolumes(self._getExtraPath('volumes.xmd'), partSet)
         partSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
-        self._defineOutputs(outputVolumes=partSet)
+        self._defineOutputs(MissingWedgeFilledNotAligned=partSet)
         if self.applyParams.get():
             partSet2 = self._createSetOfVolumes('aligned')
             xmipp3.convert.readSetOfVolumes(self.fnaligned, partSet2)
             partSet2.setSamplingRate(self.inputVolumes.get().getSamplingRate())
-            self._defineOutputs(outputParticles=partSet2)
+            self._defineOutputs(MissingWedgeFilledAndAligned=partSet2)
         # self._defineTransformRelation(self.inputVolumes, partSet)
 
 
