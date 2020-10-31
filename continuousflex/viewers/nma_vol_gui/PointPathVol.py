@@ -24,7 +24,9 @@
 # **************************************************************************
 
 from math import sqrt
-from continuousflex.viewers.plotter_vol import plotArray2D
+# from continuousflex.viewers.plotter_vol import plotArray2D
+from continuousflex.viewers.plotter_vol import plotArray2D_xy
+
 
 STATE_NO_POINTS = 0  # no points have been selected, double-click will add first one
 STATE_DRAW_POINTS = 1  # still adding points, double-click will set the last one
@@ -41,7 +43,10 @@ class PointPathVol():
         self.ax = ax
         self.data = data
 
-        plotArray2D(ax, self.data)
+        # plotArray2D(ax, self.data)
+        # To avoid plotting the sidebar twice
+        plotArray2D_xy(ax, self.data)
+
         self.callback = callback
 
         self.dragIndex = None

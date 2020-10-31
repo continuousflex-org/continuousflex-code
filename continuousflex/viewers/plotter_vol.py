@@ -146,3 +146,16 @@ def plotArray2D(ax, data, vvmin=None, vvmax=None):
         cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights)
     cb = ax.figure.colorbar(cax)
     cb.set_label('1- Cross Correlation')
+
+
+def plotArray2D_xy(ax, data, vvmin=None, vvmax=None):
+    xdata = data.getXData()
+    ydata = data.getYData()
+    weights = data.getWeights()
+    if vvmin:
+        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights, vmin=vvmin.get(), vmax=vvmax.get())
+        #plot_kwds = {'alpha': 0.25, 's': 150, 'linewidths': 0}
+        #cax = ax.scatter(xdata, ydata, c='b',**plot_kwds)
+    else:
+        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights)
+
