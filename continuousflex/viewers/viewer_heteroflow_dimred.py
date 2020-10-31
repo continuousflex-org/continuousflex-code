@@ -314,7 +314,7 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         fn_cxc = self.protocol._getExtraPath('chimera_%s.cxc' % animation)
         # cxc_command = 'open ' + animationPath + '/*.vol vseries true\n'
         cxc_command = 'open animation_%s/*.vol vseries true\n' % animation
-        cxc_command += 'volume #1 style surface level 0.7\n'
+        cxc_command += 'volume #1 style surface level 8.0\n'
         cxc_command += 'vseries play #1 loop true maxFrameRate 5 direction oscillate'
         with open(fn_cxc, 'w') as f:
             print(cxc_command, file=f)
