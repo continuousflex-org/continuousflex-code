@@ -222,6 +222,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                         break
             mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
             mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
+        mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.imgsFn)
 
 
@@ -282,6 +283,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                         break
             mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
             mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
+        mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.imgsFn)
 
         mdImgs.write(self.imgsFn)

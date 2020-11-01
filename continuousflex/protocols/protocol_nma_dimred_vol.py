@@ -194,7 +194,7 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
                 self.runJob('xmipp_pdb_nma_deform', cmd)
                 i += 1
             pdbs_list = [f for f in glob.glob(pdbs_folder+'/*.pdb')]
-            #print(pdbs_list)
+            pdbs_list.sort()
             pdbs_matrix = []
             for pdbfn in pdbs_list:
                 pdb_lines = self.readPDB(pdbfn)
