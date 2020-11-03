@@ -47,8 +47,7 @@ DIMRED_SPE = 9
 DIMRED_NPE = 10
 DIMRED_SKLEAN_PCA = 11
 
-USE_PDBS = 0
-USE_NMA_AMP = 1
+
 
 # Values to be passed to the program
 DIMRED_VALUES = ['PCA', 'LTSA', 'DM', 'LLTSA', 'LPP', 'kPCA', 'pPCA', 'LE', 'HLLE', 'SPE', 'NPE', 'sklearn_PCA','None']
@@ -87,7 +86,7 @@ class FlexProtDimredHeteroFlow(ProtAnalysis3D):
                                'Hessian Locally Linear Embedding',
                                'Stochastic Proximity Embedding',
                                'Neighborhood Preserving Embedding',
-                               'Scikit-Learn PCA (for large PDBs)',
+                               'Scikit-Learn PCA',
                                "Don't reduce dimensions"],
                       label='Dimensionality reduction method',
                       help=""" Choose among the following dimensionality reduction methods:
@@ -177,7 +176,6 @@ class FlexProtDimredHeteroFlow(ProtAnalysis3D):
 
         if methodName == 'sklearn_PCA':
             X = np.loadtxt(fname=deformationsFile)
-            # TODO: take the number of components from the user / check an option to add an average pdb in clustering
             pca = decomposition.PCA(n_components=reducedDim)
             pca.fit(X)
             Y = pca.transform(X)

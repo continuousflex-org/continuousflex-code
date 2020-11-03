@@ -64,18 +64,18 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                                                          ' subtomogram alignment and averaging.')
         form.addSection(label='Missing-wedge Compensation')
         form.addParam('WedgeMode', params.EnumParam,
-                      choices=['Do not compensate', 'Compensate (Recommended)'],
+                      choices=['Do not compensate', 'Compensate'],
                       default=WEDGE_MASK_THRE,
                       label='Wedge mode', display=params.EnumParam.DISPLAY_COMBO,
                       help='Choose to compensate for the missing wedge if aligning subtomograms.'
                            ' However, if you are working with previously aligned subtomograms, then its better not to.')
         form.addParam('tiltLow', params.IntParam, default=-60,
-                      expertLevel=params.LEVEL_ADVANCED,
+                      # expertLevel=params.LEVEL_ADVANCED,
                       condition='WedgeMode==%d' % WEDGE_MASK_THRE,
                       label='Lower tilt value',
                       help='The lower tilt angle used in obtaining the tilt series')
         form.addParam('tiltHigh', params.IntParam, default=60,
-                      expertLevel=params.LEVEL_ADVANCED,
+                      # expertLevel=params.LEVEL_ADVANCED,
                       condition='WedgeMode==%d' % WEDGE_MASK_THRE,
                       label='Upper tilt value',
                       help='The upper tilt angle used in obtaining the tilt series')
@@ -83,9 +83,9 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         form.addParam('frm_freq', params.FloatParam, default=0.25,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='Maximum normalized pixel frequency',
-                      help='The normalized frequency should be a number between 0 and 1 '
+                      help='The normalized frequency should be a number between -0.5 and 0.5 '
                            'The more it is, the bigger the search frequency is, the more time it demands, '
-                           'keep it as default is recommended')
+                           'keeping it as default is recommended')
         form.addParam('frm_maxshift', params.IntParam, default=10,
                       expertlevel=params.LEVEL_ADVANCED,
                       label='Maximum shift for rigid body search',

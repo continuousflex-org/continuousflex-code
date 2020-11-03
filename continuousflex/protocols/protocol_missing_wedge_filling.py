@@ -48,22 +48,22 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
                       label="Input volume(s)", important=True,
                       help='Select volumes')
         form.addParam('StartingReference', params.EnumParam,
-                      choices=['from input file', 'from STA run'],
+                      choices=['Import an external volume', 'Select volume'],
                       default=REFERENCE_EXT,
-                      label='Starting reference', display=params.EnumParam.DISPLAY_COMBO,
+                      label='Reference volume', display=params.EnumParam.DISPLAY_COMBO,
                       help='either an external volume file or an output volume from STA protocol')
         form.addParam('ReferenceVolume', params.FileParam,
                       pointerClass='params.FileParam', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_EXT,
-                      label="Starting Reference Volume",
+                      label="File path",
                       help='Choose a reference, typically from a STA previous run')
         form.addParam('STAVolume', params.PointerParam,
                       pointerClass='Volume', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_STA,
-                      label="Subtomogram average",
+                      label="Volume (STA)",
                       help='Choose a reference, typically from a STA previous run')
         form.addParam('AlignmentParameters', params.EnumParam,
-                      choices=['from input file', 'from STA run'],
+                      choices=['from input metadata file', 'from STA run'],
                       default=REFERENCE_EXT,
                       label='Alignment parameters', display=params.EnumParam.DISPLAY_COMBO,
                       help='either an external metadata file containing alignment parameters or STA run')

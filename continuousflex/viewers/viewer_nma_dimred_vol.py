@@ -351,8 +351,10 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
                 pca = load(prot._getExtraPath('pca_pickled.txt'))
                 deformations = pca.inverse_transform(trajectoryPoints)
             else:
-                # TODO: add mean
                 deformations = np.dot(trajectoryPoints, np.linalg.pinv(M))
+                temp = np.loadtxt(prot._getExtraPath('deformations.txt')) # the original matrix file
+                deformations += np.outer(np.ones(deformations.shape[0]),np.mean(temp, axis=0))
+                temp = None
             np.savetxt(animationRoot + 'trajectory.txt', trajectoryPoints)
         else:
             Y = np.loadtxt(prot.getOutputMatrixFile())

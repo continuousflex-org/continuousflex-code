@@ -55,10 +55,10 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
                       label="Input volume(s)", important=True,
                       help='Select volumes')
         form.addParam('StartingReference', params.EnumParam,
-                      choices=['from input file', 'from STA run'],
+                      choices=['From an external volume file', 'Select a volume'],
                       default=REFERENCE_EXT,
-                      label='Starting reference', display=params.EnumParam.DISPLAY_COMBO,
-                      help='either an external volume file or an output volume from STA protocol')
+                      label='Reference volume', display=params.EnumParam.DISPLAY_COMBO,
+                      help='Either an external volume file or a subtomogram average')
         form.addParam('ReferenceVolume', params.FileParam,
                       pointerClass='params.FileParam', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_EXT,

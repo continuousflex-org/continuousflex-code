@@ -32,30 +32,28 @@ visualization program.
 import os
 from os.path import basename, join, exists, isfile
 import numpy as np
-
 import pwem.emlib.metadata as md
-
 from pyworkflow.utils.path import cleanPath, makePath, cleanPattern
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
-
 from pyworkflow.protocol.params import StringParam, LabelParam
 from pwem.objects import SetOfParticles
-from pyworkflow.utils.process import runJob
-from pwem.viewers import VmdView
 from pyworkflow.gui.browser import FileBrowserWindow
 from continuousflex.protocols.protocol_heteroflow_dimred import FlexProtDimredHeteroFlow
 from continuousflex.protocols.data import Point, Data
 from .plotter_vol import FlexNmaVolPlotter
-from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVol
-from continuousflex.viewers.nma_vol_gui import ClusteringWindowVol
 from continuousflex.viewers.nma_vol_gui import ClusteringWindowVolHeteroFlow
 from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVolHeteroFlow
+# from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVol
+# from continuousflex.viewers.nma_vol_gui import ClusteringWindowVol
+# from pyworkflow.utils.process import runJob
+# from pwem.viewers import VmdView
+# from pwem.viewers.viewer_chimera import Chimera, ChimeraView
 
 from joblib import load, dump
 from continuousflex.protocols.utilities.spider_files3 import open_volume, save_volume
 import farneback3d
 
-from pwem.viewers.viewer_chimera import Chimera, ChimeraView
+
 from pyworkflow.protocol import params
 
 FIGURE_LIMIT_NONE = 0
@@ -102,11 +100,12 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
                       label='Open clustering tool?',
                       help='Open a GUI to visualize the volumes as points '
                            'and select some of them to create new clusters, and compute 3D averages of the clusters')
-
         form.addParam('displayTrajectories', LabelParam,
                       label='Open trajectories tool?',
                       help='Open a GUI to visualize the volumes as points'
                            ' to draw and adjust trajectories.')
+        form.addParam('graylevel',params.FloatParam, label='Gray-level threshold level for animations',
+                      default=0.2, expertLevel=params.LEVEL_ADVANCED)
         form.addParam('limits_modes', params.EnumParam,
                       choices=['Automatic (Recommended)', 'Set manually Use upper and lower values'],
                       default=FIGURE_LIMIT_NONE,
@@ -217,12 +216,6 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         return views
 
     def _displayClustering(self, paramName):
-        # self.clusterWindow = self.tkWindow(ClusteringWindowVol,
-        #                                    title='Volume Clustering Tool',
-        #                                    dim=self.protocol.reducedDim.get(),
-        #                                    data=self.getData(),
-        #                                    callback=self._createCluster
-        #                                    )
         self.clusterWindow = self.tkWindow(ClusteringWindowVolHeteroFlow,
                                            title='Volume Clustering Tool',
                                            dim=self.protocol.reducedDim.get(),
@@ -241,14 +234,6 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         return [self.clusterWindow]
 
     def _displayTrajectories(self, paramName):
-        # self.trajectoriesWindow = self.tkWindow(TrajectoriesWindowVol,
-        #                                         title='Trajectories Tool',
-        #                                         dim=self.protocol.reducedDim.get(),
-        #                                         data=self.getData(),
-        #                                         callback=self._generateAnimation,
-        #                                         loadCallback=self._loadAnimation,
-        #                                         numberOfPoints=10
-        #                                         )
         self.trajectoriesWindow = self.tkWindow(TrajectoriesWindowVolHeteroFlow,
                                                 title='Trajectories Tool',
                                                 dim=self.protocol.reducedDim.get(),
@@ -305,7 +290,6 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
 
 
     def _loadAnimationData(self, obj):
-        pass
         # prot = self.protocol
         # animationName = obj.getFileName()  # assumes that obj.getFileName is the folder of animation
         # animationPath = prot._getExtraPath(animationName)
@@ -424,7 +408,8 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         fn_cxc = self.protocol._getExtraPath('chimera_%s.cxc' % animation)
         # cxc_command = 'open ' + animationPath + '/*.vol vseries true\n'
         cxc_command = 'open animation_%s/*.vol vseries true\n' % animation
-        cxc_command += 'volume #1 style surface level 8.0\n'
+        # cxc_command += 'volume #1 style surface level 8.0\n'
+        cxc_command += 'volume #1 style surface level %f\n' % self.graylevel
         cxc_command += 'vseries play #1 loop true maxFrameRate 5 direction oscillate'
         with open(fn_cxc, 'w') as f:
             print(cxc_command, file=f)
@@ -447,7 +432,6 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
             data.addPoint(Point(pointId=particle.getObjId(),
                                 data=pointData,
                                 weight=0))
-            # print(pointData)
         return data
 
     def _validate(self):
@@ -459,7 +443,6 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         y = open_volume(path_flowy)
         z = open_volume(path_flowz)
         l = np.shape(x)
-        # print(l)
         flow = np.zeros([3, l[0], l[1], l[2]])
         flow[0, :, :, :] = x
         flow[1, :, :, :] = y
@@ -468,7 +451,6 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
 
     def read_optical_flow_by_number(self, num):
         op_path = self.protocol.inputOpFlow.get()._getExtraPath()+'/optical_flows/'
-        # op_path = self._getExtraPath() + '/optical_flows/'
         path_flowx = op_path + str(num).zfill(6) + '_opflowx.spi'
         path_flowy = op_path + str(num).zfill(6) + '_opflowy.spi'
         path_flowz = op_path + str(num).zfill(6) + '_opflowz.spi'
