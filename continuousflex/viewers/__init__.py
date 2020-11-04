@@ -30,6 +30,7 @@ from .viewer_structure_mapping import FlexProtStructureMappingViewer
 from .viewer_nma_alignment_vol import FlexAlignmentNMAVolViewer
 from .viewer_nma_dimred_vol import FlexDimredNMAVolViewer
 from .viewer_heteroflow_dimred import FlexDimredHeteroFlowViewer
+from .viewer_heteroflow import FlexHeteroFlowViewer
 
 
 
