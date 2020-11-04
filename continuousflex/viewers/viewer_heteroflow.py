@@ -141,7 +141,8 @@ class FlexHeteroFlowViewer(EmProtocolViewer):
     def _viewFlow(self, paramName):
         number = str(self.FlowNumber).zfill(6)
         flow = self.read_optical_flow_by_number(number)
-        plot_quiver_3d(flow, downsample=self.DownSample.get())
+        title = '3D optical flow for input volume number %d' % self.FlowNumber
+        plot_quiver_3d(flow, downsample=self.DownSample.get(), title=title)
         pass
 
     def _viewFlow2(self, paramName):
@@ -150,21 +151,24 @@ class FlexHeteroFlowViewer(EmProtocolViewer):
         path_flowx = op_path + str(number).zfill(6) + '_opflowx.spi'
         path_flowy = op_path + str(number).zfill(6) + '_opflowy.spi'
         path_flowz = op_path + str(number).zfill(6) + '_opflowz.spi'
-        # flow_u = self.protocol._getTmpPath('flow_u.spi')
-        # flow_v = self.protocol._getTmpPath('flow_v.spi')
         proj_x = self.protocol._getTmpPath('proj_x.spi')
         proj_y = self.protocol._getTmpPath('proj_y.spi')
         proj_z = self.protocol._getTmpPath('proj_z.spi')
         rot = 0
         tilt = 0
         psi = 0
+        title = 'Projected optical flow of input volume number %d on XY plane' % self.FlowNumber
         if self.displayFlow2 == XZ:
+            title = 'Projected optical flow of input volume number %d on XZ plane' % self.FlowNumber
             rot = 90
             tilt = 90
         elif self.displayFlow2 == ZY:
+            title = 'Projected optical flow of input volume number %d on ZY plane' % self.FlowNumber
             tilt = 90
         if paramName == 'RotTiltPsi':
             rot, tilt, psi = list(map(float, self.RotTiltPsi.get().split()))
+            title = 'Projected optical flow of input volume number %d \n using Euler angles' \
+                    ' (%.1f, %.1f, %.1f)' % (self.FlowNumber, rot, tilt, psi)
             print(rot, tilt, psi)
         command_x = '-i ' + path_flowx + ' -o ' + proj_x + ' --angles ' + str(rot) + ' ' + str(tilt) + ' ' + str(psi)
         command_y = '-i ' + path_flowy + ' -o ' + proj_y + ' --angles ' + str(rot) + ' ' + str(tilt) + ' ' + str(psi)
@@ -185,7 +189,7 @@ class FlexHeteroFlowViewer(EmProtocolViewer):
         flow2D = np.zeros([np.shape(px)[0], np.shape(px)[1], 2])
         flow2D[:,:,0] = pn[0,:,:]
         flow2D[:,:,1] = pn[1,:,:]
-        plot_quiver_2d(flow2D)
+        plot_quiver_2d(flow2D, title=title)
         pass
 
     def read_optical_flow_by_number(self, num):
