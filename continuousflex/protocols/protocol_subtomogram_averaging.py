@@ -36,6 +36,7 @@ WEDGE_MASK_THRE = 1
 
 REFERENCE_NONE = 0
 REFERENCE_EXISTS = 1
+REFERENCE_IMPORTED = 2
 
 
 class FlexProtSubtomogramAveraging(ProtAnalysis3D):
@@ -50,15 +51,21 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                       label="Input volume(s)", important=True,
                       help='Select volumes')
         form.addParam('StartingReference', params.EnumParam,
-                      choices=['start from scratch', 'start from a specific reference'],
+                      choices=['start from scratch', 'import a volume file and use it as reference',
+                               'select a volume and use as reference'],
                       default=REFERENCE_NONE,
                       label='Starting reference', display=params.EnumParam.DISPLAY_COMBO,
                       help='Align from scratch of choose a template')
         form.addParam('ReferenceVolume', params.FileParam,
                       pointerClass='params.FileParam', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_EXISTS,
-                      label="Starting Reference Volume",
-                      help='Choose a starting reference if you have a template (could cause bias to reference)')
+                      label="starting reference file",
+                      help='Choose a starting reference from an external volume file')
+        form.addParam('ReferenceImported', params.PointerParam,
+                      pointerClass='SetOfVolumes,Volume', allowsNull=True,
+                      condition='StartingReference==%d' % REFERENCE_IMPORTED,
+                      label="selected starting reference",
+                      help='Choose an imported volume as a starting reference')
         form.addParam('NumOfIters', params.IntParam, default=10,
                       label='Number of iterations', help='How many times you want to iterate while performing'
                                                          ' subtomogram alignment and averaging.')
@@ -117,7 +124,11 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         frm_maxshift = self.frm_maxshift.get()
         max_itr = self.NumOfIters.get()
         iter_result = self._getExtraPath('result.xmd')
-        reference = self.ReferenceVolume.get()
+        reference = None
+        if self.StartingReference == REFERENCE_EXISTS:
+            reference = self.ReferenceVolume.get()
+        if self.StartingReference == REFERENCE_IMPORTED:
+            reference = self.ReferenceImported.get().getFileName()
 
         print('tempdir is ', tempdir)
         print('imgFn is ', imgFn)
