@@ -26,14 +26,18 @@ import xmipp3.convert
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
 from pyworkflow.utils.path import makePath, copyFile
-from os.path import basename
+from os.path import basename, isfile
 from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
 from .utilities.spider_files3 import save_volume, open_volume
 from pyworkflow.utils import replaceBaseExt
 import numpy as np
+from continuousflex.protocols.utilities.mwr import mwr
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
+
+METHOD_STAFILL = 0
+METHOD_MCSFILL = 1
 
 
 class FlexProtMissingWedgeFilling(ProtAnalysis3D):
@@ -47,67 +51,98 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
                       pointerClass='SetOfVolumes,Volume',
                       label="Input volume(s)", important=True,
                       help='Select volumes')
-        form.addParam('StartingReference', params.EnumParam,
+        group = form.addGroup('Missing-wedge parameters')
+        group.addParam('tiltLow', params.IntParam, default=-60,
+                       label='Lower tilt value',
+                       help='The lower tilt angle used in obtaining the tilt series')
+        group.addParam('tiltHigh', params.IntParam, default=60,
+                       label='Upper tilt value',
+                       help='The upper tilt angle used in obtaining the tilt series')
+        form.addSection('Method')
+        form.addParam('Method', params.EnumParam,
+                      choices=['MW fill with the average', 'MW restoration using monte carlo simulation'],
+                      default=METHOD_STAFILL,
+                      label='Missing wedge (MW) correction method', display=params.EnumParam.DISPLAY_COMBO,
+                      help='Fill the wedge by the average will use the subtomogram averaging process to fill the wedge'
+                           ' of each subtomogram by the corresponding average region in Fourier space.'
+                           ' The monte carlo method is an implementation of the method of E. Moebel & C. Kervrann')
+        group1 = form.addGroup('MW fill with the average',
+                      condition='Method==%d' % METHOD_STAFILL)
+        group1.addParam('StartingReference', params.EnumParam, allowsNull=True,
                       choices=['Import an external volume', 'Select volume'],
                       default=REFERENCE_EXT,
                       label='Reference volume', display=params.EnumParam.DISPLAY_COMBO,
                       help='either an external volume file or an output volume from STA protocol')
-        form.addParam('ReferenceVolume', params.FileParam,
+        group1.addParam('ReferenceVolume', params.FileParam,
                       pointerClass='params.FileParam', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_EXT,
                       label="File path",
                       help='Choose a reference, typically from a STA previous run')
-        form.addParam('STAVolume', params.PointerParam,
+        group1.addParam('STAVolume', params.PointerParam,
                       pointerClass='Volume', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_STA,
                       label="Volume (STA)",
                       help='Choose a reference, typically from a STA previous run')
-        form.addParam('AlignmentParameters', params.EnumParam,
+        group1.addParam('AlignmentParameters', params.EnumParam, allowsNull=True,
                       choices=['from input metadata file', 'from STA run'],
                       default=REFERENCE_EXT,
                       label='Alignment parameters', display=params.EnumParam.DISPLAY_COMBO,
                       help='either an external metadata file containing alignment parameters or STA run')
-        form.addParam('MetaDataFile', params.FileParam,
+        group1.addParam('MetaDataFile', params.FileParam,
                       pointerClass='params.FileParam', allowsNull=True,
                       condition='AlignmentParameters==%d' % REFERENCE_EXT,
                       label="Alignment parameters MetaData",
                       help='Alignment parameters, typically from a STA previous run')
-        form.addParam('MetaDataSTA', params.PointerParam,
+        group1.addParam('MetaDataSTA', params.PointerParam,
                       pointerClass='FlexProtSubtomogramAveraging', allowsNull=True,
                       condition='AlignmentParameters==%d' % REFERENCE_STA,
                       label="Subtomogram averaging run",
                       help='Alignment parameters, typically from a STA previous run')
-        form.addParam('applyParams', params.BooleanParam,
+        group1.addParam('applyParams', params.BooleanParam, allowsNull=True,
                       default=True,
                       label='Apply alignment after filling the wedge?',
                       help='Both aligned and none aligned versions will be kept')
-        form.addSection(label='Missing-wedge parameters')
-        form.addParam('tiltLow', params.IntParam, default=-60,
-                      label='Lower tilt value',
-                      help='The lower tilt angle used in obtaining the tilt series')
-        form.addParam('tiltHigh', params.IntParam, default=60,
-                      label='Upper tilt value',
-                      help='The upper tilt angle used in obtaining the tilt series')
+        group2 = form.addGroup('MW restoration using monte carlo simulation',
+                      condition='Method==%d' % METHOD_MCSFILL)
+        group2.addParam('sigma_noise', params.FloatParam, default=0.2, allowsNull=True,
+                       label='noise sigma',
+                       help='estimated standard deviation of data noise '
+                            'defines the strength of the processing (high value gives smooth images)')
+        group2.addParam('T', params.IntParam, default=300, allowsNull=True,
+                       label='number of iterations',
+                       help='number of iterations (default: 300)')
+        group2.addParam('Tb', params.IntParam, default=100, allowsNull=True,
+                       label='length of the burn-in phase (Tb)',
+                       help='First Tb samples are discarded (default: 100)')
+        group2.addParam('beta', params.FloatParam, default=0.00004, allowsNull=True,
+                       label='scale parameter (beta)',
+                       help='scale parameter, affects the acceptance rate (default: 0.00004)')
+
 
     # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
         # Define some outputs filenames
         self.imgsFn = self._getExtraPath('volumes.xmd')
-        makePath(self._getExtraPath()+'/mw_filled')
+        makePath(self._getExtraPath() + '/mw_filled')
 
         self._insertFunctionStep('convertInputStep')
-        self._insertFunctionStep('doAlignmentStep')
-        if self.applyParams.get():
-            self._insertFunctionStep('applyAlignment')
-        self._insertFunctionStep('createOutputStep')
+        if self.Method == METHOD_STAFILL:
+            self._insertFunctionStep('doAlignmentStep_STAFILL')
+            if self.applyParams.get():
+                self._insertFunctionStep('applyAlignment')
+            self._insertFunctionStep('createOutputStep_STAFILL')
+        else:
+            self._insertFunctionStep('doAlignmentStep_MCSFILL')
+            self._insertFunctionStep('createOutputStep_MCSFILL')
+            pass
 
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
         # Write a metadata with the volumes
         xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self._getExtraPath('input.xmd'))
 
-    def doAlignmentStep(self):
+    def doAlignmentStep_STAFILL(self):
         tempdir = self._getTmpPath()
         imgFn = self.imgsFn
         StartingReference = self.StartingReference.get()
@@ -123,7 +158,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         if AlignmentParameters == REFERENCE_STA:
             MetaDataSTA = self.MetaDataSTA.get()._getExtraPath('final_md.xmd')
             MetaDataFile = MetaDataSTA
-        copyFile(MetaDataFile,imgFn)
+        copyFile(MetaDataFile, imgFn)
 
         tiltLow = self.tiltLow.get()
         tiltHigh = self.tiltHigh.get()
@@ -150,8 +185,8 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         MW_mask[size[0] // 2, :, :] = 0
         MW_mask[size[0] // 2, :, size[2] // 2] = 1
         fnmask = self._getExtraPath('Mask.spi')
-        save_volume(np.float32(MW_mask),fnmask)
-        self.runJob('xmipp_transform_geometry','-i '+fnmask+' --rotate_volume euler 0 90 0')
+        save_volume(np.float32(MW_mask), fnmask)
+        self.runJob('xmipp_transform_geometry', '-i ' + fnmask + ' --rotate_volume euler 0 90 0')
         mdImgs = md.MetaData(imgFn)
         # in case of metadata from an external file, it has to be updated with the proper filenames from 'input.xmd'
         inputSet = self.inputVolumes.get()
@@ -182,13 +217,13 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             index, fname = xmipp3.convert.xmippToLocation(imgPath)
             new_imgPath = self._getExtraPath() + '/mw_filled/'
-            if index: #case of stack
+            if index:  # case of stack
                 new_imgPath += str(index).zfill(6) + '.spi'
             else:
                 new_imgPath += basename(replaceBaseExt(basename(imgPath), 'spi'))
             # Get a copy of the volume converted to spider format
             params = '-i ' + imgPath + ' -o ' + new_imgPath + ' --type vol'
-            self.runJob('xmipp_image_convert',params)
+            self.runJob('xmipp_image_convert', params)
             # print('xmipp_image_convert',params)
             # update the name in the metadata file
             mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
@@ -210,7 +245,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             params += '--rotate_volume euler 0 -90 0 '
             # print('xmipp_transform_geometry',params)
             self.runJob('xmipp_transform_geometry', params)
-            #Now the STA is aligned, add the missing wedge region to the subtomogram:
+            # Now the STA is aligned, add the missing wedge region to the subtomogram:
             v = open_volume(new_imgPath)
             I = fft(v)
             I = fftshift(I)
@@ -230,13 +265,71 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
 
         mdImgs.write(self.imgsFn)
 
+    def doAlignmentStep_MCSFILL(self):
+        # get a copy of the input metadata
+        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
+        tempdir = self._getTmpPath()
+        imgFn = self.imgsFn
+        tiltLow = self.tiltLow.get()
+        tiltHigh = self.tiltHigh.get()
+
+        # creating a missing-wedge mask:
+        start_ang = tiltLow
+        end_ang = tiltHigh
+        size = self.inputVolumes.get().getDim()
+        MW_mask = np.ones(size)
+        x, z = np.mgrid[0.:size[0], 0.:size[2]]
+        x -= size[0] / 2
+        ind = np.where(x)
+        z -= size[2] / 2
+        angles = np.zeros(z.shape)
+        angles[ind] = np.arctan(z[ind] / x[ind]) * 180 / np.pi
+        angles = np.reshape(angles, (size[0], 1, size[2]))
+        angles = np.repeat(angles, size[1], axis=1)
+        MW_mask[angles > -start_ang] = 0
+        MW_mask[angles < -end_ang] = 0
+        MW_mask[size[0] // 2, :, :] = 0
+        MW_mask[size[0] // 2, :, size[2] // 2] = 1
+        fnmask = self._getExtraPath('Mask.spi')
+        save_volume(np.float32(MW_mask), fnmask)
+        self.runJob('xmipp_transform_geometry', '-i ' + fnmask + ' --rotate_volume euler 0 90 0')
+        # done creating the missing wedge mask, getting the paremeters from the form:
+        sigma_noise = self.sigma_noise.get()
+        T = self.T.get()
+        Tb = self.Tb.get()
+        beta = self.beta.get()
+        # looping on all images and performing mwr
+        mdImgs = md.MetaData(imgFn)
+        for objId in mdImgs:
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            index, fname = xmipp3.convert.xmippToLocation(imgPath)
+            new_imgPath = self._getExtraPath() + '/mw_filled/'
+            if index:  # case of stack
+                new_imgPath += str(index).zfill(6) + '.spi'
+            else:
+                new_imgPath += basename(replaceBaseExt(basename(imgPath), 'spi'))
+            # Get a copy of the volume converted to spider format
+            temp_path = self._getTmpPath('temp.spi')
+            # params = '-i ' + imgPath + ' -o ' + new_imgPath + ' --type vol'
+            params = '-i ' + imgPath + ' -o ' + temp_path + ' --type vol'
+            self.runJob('xmipp_image_convert', params)
+            # perform the mwr:
+            # in case the file exists (continuing or injecting)
+            if (isfile(new_imgPath)):
+                continue
+            else:
+                mwr(temp_path,fnmask,new_imgPath,sigma_noise,T,Tb,beta,True)
+            # update the name in the metadata file
+            mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
+        mdImgs.write(self.imgsFn)
+
     def applyAlignment(self):
-        makePath(self._getExtraPath()+'/mw_filled_aligned')
+        makePath(self._getExtraPath() + '/mw_filled_aligned')
         tempdir = self._getTmpPath()
         mdImgs = md.MetaData(self.imgsFn)
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
-            new_imgPath = self._getExtraPath()+'/mw_filled_aligned/' + basename(imgPath)
+            new_imgPath = self._getExtraPath() + '/mw_filled_aligned/' + basename(imgPath)
             mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
             rot = str(mdImgs.getValue(md.MDL_ANGLE_ROT, objId))
             tilt = str(mdImgs.getValue(md.MDL_ANGLE_TILT, objId))
@@ -258,8 +351,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         self.fnaligned = self._getExtraPath('volumes_aligned.xmd')
         mdImgs.write(self.fnaligned)
 
-
-    def createOutputStep(self):
+    def createOutputStep_STAFILL(self):
         partSet = self._createSetOfVolumes('not_aligned')
         xmipp3.convert.readSetOfVolumes(self._getExtraPath('volumes.xmd'), partSet)
         partSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
@@ -271,6 +363,12 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             self._defineOutputs(MissingWedgeFilledAndAligned=partSet2)
         # self._defineTransformRelation(self.inputVolumes, partSet)
 
+
+    def createOutputStep_MCSFILL(self):
+        partSet = self._createSetOfVolumes('not_aligned')
+        xmipp3.convert.readSetOfVolumes(self._getExtraPath('volumes.xmd'), partSet)
+        partSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
+        self._defineOutputs(MWRvolumes=partSet)
 
 
     # --------------------------- INFO functions --------------------------------------------
@@ -292,4 +390,3 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         for l in lines:
             print >> fWarn, l
         fWarn.close()
-
