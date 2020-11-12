@@ -134,11 +134,17 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
             shiftz = str(mdImgs.getValue(md.MDL_SHIFT_Z, objId))
             # rotate 90 around y, align, then rotate -90 to get to neutral
             params = '-i ' + imgPath + ' -o ' + tempdir + '/temp.vol '
-            params += '--rotate_volume euler 0 90 0 '
+            if(self.angleY):
+                params += '--rotate_volume euler 0 90 0 '
+            else: # only to convert
+                params += '--rotate_volume euler 0 0 0 '
             self.runJob('xmipp_transform_geometry', params)
             params = '-i ' + tempdir + '/temp.vol -o ' + new_imgPath + ' '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
+            if (not(self.angleY)):
+                params += ' --inverse '
+
             # print('xmipp_transform_geometry',params)
             self.runJob('xmipp_transform_geometry', params)
             # params = '-i ' + new_imgPath + ' --rotate_volume euler 0 -90 0 '
