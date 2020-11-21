@@ -69,6 +69,11 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         form.addParam('NumOfIters', params.IntParam, default=10,
                       label='Number of iterations', help='How many times you want to iterate while performing'
                                                          ' subtomogram alignment and averaging.')
+        form.addParam('dynamoTable', params.PathParam,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='Import a Dynamo table',
+                      help='import a Dynamo table that contains the STA parameters. This option will evaluate '
+                           'the average and transform the Dynamo table to Scipion metadata format')
         form.addSection(label='Missing-wedge Compensation')
         form.addParam('WedgeMode', params.EnumParam,
                       choices=['Do not compensate', 'Compensate'],
@@ -109,7 +114,10 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         self.outputMD = self._getExtraPath('final_md.xmd')
 
         self._insertFunctionStep('convertInputStep')
-        self._insertFunctionStep('doAlignmentStep')
+        if self.dynamoTable.empty():
+            self._insertFunctionStep('doAlignmentStep')
+        else:
+            self._insertFunctionStep('adaptDynamoStep', self.dynamoTable.get())
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
@@ -254,6 +262,69 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             mdImgs.setValue(md.MDL_ITEM_ID, target_ID, objId)
 
         mdImgs.write(self.outputMD)
+
+    def adaptDynamoStep(self, dynamoTable):
+        volumes_in = self.imgsFn
+        volume_out = self.outputVolume
+        md_out = self.outputMD
+        from continuousflex.protocols.utilities.dynamo import tbl2metadata
+        tbl2metadata(dynamoTable, volumes_in, md_out)
+
+
+        ### here:
+        mdImgs = md.MetaData(md_out)
+        counter = 0
+        first = True
+
+        for objId in mdImgs:
+            counter = counter + 1
+
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+            tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+            psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+
+            x_shift = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+            y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+            z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+
+            flip = mdImgs.getValue(md.MDL_ANGLE_Y, objId)
+            tempVol = self._getExtraPath('temp.mrc')
+            extra = self._getExtraPath()
+
+            if flip == 0:
+                if first:
+                    print("Averaging based on Dynamo parameters")
+                    first = False
+
+                params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
+
+            else:
+                if first:
+                    print("THERE IS A COMPENSATION FOR THE MISSING WEDGE")
+                    first = False
+                # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
+                params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
+                self.runJob('xmipp_transform_geometry', params, numberOfMpi=1)
+                params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
+
+            self.runJob('xmipp_transform_geometry', params, numberOfMpi=1)
+
+            if counter == 1:
+                os.system("cp %(tempVol)s %(volume_out)s" % locals())
+
+            else:
+                params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
+                self.runJob('xmipp_image_operate', params, numberOfMpi=1)
+
+        params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
+        self.runJob('xmipp_image_operate', params, numberOfMpi=1)
+        os.system("rm -f %(tempVol)s" % locals())
+         # Averaging is done
+
+        pass
 
     def createOutputStep(self):
         inputSet = self.inputVolumes.get()

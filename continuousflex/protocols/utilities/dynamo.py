@@ -60,6 +60,7 @@ def tbl2metadata(table, mdfi, mdfo):
         md_out.setValue(md.MDL_ANGLE_ROT,  rot[i], objId)
         md_out.setValue(md.MDL_ANGLE_TILT, tilt[i], objId)
         md_out.setValue(md.MDL_ANGLE_PSI,  psi[i], objId)
+        md_out.setValue(md.MDL_ANGLE_Y,    0.0, objId)
         i += 1
     pass
     md_out.write(mdfo)
