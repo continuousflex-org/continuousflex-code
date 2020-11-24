@@ -45,6 +45,7 @@ from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
                             getImageLocation, createItemMatrix,
                             setXmippAttributes)
 from .convert import modeToRow
+from pwem.objects import AtomStruct
 
 NMA_ALIGNMENT_WAV = 0
 NMA_ALIGNMENT_PROJ = 1
@@ -163,7 +164,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         #     # metadata file, not just the deformation.txt file
         #     self._insertFunctionStep('copyDeformationsStep', self.copyDeformations.get())
         #
-        # self._insertFunctionStep('createOutputStep')
+        self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self, atomsFn):
@@ -180,7 +181,11 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
     def generate_deformations(self):
         # use the input relationship between the modes to generate normal mode amplitudes metadata
-        pass
+        fnPDB = self.inputModes.get().getPdb().getFileName()
+        fnModeList = self.inputModes.get().getFileName()
+        fnDeformed = self._getExtraPath('deformed.pdb')
+        params= "--pdb %(fnPDB)s --nma %(fnModeList)s -o %(fnDeformed)s --deformations 200" % locals()
+        self.runJob('xmipp_pdb_nma_deform', params)
 
 
     def writeModesMetaData(self):
@@ -259,8 +264,8 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         # mdImgs.write(self.imgsFn)
 
     def createOutputStep(self):
-        pass
-
+        pdb = AtomStruct(self._getExtraPath('deformed.pdb'))
+        self._defineOutputs(outputPdb=pdb)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
