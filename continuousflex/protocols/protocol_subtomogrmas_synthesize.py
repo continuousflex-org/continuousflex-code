@@ -39,7 +39,6 @@ from pwem.protocols import ProtAnalysis3D
 from pyworkflow.protocol.params import NumericRangeParam
 import pwem as em
 import pwem.emlib.metadata as md
-
 from xmipp3.base import XmippMdRow
 from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
                             getImageLocation, createItemMatrix,
@@ -47,15 +46,22 @@ from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
 from .convert import modeToRow
 from pwem.objects import AtomStruct
 
+import os
+import numpy as np
+
 NMA_ALIGNMENT_WAV = 0
 NMA_ALIGNMENT_PROJ = 1
 
 MODE_RELATION_LINEAR = 0
 MODE_RELATION_3CLUSTERS = 1
 MODE_RELATION_5CLUSTERS = 2
+MODE_RELATION_RANDOM = 3
 
 MISSINGWEDGE_YES = 0
 MISSINGWEDGE_NO = 1
+
+ROTATION_SHIFT_YES=0
+ROTATION_SHIFT_NO=1
 
 
 class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
@@ -78,10 +84,18 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                            ' "8, 10, 12" -> [8,10,12]\n'
                            ' "8 9, 10-12" -> [8,9,10,11,12])\n')
         form.addParam('modeRelationChoice', params.EnumParam, default=MODE_RELATION_LINEAR,
-                      choices=['Linear relationship', 'Clusters (3 clusters)', 'Clusters (5 clusters)'],
+                      choices=['Linear relationship', 'Clusters (3 clusters)', 'Clusters (5 clusters)', 'Random'],
                       label='Relationship between the modes',
                       help='TODO')
-        # TODO: volumes size, sampling rate, number of volumes
+        form.addParam('numberOfVolumes', params.IntParam, default=1,
+                      label='Number of volumes',
+                      help='later')
+        form.addParam('samplingRate', params.FloatParam, default=1.0,
+                      label='Sampling Rate',
+                      help='later')
+        form.addParam('volumeSize', params.IntParam, default=64,
+                      label='Volume Size',
+                      help='later')
 
         # form.addParam('copyDeformations', params.PathParam,
         #               expertLevel=params.LEVEL_ADVANCED,
@@ -91,7 +105,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         #                    'all remaining steps using this file.')
         #
         form.addSection(label='Missing wedge parameters')
-        form.addParam('modeRelationChoice', params.EnumParam, default=MISSINGWEDGE_YES,
+        form.addParam('missingWedgeChoice', params.EnumParam, default=MISSINGWEDGE_YES,
                       choices=['Simulate missing wedge artefacts', 'No missing wedge'],
                       label='Missing Wedge choice',
                       help='TODO')
@@ -99,11 +113,11 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                       label='tilt step angle',
                       help='later')
         form.addParam('tiltLow', params.IntParam, default=-60,
-                      condition='modeRelationChoice==%d' % MISSINGWEDGE_YES,
+                      condition='missingWedgeChoice==%d' % MISSINGWEDGE_YES,
                       label='Lower tilt value',
                       help='The lower tilt angle used in obtaining the tilt series')
         form.addParam('tiltHigh', params.IntParam, default=60,
-                      condition='modeRelationChoice==%d' % MISSINGWEDGE_YES,
+                      condition='missingWedgeChoice==%d' % MISSINGWEDGE_YES,
                       label='Upper tilt value',
                       help='The upper tilt angle used in obtaining the tilt series')
         form.addSection(label='Noise and CTF')
@@ -121,6 +135,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         # _ctfDefocusV - 10000.0
         # _ctfQ0 - 0.112762
         form.addSection('reconstruction')
+
         # TODO: add am option to choose beterrn wbp and fourier reconstruction
         # form.addParam('discreteAngularSampling', params.FloatParam, default=10,
         #               label="Discrete angular sampling (deg)",
@@ -129,9 +144,15 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         #                    'This alignment is refined with Splines method when Wavelets and Splines alignment is chosen.')
 
         form.addSection('rigid body alignment')
-        # TODO: add an option to generate with/without rotations and give a limit to the shift value
+        form.addParam('rotationShiftChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
+                      choices=['Yes', 'No'],
+                      label='Simulate Rotations and Shifts',
+                      help='TODO')
+        form.addParam('maxShift', params.FloatParam, default=10.0,
+                      label='Maximum Shift',
+                      help='TODO')
 
-        form.addParallelSection(threads=0, mpi=8)
+        # form.addParallelSection(threads=0, mpi=8)
 
         # --------------------------- INSERT steps functions --------------------------------------------
 
@@ -141,6 +162,10 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
     def _insertAllSteps(self):
         self._insertFunctionStep("generate_deformations")
+        self._insertFunctionStep("generate_volume_from_pdb")
+        self._insertFunctionStep("generate_rotation_and_shift")
+        self._insertFunctionStep("project_volumes")
+
 
         # atomsFn = self.getInputPdb().getFileName()
         # # Define some outputs filenames
@@ -181,11 +206,101 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
     def generate_deformations(self):
         # use the input relationship between the modes to generate normal mode amplitudes metadata
+
         fnPDB = self.inputModes.get().getPdb().getFileName()
         fnModeList = self.inputModes.get().getFileName()
-        fnDeformed = self._getExtraPath('deformed.pdb')
-        params= "--pdb %(fnPDB)s --nma %(fnModeList)s -o %(fnDeformed)s --deformations 200" % locals()
-        self.runJob('xmipp_pdb_nma_deform', params)
+        numberOfModes = self.inputModes.get().getSize()
+        modeSelection = np.array(getListFromRangeString(self.modeList.get()))
+        deformationFile = self._getExtraPath('deformations.txt')
+
+        # iterate over the number of outputs desired
+        for i in range(self.numberOfVolumes.get()):
+            deformations = np.zeros(numberOfModes)
+
+            if self.modeRelationChoice == MODE_RELATION_LINEAR:
+                amplitude = 200 # TODO : choice of amplitude
+                deformations[modeSelection - 1] = np.ones(len(modeSelection))*np.random.uniform(-amplitude, amplitude)
+            elif self.modeRelationChoice == MODE_RELATION_3CLUSTERS:
+                pass
+            elif self.modeRelationChoice == MODE_RELATION_5CLUSTERS:
+                pass
+            elif self.modeRelationChoice == MODE_RELATION_RANDOM:
+                amplitude=200
+                deformations[modeSelection-1] = np.random.uniform(-amplitude, amplitude, len(modeSelection))
+
+            # we won't keep the first 6 modes
+            deformations = deformations[6:]
+
+            params = " --pdb " + fnPDB
+            params+= " --nma " + fnModeList
+            params+= " -o " + self._getExtraPath(str(i+1)+'_deformed.pdb')
+            params+= " --deformations " + ' '.join(str(i) for i in deformations)
+            self.runJob('xmipp_pdb_nma_deform', params)
+
+            # save the deformations to deformations.txt
+            with open(deformationFile, 'a') as file:
+                file.write(' '.join(str(i) for i in deformations)+'\n')
+
+
+    def generate_volume_from_pdb(self):
+        for i in range(self.numberOfVolumes.get()):
+            params = " -i " + self._getExtraPath(str(i + 1) + '_deformed.pdb')
+            params += " --sampling " + str(self.samplingRate.get())
+            params += " --size " + str(self.volumeSize.get())
+            params += " -v 0 --centerPDB "
+            self.runJob('xmipp_volume_from_pdb', params)
+
+    def generate_rotation_and_shift(self):
+        if self.rotationShiftChoice == ROTATION_SHIFT_YES:
+            for i in range(self.numberOfVolumes.get()):
+                rot1 = 360 * np.random.uniform()
+                tilt1 = 180 * np.random.uniform()
+                psi1 = 360 * np.random.uniform()
+                shift_x1 = self.maxShift.get() * np.random.uniform(-1,1)
+                shift_y1 = self.maxShift.get() * np.random.uniform(-1,1)
+                shift_z1 = self.maxShift.get() * np.random.uniform(-1,1)
+
+                params = " -i " + self._getExtraPath(str(i + 1) + '_deformed.vol')
+                params += " -o " + self._getExtraPath(str(i + 1) + '_deformed.vol')
+                params += " --rotate_volume euler " + str(rot1) + ' ' + str(tilt1) + ' ' + str(psi1)
+                params += " --shift " + str(shift_x1) + ' ' + str(shift_y1) + ' ' + str(shift_z1)
+                self.runJob('xmipp_transform_geometry', params)
+
+    def project_volumes(self):
+
+        tiltLow, tiltHigh, tiltStep = self.tiltLow.get(), self.tiltHigh.get(), self.tiltStep.get()
+        volumeSize = self.volumeSize.get()
+        for i in range(self.numberOfVolumes.get()):
+            with open(self._getExtraPath(str(i + 1) + '_deformed_projection.param'), 'a') as file:
+                file.write(
+                "\n".join([
+                "# XMIPP_STAR_1 *",
+                "# Projection Parameters",
+                "data_noname",
+                "# X and Y projection dimensions [Xdim Ydim]",
+                "_projDimensions '%(volumeSize)s %(volumeSize)s'" % locals(),
+                "# Angle Set Source -----------------------------------------------------------",
+                "# tilt axis, direction defined by rot and tilt angles in degrees",
+                "_angleRot 90",
+                "_angleTilt 90",
+                "# tilt axis offset in pixels",
+                "_shiftX 0",
+                "_shiftY 0",
+                "_shiftZ 0",
+                "# Tilting description [tilt0 tiltF tiltStep] in degrees",
+                "_projTiltRange '%(tiltLow)s %(tiltHigh)s %(tiltStep)s'" % locals(),
+                "# Noise description ----------------------------------------------------------",
+                "#     applied to angles [noise (bias)]",
+                "_noiseAngles '0 0'",
+                "#     applied to pixels [noise (bias)]",
+                "_noisePixelLevel '0 0'",
+                "#     applied to particle center coordenates [noise (bias)]",
+                "_noiseParticleCoord '0 0'" ]))
+
+            params = " -i " +  self._getExtraPath(str(i + 1) + '_deformed.vol')
+            params += " --oroot " + self._getExtraPath(str(i + 1) + '_deformed')
+            params += " --params " + self._getExtraPath(str(i + 1) + '_deformed_projection.param')
+            self.runJob('xmipp_tomo_project', params)
 
 
     def writeModesMetaData(self):
