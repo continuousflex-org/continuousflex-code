@@ -211,7 +211,9 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         fnModeList = self.inputModes.get().getFileName()
         numberOfModes = self.inputModes.get().getSize()
         modeSelection = np.array(getListFromRangeString(self.modeList.get()))
-        deformationFile = self._getExtraPath('deformations.txt')
+        # deformationFile = self._getExtraPath('deformations.txt')
+        deformationFile = self._getExtraPath('Subtomograms.xmd')
+        subtomogramMD = md.MetaData()
 
         # iterate over the number of outputs desired
         for i in range(self.numberOfVolumes.get()):
@@ -238,8 +240,17 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             self.runJob('xmipp_pdb_nma_deform', params)
 
             # save the deformations to deformations.txt
-            with open(deformationFile, 'a') as file:
-                file.write(' '.join(str(i) for i in deformations)+'\n')
+            # with open(deformationFile, 'a') as file:
+            #     file.write(' '.join(str(i) for i in deformations)+'\n')
+            # deformationsMD.setValue(md.MDL_ITEM_ID, i+1, deformationsMD.addObject())
+            subtomogramMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i+1)+'.spi'), subtomogramMD.addObject())
+            subtomogramMD.setValue(md.MDL_NMA, list(deformations), i+1)
+
+        subtomogramMD.write(deformationFile)
+
+
+
+
 
 
     def generate_volume_from_pdb(self):
@@ -252,6 +263,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
     def generate_rotation_and_shift(self):
         if self.rotationShiftChoice == ROTATION_SHIFT_YES:
+            subtomogramMD = md.MetaData(self._getExtraPath('Subtomograms.xmd'))
             for i in range(self.numberOfVolumes.get()):
                 rot1 = 360 * np.random.uniform()
                 tilt1 = 180 * np.random.uniform()
@@ -265,6 +277,16 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                 params += " --rotate_volume euler " + str(rot1) + ' ' + str(tilt1) + ' ' + str(psi1)
                 params += " --shift " + str(shift_x1) + ' ' + str(shift_y1) + ' ' + str(shift_z1)
                 self.runJob('xmipp_transform_geometry', params)
+
+                subtomogramMD.setValue(md.MDL_SHIFT_X, shift_x1, i + 1)
+                subtomogramMD.setValue(md.MDL_SHIFT_Y, shift_y1, i + 1)
+                subtomogramMD.setValue(md.MDL_SHIFT_Z, shift_z1, i + 1)
+                subtomogramMD.setValue(md.MDL_ANGLE_ROT, rot1, i + 1)
+                subtomogramMD.setValue(md.MDL_ANGLE_TILT, tilt1, i + 1)
+                subtomogramMD.setValue(md.MDL_ANGLE_PSI, psi1, i + 1)
+            subtomogramMD.write(self._getExtraPath('Subtomograms.xmd'))
+
+
 
     def project_volumes(self):
 
