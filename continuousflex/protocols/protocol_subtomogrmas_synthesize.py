@@ -143,7 +143,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='CTF Spherical Aberration',
                       help='TODO')
-        form.addParam('ctfMagnification', params.FloatParam, default=5000.0,
+        form.addParam('ctfMagnification', params.FloatParam, default=50000.0,
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='CTF Magnification',
                       help='TODO')
@@ -171,7 +171,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                       choices=['Yes', 'No'],
                       label='Simulate Rotations and Shifts',
                       help='TODO')
-        form.addParam('maxShift', params.FloatParam, default=10.0,
+        form.addParam('maxShift', params.FloatParam, default=5.0,
                       label='Maximum Shift',
                       help='TODO')
 
@@ -380,12 +380,21 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                         "_ctfQ0 " + str(self.ctfQ0.get())]))
 
             for i in range(self.numberOfVolumes.get()):
-                params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.stk')
-                params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.stk')
+                # params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.stk')
+                params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.sel')
+                # params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.stk')
                 params += " --ctf " + self._getExtraPath('ctf.param')
                 paramsNoiseCTF = params+ " --after_ctf_noise --targetSNR " + str(self.targetSNR.get())
                 self.runJob('xmipp_phantom_simulate_microscope', paramsNoiseCTF)
-                self.runJob('xmipp_ctf_phase_flip', params)
+                # self.runJob('xmipp_ctf_phase_flip', params)
+                # the metadata for the i_th stack is self._getExtraPath(str(i + 1).zfill(5) + '_projected.sel')
+                MD_i = md.MetaData(self._getExtraPath(str(i + 1).zfill(5) + '_projected.sel'))
+                for objId in MD_i:
+                    img_name = MD_i.getValue(md.MDL_IMAGE, objId)
+                    params_j = " -i " + img_name + " -o " + img_name
+                    params_j += " --ctf " + self._getExtraPath('ctf.param')
+                    # print('xmipp_ctf_phase_flip', params_j)
+                    self.runJob('xmipp_ctf_phase_flip', params_j)
 
 
     def writeModesMetaData(self):
