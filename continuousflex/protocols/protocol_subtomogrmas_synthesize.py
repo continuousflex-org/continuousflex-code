@@ -44,7 +44,7 @@ from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
                             getImageLocation, createItemMatrix,
                             setXmippAttributes)
 from .convert import modeToRow
-from pwem.objects import AtomStruct
+from pwem.objects import AtomStruct, Volume
 
 import os
 import numpy as np
@@ -60,9 +60,14 @@ MODE_RELATION_RANDOM = 3
 MISSINGWEDGE_YES = 0
 MISSINGWEDGE_NO = 1
 
-ROTATION_SHIFT_YES=0
-ROTATION_SHIFT_NO=1
+ROTATION_SHIFT_YES = 0
+ROTATION_SHIFT_NO = 1
 
+RECONSTRUCTION_FOURIER = 0
+RECONSTRUCTION_WBP = 1
+
+NOISE_CTF_YES = 0
+NOISE_CTF_NO = 1
 
 class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
     """ Protocol for flexible angular alignment. """
@@ -120,30 +125,48 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                       condition='missingWedgeChoice==%d' % MISSINGWEDGE_YES,
                       label='Upper tilt value',
                       help='The upper tilt angle used in obtaining the tilt series')
+
         form.addSection(label='Noise and CTF')
-        # Add the choice of SNR that will be add to the images
-        # Add the parameters for the CTF
-        # XMIPP_STAR_1 *
-        # #
-        # data_noname
-        # _ctfVoltage 200
-        # _ctfSphericalAberration 2
-        # _ctfSamplingRate 2.2
-        # _magnification
-        # 50000
-        # _ctfDefocusU - 10000.0
-        # _ctfDefocusV - 10000.0
-        # _ctfQ0 - 0.112762
-        form.addSection('reconstruction')
+        form.addParam('noiseCTFChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
+                      choices=['Yes', 'No'],
+                      label='Apply Noise and CTF',
+                      help='TODO')
+        form.addParam('targetSNR', params.FloatParam, default=0.1,
+                      condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
+                      label='Tagret SNR',
+                      help='TODO')
+        form.addParam('ctfVoltage', params.FloatParam, default=200.0,
+                      condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
+                      label='CTF Voltage',
+                      help='TODO')
+        form.addParam('ctfSphericalAberration', params.FloatParam, default=2,
+                      condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
+                      label='CTF Spherical Aberration',
+                      help='TODO')
+        form.addParam('ctfMagnification', params.FloatParam, default=5000.0,
+                      condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
+                      label='CTF Magnification',
+                      help='TODO')
+        form.addParam('ctfDefocusU', params.FloatParam, default=-10000.0,
+                      condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
+                      label='CTF DefocusU',
+                      help='TODO')
+        form.addParam('ctfDefocusV', params.FloatParam, default=-10000.0,
+                      condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
+                      label='CTF DefocusV',
+                      help='TODO')
+        form.addParam('ctfQ0', params.FloatParam, default=-0.112762,
+                      condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
+                      label='CTF Q0',
+                      help='TODO')
 
-        # TODO: add am option to choose beterrn wbp and fourier reconstruction
-        # form.addParam('discreteAngularSampling', params.FloatParam, default=10,
-        #               label="Discrete angular sampling (deg)",
-        #               help='This is the angular step (in degrees) with which a library of reference projections '
-        #                    'is computed for rigid-body alignment in Projection Matching and Wavelets methods. \n'
-        #                    'This alignment is refined with Splines method when Wavelets and Splines alignment is chosen.')
+        form.addSection('Reconstruction')
+        form.addParam('reconstructionChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
+                      choices=['Fourier interpolation', ' Weighted BackProjection'],
+                      label='Reconstruction method',
+                      help='TODO')
 
-        form.addSection('rigid body alignment')
+        form.addSection('Rigid body alignment')
         form.addParam('rotationShiftChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
                       choices=['Yes', 'No'],
                       label='Simulate Rotations and Shifts',
@@ -165,6 +188,8 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         self._insertFunctionStep("generate_volume_from_pdb")
         self._insertFunctionStep("generate_rotation_and_shift")
         self._insertFunctionStep("project_volumes")
+        self._insertFunctionStep("apply_noise_and_ctf")
+        self._insertFunctionStep("reconstruct")
 
 
         # atomsFn = self.getInputPdb().getFileName()
@@ -235,7 +260,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
             params = " --pdb " + fnPDB
             params+= " --nma " + fnModeList
-            params+= " -o " + self._getExtraPath(str(i+1)+'_deformed.pdb')
+            params+= " -o " + self._getExtraPath(str(i+1).zfill(5)+'_deformed.pdb')
             params+= " --deformations " + ' '.join(str(i) for i in deformations)
             self.runJob('xmipp_pdb_nma_deform', params)
 
@@ -255,7 +280,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
     def generate_volume_from_pdb(self):
         for i in range(self.numberOfVolumes.get()):
-            params = " -i " + self._getExtraPath(str(i + 1) + '_deformed.pdb')
+            params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_deformed.pdb')
             params += " --sampling " + str(self.samplingRate.get())
             params += " --size " + str(self.volumeSize.get())
             params += " -v 0 --centerPDB "
@@ -272,8 +297,8 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                 shift_y1 = self.maxShift.get() * np.random.uniform(-1,1)
                 shift_z1 = self.maxShift.get() * np.random.uniform(-1,1)
 
-                params = " -i " + self._getExtraPath(str(i + 1) + '_deformed.vol')
-                params += " -o " + self._getExtraPath(str(i + 1) + '_deformed.vol')
+                params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_deformed.vol')
+                params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_deformed.vol')
                 params += " --rotate_volume euler " + str(rot1) + ' ' + str(tilt1) + ' ' + str(psi1)
                 params += " --shift " + str(shift_x1) + ' ' + str(shift_y1) + ' ' + str(shift_z1)
                 self.runJob('xmipp_transform_geometry', params)
@@ -290,39 +315,77 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
     def project_volumes(self):
 
-        tiltLow, tiltHigh, tiltStep = self.tiltLow.get(), self.tiltHigh.get(), self.tiltStep.get()
+        tiltStep =  self.tiltStep.get()
         volumeSize = self.volumeSize.get()
-        for i in range(self.numberOfVolumes.get()):
-            with open(self._getExtraPath(str(i + 1) + '_deformed_projection.param'), 'a') as file:
-                file.write(
-                "\n".join([
-                "# XMIPP_STAR_1 *",
-                "# Projection Parameters",
-                "data_noname",
-                "# X and Y projection dimensions [Xdim Ydim]",
-                "_projDimensions '%(volumeSize)s %(volumeSize)s'" % locals(),
-                "# Angle Set Source -----------------------------------------------------------",
-                "# tilt axis, direction defined by rot and tilt angles in degrees",
-                "_angleRot 90",
-                "_angleTilt 90",
-                "# tilt axis offset in pixels",
-                "_shiftX 0",
-                "_shiftY 0",
-                "_shiftZ 0",
-                "# Tilting description [tilt0 tiltF tiltStep] in degrees",
-                "_projTiltRange '%(tiltLow)s %(tiltHigh)s %(tiltStep)s'" % locals(),
-                "# Noise description ----------------------------------------------------------",
-                "#     applied to angles [noise (bias)]",
-                "_noiseAngles '0 0'",
-                "#     applied to pixels [noise (bias)]",
-                "_noisePixelLevel '0 0'",
-                "#     applied to particle center coordenates [noise (bias)]",
-                "_noiseParticleCoord '0 0'" ]))
 
-            params = " -i " +  self._getExtraPath(str(i + 1) + '_deformed.vol')
-            params += " --oroot " + self._getExtraPath(str(i + 1) + '_deformed')
-            params += " --params " + self._getExtraPath(str(i + 1) + '_deformed_projection.param')
+        if self.missingWedgeChoice == MISSINGWEDGE_YES:
+            tiltLow, tiltHigh = self.tiltLow.get(), self.tiltHigh.get()
+        else:
+            tiltLow, tiltHigh = -90, 90
+
+        with open(self._getExtraPath('projection.param'), 'a') as file:
+            file.write(
+                "\n".join([
+                    "# XMIPP_STAR_1 *",
+                    "# Projection Parameters",
+                    "data_noname",
+                    "# X and Y projection dimensions [Xdim Ydim]",
+                    "_projDimensions '%(volumeSize)s %(volumeSize)s'" % locals(),
+                    "# Angle Set Source -----------------------------------------------------------",
+                    "# tilt axis, direction defined by rot and tilt angles in degrees",
+                    "_angleRot 90",
+                    "_angleTilt 90",
+                    "# tilt axis offset in pixels",
+                    "_shiftX 0",
+                    "_shiftY 0",
+                    "_shiftZ 0",
+                    "# Tilting description [tilt0 tiltF tiltStep] in degrees",
+                    "_projTiltRange '%(tiltLow)s %(tiltHigh)s %(tiltStep)s'" % locals(),
+                    "# Noise description ----------------------------------------------------------",
+                    "#     applied to angles [noise (bias)]",
+                    "_noiseAngles '0 0'",
+                    "#     applied to pixels [noise (bias)]",
+                    "_noisePixelLevel '0 0'",
+                    "#     applied to particle center coordenates [noise (bias)]",
+                    "_noiseParticleCoord '0 0'"]))
+        for i in range(self.numberOfVolumes.get()):
+            params = " -i " +  self._getExtraPath(str(i + 1).zfill(5) + '_deformed.vol')
+            params += " --oroot " + self._getExtraPath(str(i + 1).zfill(5) + '_projected')
+            params += " --params " + self._getExtraPath('projection.param')
             self.runJob('xmipp_tomo_project', params)
+
+    def reconstruct(self):
+        for i in range(self.numberOfVolumes.get()):
+            params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.sel')
+            params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_reconstructed.vol')
+
+            if self.reconstructionChoice == RECONSTRUCTION_FOURIER:
+                self.runJob('xmipp_reconstruct_fourier', params)
+            elif self.reconstructionChoice == RECONSTRUCTION_WBP:
+                self.runJob('xmipp_reconstruct_wbp', params)
+
+    def apply_noise_and_ctf(self):
+        if self.noiseCTFChoice ==NOISE_CTF_YES:
+            with open(self._getExtraPath('ctf.param'), 'a') as file:
+                file.write(
+                    "\n".join([
+                        "# XMIPP_STAR_1 *",
+                        "data_noname",
+                        "_ctfVoltage " + str(self.ctfVoltage.get()),
+                        "_ctfSphericalAberration " + str(self.ctfSphericalAberration.get()),
+                        "_ctfSamplingRate " + str(self.samplingRate.get()),
+                        "_magnification " + str(self.ctfMagnification.get()),
+                        "_ctfDefocusU " + str(self.ctfDefocusU.get()),
+                        "_ctfDefocusV " + str(self.ctfDefocusV.get()),
+                        "_ctfQ0 " + str(self.ctfQ0.get())]))
+
+            for i in range(self.numberOfVolumes.get()):
+                params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.stk')
+                params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.stk')
+                params += " --ctf " + self._getExtraPath('ctf.param')
+                paramsNoiseCTF = params+ " --after_ctf_noise --targetSNR " + str(self.targetSNR.get())
+                self.runJob('xmipp_phantom_simulate_microscope', paramsNoiseCTF)
+                self.runJob('xmipp_ctf_phase_flip', params)
 
 
     def writeModesMetaData(self):
@@ -401,8 +464,8 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         # mdImgs.write(self.imgsFn)
 
     def createOutputStep(self):
-        pdb = AtomStruct(self._getExtraPath('deformed.pdb'))
-        self._defineOutputs(outputPdb=pdb)
+        volume = Volume(self._getExtraPath(str(1).zfill(5) +'_reconstructed.vol'))
+        self._defineOutputs(outputVolume=volume)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
