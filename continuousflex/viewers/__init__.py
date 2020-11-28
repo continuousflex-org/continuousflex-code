@@ -26,7 +26,7 @@ from .viewer_nma import FlexNMAViewer
 from .viewer_nma_alignment import FlexAlignmentNMAViewer
 from .viewer_nma_dimred import FlexDimredNMAViewer
 from .viewer_structure_mapping import FlexProtStructureMappingViewer
-
+from .viewer_subtomograms_synthesize import FlexProtSynthesizeSubtomoViewer
 
 
 

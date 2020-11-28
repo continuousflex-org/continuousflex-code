@@ -29,7 +29,7 @@
 from os.path import basename
 
 from pwem.convert.atom_struct import cifToPdb
-from pyworkflow.utils import replaceBaseExt
+from pyworkflow.utils import replaceBaseExt, replaceExt
 
 from pyworkflow.utils import isPower2, getListFromRangeString
 from pyworkflow.utils.path import copyFile, cleanPath
@@ -45,7 +45,7 @@ from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
                             setXmippAttributes)
 from .convert import modeToRow
 from pwem.objects import AtomStruct, Volume
-
+import xmipp3
 import os
 import numpy as np
 
@@ -233,11 +233,14 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         # use the input relationship between the modes to generate normal mode amplitudes metadata
 
         fnPDB = self.inputModes.get().getPdb().getFileName()
-        fnModeList = self.inputModes.get().getFileName()
+        # fnModeList = self.inputModes.get().getFileName()
+        fnModeList = replaceExt(self.inputModes.get().getFileName(),'xmd')
+        # print(fnModeList)
+
         numberOfModes = self.inputModes.get().getSize()
         modeSelection = np.array(getListFromRangeString(self.modeList.get()))
         # deformationFile = self._getExtraPath('deformations.txt')
-        deformationFile = self._getExtraPath('Subtomograms.xmd')
+        deformationFile = self._getExtraPath('GroundTruth.xmd')
         subtomogramMD = md.MetaData()
 
         # iterate over the number of outputs desired
@@ -288,7 +291,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
     def generate_rotation_and_shift(self):
         if self.rotationShiftChoice == ROTATION_SHIFT_YES:
-            subtomogramMD = md.MetaData(self._getExtraPath('Subtomograms.xmd'))
+            subtomogramMD = md.MetaData(self._getExtraPath('GroundTruth.xmd'))
             for i in range(self.numberOfVolumes.get()):
                 rot1 = 360 * np.random.uniform()
                 tilt1 = 180 * np.random.uniform()
@@ -309,7 +312,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                 subtomogramMD.setValue(md.MDL_ANGLE_ROT, rot1, i + 1)
                 subtomogramMD.setValue(md.MDL_ANGLE_TILT, tilt1, i + 1)
                 subtomogramMD.setValue(md.MDL_ANGLE_PSI, psi1, i + 1)
-            subtomogramMD.write(self._getExtraPath('Subtomograms.xmd'))
+            subtomogramMD.write(self._getExtraPath('GroundTruth.xmd'))
 
 
 
@@ -473,8 +476,18 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         # mdImgs.write(self.imgsFn)
 
     def createOutputStep(self):
-        volume = Volume(self._getExtraPath(str(1).zfill(5) +'_reconstructed.vol'))
-        self._defineOutputs(outputVolume=volume)
+        # first making a metadata for only the subtomograms:
+        out_mdfn = self._getExtraPath('subtomograms.xmd')
+        pattern = '"' + self._getExtraPath() + '/*_reconstructed.vol"'
+        command = '-p ' + pattern + ' -o ' + out_mdfn
+        self.runJob('xmipp_metadata_selfile_create', command)
+        # now creating the output set of volumes as output:
+        partSet = self._createSetOfVolumes('subtomograms')
+        xmipp3.convert.readSetOfVolumes(out_mdfn, partSet)
+        partSet.setSamplingRate(self.samplingRate.get())
+        self._defineOutputs(outputVolumes=partSet)
+        # volume = Volume(self._getExtraPath(str(1).zfill(5) +'_reconstructed.vol'))
+        # self._defineOutputs(outputVolume=volume)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
