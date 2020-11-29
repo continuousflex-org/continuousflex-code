@@ -62,7 +62,8 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
         form.addParam('angleY', params.BooleanParam,
                       default=True,
                       label='Are those parameters come from Scipion/Xmipp?',
-                      help='If the results are wrong, try to switch this to no')
+                      help='If the original alignment was done on Dynamo or if the alignment was done '
+                           'without missing wedge compensation, switch this to no')
 
 
     # --------------------------- INSERT steps functions --------------------------------------------
