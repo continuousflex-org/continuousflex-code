@@ -39,6 +39,7 @@ from continuousflex.protocols import FlexProtSynthesizeSubtomo
 import xmipp3
 import pwem.emlib.metadata as md
 from pyworkflow.utils.process import runJob
+from pwem.viewers import ObjectView
 
 class FlexProtSynthesizeSubtomoViewer(ProtocolViewer):
     """ Visualization of results from synthesized subtomogrmas
@@ -76,8 +77,10 @@ class FlexProtSynthesizeSubtomoViewer(ProtocolViewer):
                 } 
                         
     def _viewVolumes(self, paramName):
-        mdfn = self.protocol._getExtraPath('subtomograms.xmd')
-        runJob(None, 'xmipp_showj', mdfn)
+        volumes = self.protocol.outputVolumes
+        return [ObjectView(self._project, volumes.strId(), volumes.getFileName())]
+        # mdfn = self.protocol._getExtraPath('subtomograms.xmd')
+        # runJob(None, 'xmipp_showj', mdfn)
 
     def _viewRawDeformation(self, paramName):
         components = self.displayRawDeformation.get()
