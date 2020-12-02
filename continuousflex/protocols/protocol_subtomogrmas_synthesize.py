@@ -69,6 +69,9 @@ RECONSTRUCTION_WBP = 1
 NOISE_CTF_YES = 0
 NOISE_CTF_NO = 1
 
+FULL_TOMOGRAM_YES= 0
+FULL_TOMOGRAM_NO = 1
+
 class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
     """ Protocol for flexible angular alignment. """
     _label = 'synthesize subtomograms'
@@ -102,13 +105,6 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                       label='Volume Size',
                       help='later')
 
-        # form.addParam('copyDeformations', params.PathParam,
-        #               expertLevel=params.LEVEL_ADVANCED,
-        #               label='Precomputed results (for development)',
-        #               help='Only for tests during development. Enter a metadata file with precomputed elastic '
-        #                    'and rigid-body alignment parameters and perform '
-        #                    'all remaining steps using this file.')
-        #
         form.addSection(label='Missing wedge parameters')
         form.addParam('missingWedgeChoice', params.EnumParam, default=MISSINGWEDGE_YES,
                       choices=['Simulate missing wedge artefacts', 'No missing wedge'],
@@ -175,6 +171,20 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                       label='Maximum Shift',
                       help='TODO')
 
+        form.addSection('Generate full tomogram')
+        form.addParam('fullTomogramChoice', params.EnumParam, default=FULL_TOMOGRAM_YES,
+                      choices=['Yes', 'No'],
+                      label='Generate full tomogram',
+                      help='TODO')
+        form.addParam('tomoSize', params.IntParam, default=512,
+                      condition='fullTomogramChoice==%d' % FULL_TOMOGRAM_YES,
+                      label='Tomogram Size',
+                      help='TODO')
+        form.addParam('boxSize', params.IntParam, default=64,
+                      condition='fullTomogramChoice==%d' % FULL_TOMOGRAM_YES,
+                      label='Box Size',
+                      help='TODO')
+
         # form.addParallelSection(threads=0, mpi=8)
 
         # --------------------------- INSERT steps functions --------------------------------------------
@@ -190,6 +200,11 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         self._insertFunctionStep("project_volumes")
         self._insertFunctionStep("apply_noise_and_ctf")
         self._insertFunctionStep("reconstruct")
+
+        if self.fullTomogramChoice == FULL_TOMOGRAM_YES:
+            self._insertFunctionStep("create_phantom")
+            self._insertFunctionStep("map_volumes_to_tomogram")
+            self._insertFunctionStep("project_tomogram")
 
 
         # atomsFn = self.getInputPdb().getFileName()
@@ -276,10 +291,87 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
         subtomogramMD.write(deformationFile)
 
+    def create_phantom(self):
+        tomoSize = self.tomoSize.get()
+        with open(self._getExtraPath('tomogram.param'), 'a') as file:
+            file.write(
+                "\n".join([
+                        "# XMIPP_STAR_1 *",
+                        "data_block1",
+                        " _dimensions3D  '%(tomoSize)s %(tomoSize)s %(tomoSize)s'" % locals(),
+                        " _phantomBGDensity  0",
+                        " _scale  1",
+                        "data_block2",
+                        "loop_",
+                        " _featureType",
+                        " _featureOperation",
+                        " _featureDensity",
+                        " _featureCenter",
+                        " _featureSpecificVector",
+                        " cub + 0.0 '0 0 0' '0 0 0 0 0 0'"]))
 
+        params = " -i " + self._getExtraPath('tomogram.param')
+        params += " -o " + self._getExtraPath('tomogram.vol')
+        self.runJob('xmipp_phantom_create', params)
 
+    def map_volumes_to_tomogram(self):
+        for i in range(self.numberOfVolumes.get()):
+            tomogramMapMD = md.MetaData()
+            tomoSize = self.tomoSize.get()
+            boxSize = self.boxSize.get()
 
+            tomogramMapMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i+1).zfill(5) + '.vol'), tomogramMapMD.addObject())
+            tomogramMapMD.setValue(md.MDL_XCOOR, np.random.randint(0 + boxSize/2, tomoSize - boxSize/2), 1)
+            tomogramMapMD.setValue(md.MDL_YCOOR, np.random.randint(0 + boxSize/2, tomoSize - boxSize/2), 1)
+            tomogramMapMD.setValue(md.MDL_ZCOOR, np.random.randint(tomoSize/3 + boxSize/2, (tomoSize*2)/3 - boxSize/2), 1)
+            tomogramMapMD.write( self._getExtraPath(str(i+1).zfill(5) +'_tomogram_map.xmd'))
 
+            params = " -i " + self._getExtraPath('tomogram.vol')
+            params += " -o " + self._getExtraPath('tomogram.vol')
+            params += " --geom " + self._getExtraPath(str(i+1).zfill(5) +'_tomogram_map.xmd')
+            params += " --ref " + self._getExtraPath(str(i+1).zfill(5) + '_deformed.vol')
+            params += " --method copy "
+            self.runJob('xmipp_tomo_map_back', params)
+
+    def project_tomogram(self):
+
+        tiltStep =  self.tiltStep.get()
+        tomoSize = self.tomoSize.get()
+
+        if self.missingWedgeChoice == MISSINGWEDGE_YES:
+            tiltLow, tiltHigh = self.tiltLow.get(), self.tiltHigh.get()
+        else:
+            tiltLow, tiltHigh = -90, 90
+
+        with open(self._getExtraPath('projection_tomogram.param'), 'a') as file:
+            file.write(
+                "\n".join([
+                    "# XMIPP_STAR_1 *",
+                    "# Projection Parameters",
+                    "data_noname",
+                    "# X and Y projection dimensions [Xdim Ydim]",
+                    "_projDimensions '%(tomoSize)s %(tomoSize)s'" % locals(),
+                    "# Angle Set Source -----------------------------------------------------------",
+                    "# tilt axis, direction defined by rot and tilt angles in degrees",
+                    "_angleRot 90",
+                    "_angleTilt 90",
+                    "# tilt axis offset in pixels",
+                    "_shiftX 0",
+                    "_shiftY 0",
+                    "_shiftZ 0",
+                    "# Tilting description [tilt0 tiltF tiltStep] in degrees",
+                    "_projTiltRange '%(tiltLow)s %(tiltHigh)s %(tiltStep)s'" % locals(),
+                    "# Noise description ----------------------------------------------------------",
+                    "#     applied to angles [noise (bias)]",
+                    "_noiseAngles '0 0'",
+                    "#     applied to pixels [noise (bias)]",
+                    "_noisePixelLevel '0 0'",
+                    "#     applied to particle center coordenates [noise (bias)]",
+                    "_noiseParticleCoord '0 0'"]))
+        params = " -i " + self._getExtraPath('tomogram.vol')
+        params += " --oroot " + self._getExtraPath('projected_tomogram')
+        params += " --params " + self._getExtraPath('projection_tomogram.param')
+        self.runJob('xmipp_tomo_project', params)
 
     def generate_volume_from_pdb(self):
         for i in range(self.numberOfVolumes.get()):
