@@ -252,6 +252,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         deformationFile = self._getExtraPath('GroundTruth.xmd')
         subtomogramMD = md.MetaData()
 
+        cluster1 = cluster2 = cluster3 = False
         # iterate over the number of outputs desired
         for i in range(self.numberOfVolumes.get()):
             deformations = np.zeros(numberOfModes)
@@ -260,7 +261,23 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                 amplitude = 200 # TODO : choice of amplitude
                 deformations[modeSelection - 1] = np.ones(len(modeSelection))*np.random.uniform(-amplitude, amplitude)
             elif self.modeRelationChoice == MODE_RELATION_3CLUSTERS:
-                pass
+                # TODO: add the option to the centers and the diameter of each cluster (now the diameter is zero)
+                center1 = (-150, 0)
+                center2 = (+150, 0)
+                center3 = (0, +150)
+                if not(cluster1 or cluster2 or cluster3):
+                    cluster1 = True
+                if cluster3:
+                    deformations[modeSelection - 1] = center3
+                    cluster3 = False
+                if cluster2:
+                    deformations[modeSelection - 1] = center2
+                    cluster2 = False
+                    cluster3 = True
+                if cluster1:
+                    deformations[modeSelection - 1] = center1
+                    cluster1 = False
+                    cluster2 = True
             elif self.modeRelationChoice == MODE_RELATION_5CLUSTERS:
                 pass
             elif self.modeRelationChoice == MODE_RELATION_RANDOM:
