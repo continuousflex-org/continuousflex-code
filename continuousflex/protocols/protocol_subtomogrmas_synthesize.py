@@ -49,6 +49,9 @@ import xmipp3
 import os
 import numpy as np
 
+
+np.random.seed(0)
+
 NMA_ALIGNMENT_WAV = 0
 NMA_ALIGNMENT_PROJ = 1
 
