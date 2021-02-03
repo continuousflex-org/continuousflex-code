@@ -55,7 +55,9 @@ NMA_ALIGNMENT_PROJ = 1
 MODE_RELATION_LINEAR = 0
 MODE_RELATION_3CLUSTERS = 1
 MODE_RELATION_5CLUSTERS = 2
-MODE_RELATION_RANDOM = 3
+MODE_RELATION_MESH = 3
+MODE_RELATION_RANDOM = 4
+
 
 MISSINGWEDGE_YES = 0
 MISSINGWEDGE_NO = 1
@@ -92,7 +94,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                            ' "8, 10, 12" -> [8,10,12]\n'
                            ' "8 9, 10-12" -> [8,9,10,11,12])\n')
         form.addParam('modeRelationChoice', params.EnumParam, default=MODE_RELATION_LINEAR,
-                      choices=['Linear relationship', 'Clusters (3 clusters)', 'Clusters (5 clusters)', 'Random'],
+                      choices=['Linear relationship', 'Clusters (3 clusters)', 'Clusters (5 clusters)', 'Mesh', 'Random'],
                       label='Relationship between the modes',
                       help='TODO')
         form.addParam('numberOfVolumes', params.IntParam, default=1,
@@ -251,8 +253,12 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         modeSelection = np.array(getListFromRangeString(self.modeList.get()))
         deformationFile = self._getExtraPath('GroundTruth.xmd')
         subtomogramMD = md.MetaData()
-
+        # these vairables for the generation in 3 clusters
         cluster1 = cluster2 = cluster3 = False
+        # these variables for the generaton like a mesh (has to be 121 volumes)
+        XX, YY = np.meshgrid(np.linspace(start=-150, stop=150, num=11), np.linspace(start=150, stop=-150, num=11))
+        mode7_samples = XX.reshape(-1)
+        mode8_samples = YY.reshape(-1)
         # iterate over the number of outputs desired
         for i in range(self.numberOfVolumes.get()):
             deformations = np.zeros(numberOfModes)
@@ -283,6 +289,9 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             elif self.modeRelationChoice == MODE_RELATION_RANDOM:
                 amplitude=200
                 deformations[modeSelection-1] = np.random.uniform(-amplitude, amplitude, len(modeSelection))
+            elif self.modeRelationChoice == MODE_RELATION_MESH:
+                new_point=(mode7_samples[i],mode8_samples[i])
+                deformations[modeSelection - 1] = new_point
 
             # we won't keep the first 6 modes
             deformations = deformations[6:]
