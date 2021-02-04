@@ -56,7 +56,8 @@ MODE_RELATION_LINEAR = 0
 MODE_RELATION_3CLUSTERS = 1
 MODE_RELATION_5CLUSTERS = 2
 MODE_RELATION_MESH = 3
-MODE_RELATION_RANDOM = 4
+MODE_RELATION_MESH2 = 4
+MODE_RELATION_RANDOM = 5
 
 
 MISSINGWEDGE_YES = 0
@@ -94,7 +95,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                            ' "8, 10, 12" -> [8,10,12]\n'
                            ' "8 9, 10-12" -> [8,9,10,11,12])\n')
         form.addParam('modeRelationChoice', params.EnumParam, default=MODE_RELATION_LINEAR,
-                      choices=['Linear relationship', 'Clusters (3 clusters)', 'Clusters (5 clusters)', 'Mesh', 'Random'],
+                      choices=['Linear relationship', 'Clusters (3 clusters)', 'Clusters (5 clusters)', 'Mesh121', 'Mesh36' , 'Random'],
                       label='Relationship between the modes',
                       help='TODO')
         form.addParam('numberOfVolumes', params.IntParam, default=1,
@@ -259,6 +260,10 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         XX, YY = np.meshgrid(np.linspace(start=-150, stop=150, num=11), np.linspace(start=150, stop=-150, num=11))
         mode7_samples = XX.reshape(-1)
         mode8_samples = YY.reshape(-1)
+        # these variables for the generaton like a mesh (has to be 36 volumes)
+        XX, YY = np.meshgrid(np.linspace(start=-100, stop=100, num=6), np.linspace(start=100, stop=-100, num=6))
+        mode7_samples_2 = XX.reshape(-1)
+        mode8_samples_2 = YY.reshape(-1)
         # iterate over the number of outputs desired
         for i in range(self.numberOfVolumes.get()):
             deformations = np.zeros(numberOfModes)
@@ -291,6 +296,9 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                 deformations[modeSelection-1] = np.random.uniform(-amplitude, amplitude, len(modeSelection))
             elif self.modeRelationChoice == MODE_RELATION_MESH:
                 new_point=(mode7_samples[i],mode8_samples[i])
+                deformations[modeSelection - 1] = new_point
+            elif self.modeRelationChoice == MODE_RELATION_MESH2:
+                new_point=(mode7_samples_2[i],mode8_samples_2[i])
                 deformations[modeSelection - 1] = new_point
 
             # we won't keep the first 6 modes
