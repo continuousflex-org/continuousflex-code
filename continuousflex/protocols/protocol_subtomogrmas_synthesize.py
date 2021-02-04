@@ -310,7 +310,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             params+= " --deformations " + ' '.join(str(i) for i in deformations)
             self.runJob('xmipp_pdb_nma_deform', params)
 
-            subtomogramMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i+1)+'.spi'), subtomogramMD.addObject())
+            subtomogramMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i+1).zfill(5)+'_reconstructed'+'.vol'), subtomogramMD.addObject())
             subtomogramMD.setValue(md.MDL_NMA, list(deformations), i+1)
 
         subtomogramMD.write(deformationFile)
