@@ -1,8 +1,6 @@
 # **************************************************************************
-# *
 # * Authors:  Mohamad Harastani          (mohamad.harastani@upmc.fr)
-# * TODO: Add Remi
-# *
+# *           Rémi Vuillemot             (remi.vuillemot@upmc.fr)
 # * IMPMC, UPMC Sorbonne University
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -22,9 +20,7 @@
 # *
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
-# *
 # **************************************************************************
-
 
 from os.path import basename
 
@@ -54,11 +50,8 @@ NMA_ALIGNMENT_PROJ = 1
 
 MODE_RELATION_LINEAR = 0
 MODE_RELATION_3CLUSTERS = 1
-MODE_RELATION_5CLUSTERS = 2
-MODE_RELATION_MESH = 3
-MODE_RELATION_MESH2 = 4
-MODE_RELATION_RANDOM = 5
-
+MODE_RELATION_MESH = 2
+MODE_RELATION_RANDOM = 3
 
 MISSINGWEDGE_YES = 0
 MISSINGWEDGE_NO = 1
@@ -76,7 +69,7 @@ FULL_TOMOGRAM_YES= 0
 FULL_TOMOGRAM_NO = 1
 
 class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
-    """ Protocol for flexible angular alignment. """
+    """ Protocol for synthesizing subtomograms. """
     _label = 'synthesize subtomograms'
 
     # --------------------------- DEFINE param functions --------------------------------------------
@@ -87,35 +80,55 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                       help='Set of modes computed by normal mode analysis.')
         form.addParam('modeList', NumericRangeParam,
                       label="Modes selection",
+                      default='7-8',
                       help='Select the normal modes that will be used for image analysis. \n'
-                           'If you leave this field empty, all computed modes will be selected for image analysis.\n'
+                           'It is usually two modes that should be selected, unless if the relationship is linear or random.\n'
                            'You have several ways to specify the modes.\n'
-                           '   Examples:\n'
+                           ' Examples:\n'
                            ' "7,8-10" -> [7,8,9,10]\n'
                            ' "8, 10, 12" -> [8,10,12]\n'
                            ' "8 9, 10-12" -> [8,9,10,11,12])\n')
         form.addParam('modeRelationChoice', params.EnumParam, default=MODE_RELATION_LINEAR,
-                      choices=['Linear relationship', 'Clusters (3 clusters)', 'Clusters (5 clusters)', 'Mesh121', 'Mesh36' , 'Random'],
+                      choices=['Linear relationship', '3 Clusters', 'Mesh', 'Random'],
                       label='Relationship between the modes',
-                      help='TODO')
-        form.addParam('numberOfVolumes', params.IntParam, default=1,
+                      help='linear relationship: all the selected modes will have equal amplitudes. \n'
+                           '3 clusters: the volumes will be devided exactly into three classes.\n'
+                           'Mesh: the amplitudes will be in a mesh shape (mesh size is square of what mesh step).\n'
+                           'Random: all the amplitudes will be random in the given range')
+        form.addParam('centerPoint', params.IntParam, default=100,
+                      condition='modeRelationChoice==%d' % MODE_RELATION_3CLUSTERS,
+                      label='Center point',
+                      help='This number will be used to determine the distance between the clusters'
+                           'center1 = (-center_point, 0)'
+                           'center2 = (center_point, 0)'
+                           'center3 = (0, center_point)')
+        form.addParam('modesAmplitudeRange', params.IntParam, default=200,
+                      condition='modeRelationChoice==%d or modeRelationChoice==%d or modeRelationChoice==%d' % (MODE_RELATION_LINEAR,MODE_RELATION_MESH, MODE_RELATION_RANDOM),
+                      label='Amplitude range N --> [-N, N]',
+                      help='Choose the number N for which the generated normal mode amplitudes are in the range of [-N, N]')
+        form.addParam('meshRowPoints', params.IntParam, default=6,
+                      condition='modeRelationChoice==%d' % MODE_RELATION_MESH,
+                      label='Mesh number of steps',
+                      help='This number will be the number of points in the row and the column (mesh shape will be size*size)')
+        form.addParam('numberOfVolumes', params.IntParam, default=10,
                       label='Number of volumes',
-                      help='later')
-        form.addParam('samplingRate', params.FloatParam, default=1.0,
+                      condition='modeRelationChoice!=%d'% MODE_RELATION_MESH,
+                      help='Number of volumes that will be generated')
+        form.addParam('samplingRate', params.FloatParam, default=2.2,
                       label='Sampling Rate',
-                      help='later')
+                      help='The sampling rate (voxel size in Angstroms)')
         form.addParam('volumeSize', params.IntParam, default=64,
                       label='Volume Size',
-                      help='later')
+                      help='Volume size in voxels (all volumes will be cubes)')
 
         form.addSection(label='Missing wedge parameters')
         form.addParam('missingWedgeChoice', params.EnumParam, default=MISSINGWEDGE_YES,
                       choices=['Simulate missing wedge artefacts', 'No missing wedge'],
                       label='Missing Wedge choice',
-                      help='TODO')
+                      help='We can either simulate missing wedge artefacts by generating with tilt range or the tilt range will be full -90 to 90')
         form.addParam('tiltStep', params.IntParam, default=1,
                       label='tilt step angle',
-                      help='later')
+                      help='tilting step in the tilt range (examples 1 , 2, 4 degree)')
         form.addParam('tiltLow', params.IntParam, default=-60,
                       condition='missingWedgeChoice==%d' % MISSINGWEDGE_YES,
                       label='Lower tilt value',
@@ -129,76 +142,78 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         form.addParam('noiseCTFChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
                       choices=['Yes', 'No'],
                       label='Apply Noise and CTF',
-                      help='TODO')
+                      help='If not selected, the CTF will not be simulated')
         form.addParam('targetSNR', params.FloatParam, default=0.1,
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='Tagret SNR',
-                      help='TODO')
+                      help='The signal to noise ratio for the noise')
         form.addParam('ctfVoltage', params.FloatParam, default=200.0,
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='CTF Voltage',
-                      help='TODO')
+                      help='Simualted voltage in the microscope in kV')
         form.addParam('ctfSphericalAberration', params.FloatParam, default=2,
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='CTF Spherical Aberration',
-                      help='TODO')
+                      help='Microscope attribute')
         form.addParam('ctfMagnification', params.FloatParam, default=50000.0,
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='CTF Magnification',
-                      help='TODO')
-        form.addParam('ctfDefocusU', params.FloatParam, default=-10000.0,
+                      help='Maginification in the microscope')
+        form.addParam('ctfDefocusU', params.FloatParam, default=-5000.0,
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='CTF DefocusU',
-                      help='TODO')
-        form.addParam('ctfDefocusV', params.FloatParam, default=-10000.0,
+                      help='defocus value (keep the value for DefocusV for simplicity)')
+        form.addParam('ctfDefocusV', params.FloatParam, default=-5000.0,
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='CTF DefocusV',
-                      help='TODO')
+                      help='defocus value (keep the value for DefocusU for simplicity)')
         form.addParam('ctfQ0', params.FloatParam, default=-0.112762,
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='CTF Q0',
-                      help='TODO')
+                      help='Microscope attribute')
 
         form.addSection('Reconstruction')
         form.addParam('reconstructionChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
                       choices=['Fourier interpolation', ' Weighted BackProjection'],
                       label='Reconstruction method',
-                      help='TODO')
+                      help='Tomographic reconstruction method')
 
-        form.addSection('Rigid body alignment')
+        form.addSection('Rigid body variability')
         form.addParam('rotationShiftChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
                       choices=['Yes', 'No'],
                       label='Simulate Rotations and Shifts',
-                      help='TODO')
+                      help='If yes, the volumes will be rotated and shifted randomly in the range,'
+                           ' otherwise no rotations nor shifts will be applied')
         form.addParam('maxShift', params.FloatParam, default=5.0,
                       label='Maximum Shift',
-                      help='TODO')
+                      help='The maximum shift from the center that will be applied')
 
         form.addSection('Generate full tomogram')
-        form.addParam('fullTomogramChoice', params.EnumParam, default=FULL_TOMOGRAM_YES,
+        form.addParam('fullTomogramChoice', params.EnumParam, default=FULL_TOMOGRAM_NO,
                       choices=['Yes', 'No'],
                       label='Generate full tomogram',
-                      help='TODO')
+                      help='If yes, the generated volumes will be put in a big volume, a tomogram will be generated')
         form.addParam('numberOfTomograms', params.IntParam, default=1,
                       condition='fullTomogramChoice==%d' % FULL_TOMOGRAM_YES,
                       label='Number of tomograms',
-                      help='TODO')
+                      help='We can distribute the volumes on several tomograms')
         form.addParam('tomoSizeX', params.IntParam, default=512,
                       condition='fullTomogramChoice==%d' % FULL_TOMOGRAM_YES,
                       label='Tomogram Size X',
-                      help='TODO')
+                      help='X dimension of the tomogram')
         form.addParam('tomoSizeY', params.IntParam, default=512,
                       condition='fullTomogramChoice==%d' % FULL_TOMOGRAM_YES,
                       label='Tomogram Size Y',
-                      help='TODO')
+                      help='Y dimension of the tomogram')
         form.addParam('tomoSizeZ', params.IntParam, default=128,
                       condition='fullTomogramChoice==%d' % FULL_TOMOGRAM_YES,
                       label='Tomogram Size Z',
-                      help='TODO')
+                      help='Z dimension of the tomogram')
         form.addParam('boxSize', params.IntParam, default=64,
                       condition='fullTomogramChoice==%d' % FULL_TOMOGRAM_YES,
                       label='Box Size',
-                      help='TODO')
+                      help='The distance where volumes inside the tomogram will not overlap,'
+                           ' the bigger the more seperated the molecules inside')
 
         # form.addParallelSection(threads=0, mpi=8)
 
@@ -232,50 +247,40 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
-    def convertInputStep(self, atomsFn):
-        pass
-        # Write the modes metadata taking into account the selection
-        # self.writeModesMetaData()
-        # Write a metadata with the normal modes information
-        # to launch the nma alignment programs
-        # writeSetOfParticles(self.inputParticles.get(), self.imgsFn)
-
-    # This is now done differently (see _insertAllSteps) and this line must be removed now
-    # Copy the atoms file to current working dir
-    # copyFile(atomsFn, self.atomsFn)
-
     def generate_deformations(self):
         # use the input relationship between the modes to generate normal mode amplitudes metadata
-
         fnPDB = self.inputModes.get().getPdb().getFileName()
         fnModeList = replaceExt(self.inputModes.get().getFileName(),'xmd')
-
+        modeAmplitude = self.modesAmplitudeRange.get()
+        meshRowPoints = self.meshRowPoints.get()
         numberOfModes = self.inputModes.get().getSize()
         modeSelection = np.array(getListFromRangeString(self.modeList.get()))
         deformationFile = self._getExtraPath('GroundTruth.xmd')
         subtomogramMD = md.MetaData()
-        # these vairables for the generation in 3 clusters
+        # these vairables for alternating the generation when 3 clusters are selected
         cluster1 = cluster2 = cluster3 = False
-        # these variables for the generaton like a mesh (has to be 121 volumes)
-        XX, YY = np.meshgrid(np.linspace(start=-150, stop=150, num=11), np.linspace(start=150, stop=-150, num=11))
+        # these variables for the generaton of a mesh if selected
+        XX, YY = np.meshgrid(np.linspace(start=-modeAmplitude, stop=modeAmplitude, num=meshRowPoints),
+                             np.linspace(start=modeAmplitude, stop=-modeAmplitude, num=meshRowPoints))
         mode7_samples = XX.reshape(-1)
         mode8_samples = YY.reshape(-1)
-        # these variables for the generaton like a mesh (has to be 36 volumes)
-        XX, YY = np.meshgrid(np.linspace(start=-100, stop=100, num=6), np.linspace(start=100, stop=-100, num=6))
-        mode7_samples_2 = XX.reshape(-1)
-        mode8_samples_2 = YY.reshape(-1)
-        # iterate over the number of outputs desired
-        for i in range(self.numberOfVolumes.get()):
+
+        # iterate over the number of outputs (if mesh this has to be calculated)
+        if self.modeRelationChoice.get() is MODE_RELATION_MESH:
+            numberOfVolumes = self.meshRowPoints.get()*self.meshRowPoints.get()
+        else:
+            numberOfVolumes = self.numberOfVolumes.get()
+        for i in range(numberOfVolumes):
             deformations = np.zeros(numberOfModes)
 
             if self.modeRelationChoice == MODE_RELATION_LINEAR:
-                amplitude = 200 # TODO : choice of amplitude
+                amplitude = self.modesAmplitudeRange.get()
                 deformations[modeSelection - 1] = np.ones(len(modeSelection))*np.random.uniform(-amplitude, amplitude)
             elif self.modeRelationChoice == MODE_RELATION_3CLUSTERS:
-                # TODO: add the option to the centers and the diameter of each cluster (now the diameter is zero)
-                center1 = (-150, 0)
-                center2 = (+150, 0)
-                center3 = (0, +150)
+                center_point = self.centerPoint.get()
+                center1 = (-center_point, 0)
+                center2 = (center_point, 0)
+                center3 = (0, center_point)
                 if not(cluster1 or cluster2 or cluster3):
                     cluster1 = True
                 if cluster3:
@@ -289,16 +294,11 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                     deformations[modeSelection - 1] = center1
                     cluster1 = False
                     cluster2 = True
-            elif self.modeRelationChoice == MODE_RELATION_5CLUSTERS:
-                pass
             elif self.modeRelationChoice == MODE_RELATION_RANDOM:
-                amplitude=200
+                amplitude=self.modesAmplitudeRange.get()
                 deformations[modeSelection-1] = np.random.uniform(-amplitude, amplitude, len(modeSelection))
             elif self.modeRelationChoice == MODE_RELATION_MESH:
                 new_point=(mode7_samples[i],mode8_samples[i])
-                deformations[modeSelection - 1] = new_point
-            elif self.modeRelationChoice == MODE_RELATION_MESH2:
-                new_point=(mode7_samples_2[i],mode8_samples_2[i])
                 deformations[modeSelection - 1] = new_point
 
             # we won't keep the first 6 modes
@@ -396,7 +396,6 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         particlesPerTomogram = self.numberOfVolumes.get()//numberOfTomograms
 
         for t in range(numberOfTomograms):
-
             # Shuffle the positions order to fill the tomogram boxes in random order
             np.random.shuffle(boxPositions)
 
@@ -420,14 +419,12 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                 self.runJob('xmipp_tomo_map_back', params)
 
     def project_volumes(self):
-
         if self.fullTomogramChoice == FULL_TOMOGRAM_YES:
             # If tomograms are selected, the volumes projected will be tomograms
             sizeX = self.tomoSizeX.get()
             sizeY = self.tomoSizeY.get()
             numberOfVolumes = self.numberOfTomograms.get()
             volumeName = "_tomogram.vol"
-
         else:
             # else, the deformed volumes are projected
             sizeX = self.volumeSize.get()
@@ -517,82 +514,6 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             elif self.reconstructionChoice == RECONSTRUCTION_WBP:
                 self.runJob('xmipp_reconstruct_wbp', params)
 
-
-    def writeModesMetaData(self):
-        """ Iterate over the input SetOfNormalModes and write
-        the proper Xmipp metadata.
-        Take into account a possible selection of modes (This option is 
-        just a shortcut for testing. The recommended
-        way is just create a subset from the GUI and use that as input)
-        """
-        # modeSelection = []
-        # if self.modeList.empty():
-        #     modeSelection = []
-        # else:
-        #     modeSelection = getListFromRangeString(self.modeList.get())
-        #
-        # mdModes = md.MetaData()
-        #
-        # inputModes = self.inputModes.get()
-        # for mode in inputModes:
-        #     # If there is a mode selection, only
-        #     # take into account those selected
-        #     if not modeSelection or mode.getObjId() in modeSelection:
-        #         row = XmippMdRow()
-        #         modeToRow(mode, row)
-        #         row.writeToMd(mdModes, mdModes.addObject())
-        # mdModes.write(self.modesFn)
-        pass
-
-    def copyDeformationsStep(self, deformationMd):
-        pass
-        # copyFile(deformationMd, self.imgsFn)
-        # # We need to update the image name with the good ones
-        # # and the same with the ids.
-        # inputSet = self.inputParticles.get()
-        # mdImgs = md.MetaData(self.imgsFn)
-        # for objId in mdImgs:
-        #     imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
-        #     index, fn = xmippToLocation(imgPath)
-        #     # Conside the index is the id in the input set
-        #     particle = inputSet[index]
-        #     mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
-        #     mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
-        # mdImgs.write(self.imgsFn)
-
-    def performNmaStep(self, atomsFn, modesFn):
-        pass
-        # sampling = self.inputParticles.get().getSamplingRate()
-        # discreteAngularSampling = self.discreteAngularSampling.get()
-        # trustRegionScale = self.trustRegionScale.get()
-        # odir = self._getTmpPath()
-        # imgFn = self.imgsFn
-        #
-        # args = "-i %(imgFn)s --pdb %(atomsFn)s --modes %(modesFn)s --sampling_rate %(sampling)f "
-        # args += "--discrAngStep %(discreteAngularSampling)f --odir %(odir)s --centerPDB "
-        # args += "--trustradius_scale %(trustRegionScale)d --resume "
-        #
-        # if self.getInputPdb().getPseudoAtoms():
-        #     args += "--fixed_Gaussian "
-        #
-        # if self.alignmentMethod == NMA_ALIGNMENT_PROJ:
-        #     args += "--projMatch "
-        #
-        # self.runJob("xmipp_nma_alignment", args % locals())
-        #
-        # cleanPath(self._getPath('nmaTodo.xmd'))
-        #
-        # inputSet = self.inputParticles.get()
-        # mdImgs = md.MetaData(self.imgsFn)
-        # for objId in mdImgs:
-        #     imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
-        #     index, fn = xmippToLocation(imgPath)
-        #     # Conside the index is the id in the input set
-        #     particle = inputSet[index]
-        #     mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
-        #     mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
-        # mdImgs.write(self.imgsFn)
-
     def createOutputStep(self):
         # first making a metadata for only the subtomograms:
         out_mdfn = self._getExtraPath('subtomograms.xmd')
@@ -604,8 +525,6 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         xmipp3.convert.readSetOfVolumes(out_mdfn, partSet)
         partSet.setSamplingRate(self.samplingRate.get())
         self._defineOutputs(outputVolumes=partSet)
-        # volume = Volume(self._getExtraPath(str(1).zfill(5) +'_reconstructed.vol'))
-        # self._defineOutputs(outputVolume=volume)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
@@ -614,13 +533,10 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
     def _validate(self):
         errors = []
-        # xdim = self.inputParticles.get().getDim()[0]
-        # if not isPower2(xdim):
-        #     errors.append("Image dimension (%s) is not a power of two, consider resize them" % xdim)
         return errors
 
     def _citations(self):
-        return ['Jonic2005', 'Sorzano2004b', 'Jin2014']
+        return ['harastani2020hybrid','Jonic2005', 'Sorzano2004b', 'Jin2014']
 
     def _methods(self):
         pass
@@ -637,8 +553,3 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
     def _getLocalModesFn(self):
         modesFn = self.inputModes.get().getFileName()
         return self._getBasePath(modesFn)
-
-    # def _updateParticle(self, item, row):
-    #     setXmippAttributes(item, row, md.MDL_ANGLE_ROT, md.MDL_ANGLE_TILT, md.MDL_ANGLE_PSI, md.MDL_SHIFT_X,
-    #                        md.MDL_SHIFT_Y, md.MDL_FLIP, md.MDL_NMA, md.MDL_COST)
-    #     createItemMatrix(item, row, align=em.ALIGN_PROJ)
