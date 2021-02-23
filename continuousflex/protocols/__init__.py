@@ -34,5 +34,4 @@ from .protocol_subtomogrmas_synthesize import FlexProtSynthesizeSubtomo
 from .data import *
 from .pdb import *
 from .protocol_pdb_dimred import FlexProtDimredPdb
-
-
+from .protocol_subtomograms_classify import FlexProtSubtomoClassify

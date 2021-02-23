@@ -149,7 +149,3 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             if self.zlimits_mode.get() == Z_LIMITS:
                 ax.set_zlim([z_low,z_high])
         plt.show()
-
-
-
-        
