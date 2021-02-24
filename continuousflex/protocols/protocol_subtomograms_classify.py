@@ -41,14 +41,6 @@ from sklearn import decomposition
 from joblib import dump, load
 
 
-
-USE_PDBS = 0
-USE_NMA_AMP = 1
-
-# Values to be passed to the program
-DIMRED_VALUES = ['sklearn_PCA']
-
-
 class FlexProtSubtomoClassify(ProtAnalysis3D):
     """ Protocol applying post alignment classification on subtomograms. """
     _label = 'classify subtomograms'
@@ -87,7 +79,6 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
                       label='Reduced dimension')
         form.addParam('numOfClasses', IntParam, default=2,
                       label='Number of classes')
-
         # form.addParallelSection(threads=0, mpi=8)
 
         # --------------------------- INSERT steps functions --------------------------------------------
@@ -99,16 +90,8 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
             self._insertFunctionStep('performHierarchicalClustering')
         else:
             self._insertFunctionStep('performKmeansClustering')
-
         self._insertFunctionStep('createOutputStep')
-        # print(mdSubtomo)
-        # reducedDim = self.reducedDim.get()
-        # method = self.dimredMethod.get()
-        # extraParams = self.extraParams.get('')
-        # deformationsFile = self.getDeformationFile()
-        # self._insertFunctionStep('performPDBdimred',
-        #                          pdb_mat,reducedDim,method,extraParams,deformationsFile)
-        # self._insertFunctionStep('createOutputStep')
+
 
     # --------------------------- STEPS functions --------------------------------------------
     def subtomo_wedge_align(self,mdSubtomo):
@@ -169,10 +152,8 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += ' --inverse '
             self.runJob('xmipp_transform_geometry', params)
-
             subtomogaligneMD.setValue(md.MDL_IMAGE, fnalignedsubtomo, subtomogaligneMD.addObject())
             mwalignedMD.setValue(md.MDL_IMAGE, fnalignedmask, mwalignedMD.addObject())
-
         subtomogaligneMD.write(self._getExtraPath('aligned_subtomograms.xmd'))
         mwalignedMD.write(self._getExtraPath('aligned_masks.xmd'))
 
@@ -231,12 +212,9 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
         dump(labels, filename=self._getExtraPath('hierarchical_clustering_labels.pkl'))
         print(clustering_class)
         # creating a metadate of subtomograms for each class and an average
-
-
         N = self.getVolumeSize()
         Averages = np.zeros([N, N, N, self.numOfClasses.get()])
         subtomogaligneMD = md.MetaData(self._getExtraPath('aligned_subtomograms.xmd'))
-
         # creating a metadata for each class
         classesMD = [md.MetaData() for i in range(self.numOfClasses.get())]
         for i in subtomogaligneMD:
@@ -249,7 +227,6 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
         for i in range(self.numOfClasses.get()):
             name = self._getExtraPath('class_'+str(i).zfill(2)+'.xmd')
             classesMD[i].write(name)
-
         # creating a metadata for all class averages:
         md_averages = md.MetaData()
         makePath(self._getExtraPath('class_averages/'))
@@ -271,20 +248,19 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
         pca_pickled = self._getExtraPath('pca_pickled.pkl')
         np.savetxt(self._getExtraPath('dimred_mat.txt'),data)
         dump(pca,pca_pickled)
-
+        # clustering now
         clustering = KMeans(n_clusters=self.numOfClasses.get()).fit(data)
         clustering_class = clustering.fit_predict(data)
         labels = clustering.labels_
         # for l in np.unique(label):
         #     print(len(data[label == l]))
-        dump(labels, filename=self._getExtraPath('hierarchical_clustering_labels.pkl'))
+        dump(clustering, filename=self._getExtraPath('kmeans_algo.pkl'))
+        dump(labels, filename=self._getExtraPath('kmeans_clustering_labels.pkl'))
         print(clustering_class)
         # creating a metadate of subtomograms for each class and an average
-
         N = self.getVolumeSize()
         Averages = np.zeros([N, N, N, self.numOfClasses.get()])
         subtomogaligneMD = md.MetaData(self._getExtraPath('aligned_subtomograms.xmd'))
-
         # creating a metadata for each class
         classesMD = [md.MetaData() for i in range(self.numOfClasses.get())]
         for i in subtomogaligneMD:
@@ -297,7 +273,6 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
         for i in range(self.numOfClasses.get()):
             name = self._getExtraPath('class_' + str(i).zfill(2) + '.xmd')
             classesMD[i].write(name)
-
         # creating a metadata for all class averages:
         md_averages = md.MetaData()
         makePath(self._getExtraPath('class_averages/'))
@@ -309,10 +284,7 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
             save_volume(ave, name)
             md_averages.setValue(md.MDL_IMAGE, name, md_averages.addObject())
         md_averages.write(self._getExtraPath('averages.xmd'))
-
         pass
-
-
 
     def createOutputStep(self):
         out_mdfn = self._getExtraPath('averages.xmd')
@@ -389,4 +361,3 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
         vv2 = self.normalize(v2)
         score = np.sum(vv1 * vv2) / vv1.size
         return score
-

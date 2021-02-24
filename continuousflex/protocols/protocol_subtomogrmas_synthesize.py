@@ -320,7 +320,11 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
 
     def generate_volume_from_pdb(self):
-        for i in range(self.numberOfVolumes.get()):
+        if self.modeRelationChoice.get() is MODE_RELATION_MESH:
+            numberOfVolumes = self.meshRowPoints.get()*self.meshRowPoints.get()
+        else:
+            numberOfVolumes = self.numberOfVolumes.get()
+        for i in range(numberOfVolumes):
             params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_deformed.pdb')
             params += " --sampling " + str(self.samplingRate.get())
             params += " --size " + str(self.volumeSize.get())
@@ -329,7 +333,12 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
     def generate_rotation_and_shift(self):
         subtomogramMD = md.MetaData(self._getExtraPath('GroundTruth.xmd'))
-        for i in range(self.numberOfVolumes.get()):
+        if self.modeRelationChoice.get() is MODE_RELATION_MESH:
+            numberOfVolumes = self.meshRowPoints.get()*self.meshRowPoints.get()
+        else:
+            numberOfVolumes = self.numberOfVolumes.get()
+
+        for i in range(numberOfVolumes):
             rot1 = 360 * np.random.uniform()
             tilt1 = 180 * np.random.uniform()
             psi1 = 360 * np.random.uniform()
@@ -396,7 +405,13 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         # The number of particles per tomogram is the integer division of the number of volumes
         #  and the number of tomograms
         numberOfTomograms = self.numberOfTomograms.get()
-        particlesPerTomogram = self.numberOfVolumes.get()//numberOfTomograms
+
+        if self.modeRelationChoice.get() is MODE_RELATION_MESH:
+            numberOfVolumes = self.meshRowPoints.get()*self.meshRowPoints.get()
+        else:
+            numberOfVolumes = self.numberOfVolumes.get()
+
+        particlesPerTomogram = numberOfVolumes//numberOfTomograms
 
         for t in range(numberOfTomograms):
             # Shuffle the positions order to fill the tomogram boxes in random order
@@ -432,7 +447,11 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             # else, the deformed volumes are projected
             sizeX = self.volumeSize.get()
             sizeY = self.volumeSize.get()
-            numberOfVolumes = self.numberOfVolumes.get()
+            if self.modeRelationChoice.get() is MODE_RELATION_MESH:
+                numberOfVolumes = self.meshRowPoints.get() * self.meshRowPoints.get()
+            else:
+                numberOfVolumes = self.numberOfVolumes.get()
+
             volumeName = "_deformed.vol"
 
         tiltStep = self.tiltStep.get()
@@ -478,7 +497,10 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             numberOfVolumes = self.numberOfTomograms.get()
 
         else:
-            numberOfVolumes = self.numberOfVolumes.get()
+            if self.modeRelationChoice.get() is MODE_RELATION_MESH:
+                numberOfVolumes = self.meshRowPoints.get() * self.meshRowPoints.get()
+            else:
+                numberOfVolumes = self.numberOfVolumes.get()
 
         with open(self._getExtraPath('ctf.param'), 'a') as file:
             file.write(
@@ -508,7 +530,12 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                 self.runJob('xmipp_ctf_phase_flip', params_j)
 
     def reconstruct(self):
-        for i in range(self.numberOfVolumes.get()):
+        if self.modeRelationChoice.get() is MODE_RELATION_MESH:
+            numberOfVolumes = self.meshRowPoints.get() * self.meshRowPoints.get()
+        else:
+            numberOfVolumes = self.numberOfVolumes.get()
+
+        for i in range(numberOfVolumes):
             params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.sel')
             params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_reconstructed.vol')
 

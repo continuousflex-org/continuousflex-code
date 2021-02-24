@@ -28,6 +28,4 @@ from .viewer_nma_dimred import FlexDimredNMAViewer
 from .viewer_structure_mapping import FlexProtStructureMappingViewer
 from .viewer_subtomograms_synthesize import FlexProtSynthesizeSubtomoViewer
 from .viewer_pdb_dimred import FlexProtPdbDimredViewer
-
-
-
+from .viewer_subtomograms_classify import FlexProtSubtomoClassifyViewer
