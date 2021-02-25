@@ -33,6 +33,8 @@ from pyworkflow.tests import setupTestProject, DataSet
 from continuousflex.protocols import (FlexProtNMA, FlexProtSynthesizeSubtomo,NMA_CUTOFF_ABS)
 from continuousflex.protocols.protocol_subtomogrmas_synthesize import MODE_RELATION_LINEAR, MODE_RELATION_3CLUSTERS,\
     MODE_RELATION_MESH, MODE_RELATION_RANDOM
+from continuousflex.protocols.protocol_pdb_dimred import FlexProtDimredPdb
+from continuousflex.protocols.protocol_subtomograms_classify import FlexProtSubtomoClassify
 
 class TestSubtomogramSynthesize(TestWorkflow):
     """ Check subtomograms are generated propoerly """
@@ -53,39 +55,122 @@ class TestSubtomogramSynthesize(TestWorkflow):
         # Import a PDB
         protImportPdb = self.newProtocol(ProtImportPdb, inputPdbData=1,
                                          pdbFile=self.ds.getFile('pdb'))
+        protImportPdb.setObjLabel('AK.pdb')
         self.launchProtocol(protImportPdb)
         
         # Launch NMA for PDB imported
         protNMA = self.newProtocol(FlexProtNMA,
                                     cutoffMode=NMA_CUTOFF_ABS)
         protNMA.inputStructure.set(protImportPdb.outputPdb)
+        protNMA.setObjLabel('NMA')
         self.launchProtocol(protNMA)
-        
+        #------------------------------------------------------------------------------------
         # Synthesize subtomograms with linear relationship
         protSynthesize1 = self.newProtocol(FlexProtSynthesizeSubtomo,
                                          modeList='7-8',
                                          modeRelationChoice=MODE_RELATION_LINEAR)
         protSynthesize1.inputModes.set(protNMA.outputModes)
+        protSynthesize1.setObjLabel('synthesized linear')
         self.launchProtocol(protSynthesize1)
 
+        protpdbdimred1 = self.newProtocol(FlexProtDimredPdb,
+                                         reducedDim=3)
+        protpdbdimred1.pdbs.set(protSynthesize1)
+        protpdbdimred1.setObjLabel('pdb dimred')
+        self.launchProtocol(protpdbdimred1)
 
+        protclassifyhierarchical1= self.newProtocol(FlexProtSubtomoClassify,
+                                                   numOfClasses=3)
+        protclassifyhierarchical1.ProtSynthesize.set(protSynthesize1)
+        protclassifyhierarchical1.setObjLabel('hierarchical')
+        self.launchProtocol(protclassifyhierarchical1)
+        protclassifyKmeans1 = self.newProtocol(FlexProtSubtomoClassify,
+                                                     numOfClasses=3,
+                                                     classifyTechnique=1,
+                                                     reducedDim=3)
+        protclassifyKmeans1.ProtSynthesize.set(protSynthesize1)
+        protclassifyKmeans1.setObjLabel('Kmeans')
+        self.launchProtocol(protclassifyKmeans1)
+        # ------------------------------------------------------------------------------------
         # Synthesize subtomograms with clusters relationship
         protSynthesize2 = self.newProtocol(FlexProtSynthesizeSubtomo,
                                          modeList='7-8',
                                          modeRelationChoice=MODE_RELATION_3CLUSTERS)
         protSynthesize2.inputModes.set(protNMA.outputModes)
+        protSynthesize2.setObjLabel('synthesized 3 clusters')
         self.launchProtocol(protSynthesize2)
 
+        protpdbdimred2 = self.newProtocol(FlexProtDimredPdb,
+                                         reducedDim=3)
+        protpdbdimred2.pdbs.set(protSynthesize2)
+        protpdbdimred2.setObjLabel('pdb dimred')
+        self.launchProtocol(protpdbdimred2)
+
+        protclassifyhierarchical2= self.newProtocol(FlexProtSubtomoClassify,
+                                                   numOfClasses=3)
+        protclassifyhierarchical2.ProtSynthesize.set(protSynthesize2)
+        protclassifyhierarchical2.setObjLabel('hierarchical')
+        self.launchProtocol(protclassifyhierarchical2)
+        protclassifyKmeans2 = self.newProtocol(FlexProtSubtomoClassify,
+                                                     numOfClasses=3,
+                                                     classifyTechnique=1,
+                                                     reducedDim=3)
+        protclassifyKmeans2.ProtSynthesize.set(protSynthesize2)
+        protclassifyKmeans2.setObjLabel('Kmeans')
+        self.launchProtocol(protclassifyKmeans2)
+        # ------------------------------------------------------------------------------------
         # Synthesize subtomograms with Mesh relationship
         protSynthesize3 = self.newProtocol(FlexProtSynthesizeSubtomo,
                                          modeList='7-8',
                                          modeRelationChoice=MODE_RELATION_MESH)
         protSynthesize3.inputModes.set(protNMA.outputModes)
+        protSynthesize3.setObjLabel('synthesized mesh')
         self.launchProtocol(protSynthesize3)
 
+        protpdbdimred3 = self.newProtocol(FlexProtDimredPdb,
+                                         reducedDim=3)
+        protpdbdimred3.pdbs.set(protSynthesize3)
+        protpdbdimred3.setObjLabel('pdb dimred')
+        self.launchProtocol(protpdbdimred3)
+
+        protclassifyhierarchical3= self.newProtocol(FlexProtSubtomoClassify,
+                                                   numOfClasses=3)
+        protclassifyhierarchical3.ProtSynthesize.set(protSynthesize3)
+        protclassifyhierarchical3.setObjLabel('hierarchical')
+        self.launchProtocol(protclassifyhierarchical3)
+        protclassifyKmeans3 = self.newProtocol(FlexProtSubtomoClassify,
+                                                     numOfClasses=3,
+                                                     classifyTechnique=1,
+                                                     reducedDim=3)
+        protclassifyKmeans3.ProtSynthesize.set(protSynthesize3)
+        protclassifyKmeans3.setObjLabel('Kmeans')
+        self.launchProtocol(protclassifyKmeans3)
+        # ------------------------------------------------------------------------------------
         # Synthesize subtomograms with random relationship
         protSynthesize4 = self.newProtocol(FlexProtSynthesizeSubtomo,
                                          modeList='7-8',
                                          modeRelationChoice=MODE_RELATION_RANDOM)
         protSynthesize4.inputModes.set(protNMA.outputModes)
+        protSynthesize4.setObjLabel('synthesized random')
         self.launchProtocol(protSynthesize4)
+
+        protpdbdimred4 = self.newProtocol(FlexProtDimredPdb,
+                                         reducedDim=3)
+        protpdbdimred4.pdbs.set(protSynthesize4)
+        protpdbdimred4.setObjLabel('pdb dimred')
+        self.launchProtocol(protpdbdimred4)
+
+        protclassifyhierarchical4= self.newProtocol(FlexProtSubtomoClassify,
+                                                   numOfClasses=3)
+        protclassifyhierarchical4.ProtSynthesize.set(protSynthesize4)
+        protclassifyhierarchical4.setObjLabel('hierarchical')
+        self.launchProtocol(protclassifyhierarchical4)
+        protclassifyKmeans4 = self.newProtocol(FlexProtSubtomoClassify,
+                                                     numOfClasses=3,
+                                                     classifyTechnique=1,
+                                                     reducedDim=3)
+        protclassifyKmeans4.ProtSynthesize.set(protSynthesize4)
+        protclassifyKmeans4.setObjLabel('Kmeans')
+        self.launchProtocol(protclassifyKmeans4)
+
+        

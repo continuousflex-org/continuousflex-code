@@ -113,7 +113,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                       condition='modeRelationChoice==%d' % MODE_RELATION_MESH,
                       label='Mesh number of steps',
                       help='This number will be the number of points in the row and the column (mesh shape will be size*size)')
-        form.addParam('numberOfVolumes', params.IntParam, default=10,
+        form.addParam('numberOfVolumes', params.IntParam, default=36,
                       label='Number of volumes',
                       condition='modeRelationChoice!=%d'% MODE_RELATION_MESH,
                       help='Number of volumes that will be generated')
