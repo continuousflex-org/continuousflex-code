@@ -103,8 +103,6 @@ class TestNMA(TestWorkflow):
         self.launchProtocol(protImportVol)
         
         # Convert the Volume to Pdb
-        # NMA_MASK_THRE = Domain.importFromPlugin('xmipp3.protocols.pdb.protocol_pseudoatoms_base',
-        #                                  'NMA_MASK_THRE')
         protConvertVol = self.newProtocol(FlexProtConvertToPseudoAtoms)
         protConvertVol.inputStructure.set(protImportVol.outputVolume)
         protConvertVol.maskMode.set(NMA_MASK_THRE)
