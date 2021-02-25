@@ -157,7 +157,8 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                 counter = counter + 1
                 imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
                 if counter == 1:
-                    os.system("cp %(imgPath)s %(tempVol)s" % locals())
+                    args = '-i %(imgPath)s -o %(tempVol)s --type vol' % locals()
+                    self.runJob('xmipp_image_convert',args, numberOfMpi=1)
                 else:
                     params = '-i %(imgPath)s --plus %(tempVol)s -o %(tempVol)s ' % locals()
                     self.runJob('xmipp_image_operate', params, numberOfMpi=1)
