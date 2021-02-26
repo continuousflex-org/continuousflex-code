@@ -43,16 +43,12 @@ from continuousflex.protocols.data import Point, Data
 from .plotter_vol import FlexNmaVolPlotter
 from continuousflex.viewers.nma_vol_gui import ClusteringWindowVolHeteroFlow
 from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVolHeteroFlow
-# from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVol
-# from continuousflex.viewers.nma_vol_gui import ClusteringWindowVol
-# from pyworkflow.utils.process import runJob
-# from pwem.viewers import VmdView
-# from pwem.viewers.viewer_chimera import Chimera, ChimeraView
+from pwem.viewers.viewer_chimera import Chimera
 
 from joblib import load, dump
 from continuousflex.protocols.utilities.spider_files3 import open_volume, save_volume
 import farneback3d
-
+import matplotlib.pyplot as plt
 
 from pyworkflow.protocol import params
 
@@ -95,7 +91,9 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
                            'Type 1 2 3 to see the histogram of reduced dimensions, using axes 1, 2, '
                            'and 3; etc. '
                       )
-
+        form.addParam('displayPcaSingularValues', LabelParam,
+                      label="Display PCA singular values",
+                      help="The values should help you see how many dimensions are in the data ")
         form.addParam('displayClustering', LabelParam,
                       label='Open clustering tool?',
                       help='Open a GUI to visualize the volumes as points '
@@ -155,6 +153,7 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
 
     def _getVisualizeDict(self):
         return {'displayRawDeformation': self._viewRawDeformation,
+                'displayPcaSingularValues': self.viewPcaSinglularValues,
                 'displayClustering': self._displayClustering,
                 'displayTrajectories': self._displayTrajectories,
                 }
@@ -413,11 +412,9 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         cxc_command += 'vseries play #1 loop true maxFrameRate 5 direction oscillate'
         with open(fn_cxc, 'w') as f:
             print(cxc_command, file=f)
-        # ChimeraView(fn_cxc)
-        command = '$SCIPION_HOME/$CHIMERA_HOME/bin/ChimeraX ' + fn_cxc
+        command = Chimera.getHome()+'/bin/ChimeraX ' + fn_cxc
+        # print(Chimera.getHome())
         os.system(command)
-
-
 
 
     def loadData(self):
@@ -456,3 +453,11 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         path_flowz = op_path + str(num).zfill(6) + '_opflowz.spi'
         flow = self.read_optical_flow(path_flowx, path_flowy, path_flowz)
         return flow
+
+    def viewPcaSinglularValues(self, paramName):
+        pca = load(self.protocol._getExtraPath('pca_pickled.txt'))
+        fig = plt.figure('PCA singlular values')
+        plt.stem(pca.singular_values_)
+        plt.xticks(np.arange(0, len(pca.singular_values_), 1))
+        plt.show()
+        pass

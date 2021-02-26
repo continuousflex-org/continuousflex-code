@@ -31,6 +31,7 @@ from continuousflex.protocols.protocol_subtomogrmas_synthesize import MODE_RELAT
 from continuousflex.protocols.protocol_pdb_dimred import FlexProtDimredPdb
 from continuousflex.protocols.protocol_subtomograms_classify import FlexProtSubtomoClassify
 from continuousflex.protocols.protocol_subtomogram_averaging import FlexProtSubtomogramAveraging
+from continuousflex.protocols.protocol_missing_wedge_filling import FlexProtMissingWedgeFilling
 
 class TestStA(TestWorkflow):
     """ Check subtomograms are generated propoerly """
@@ -60,18 +61,64 @@ class TestStA(TestWorkflow):
         protNMA.setObjLabel('NMA')
         self.launchProtocol(protNMA)
         #------------------------------------------------------------------------------------
-        # Synthesize subtomograms with linear relationship
+        # Synthesize subtomograms with 3 clusters relationship
         protSynthesize = self.newProtocol(FlexProtSynthesizeSubtomo,
                                          modeList='7-8',
                                          numberOfVolumes=36,
-                                         modeRelationChoice=MODE_RELATION_LINEAR)
+                                         modeRelationChoice=MODE_RELATION_3CLUSTERS)
         protSynthesize.inputModes.set(protNMA.outputModes)
-        protSynthesize.setObjLabel('synthesized linear')
+        protSynthesize.setObjLabel('subtomograms 3 clusters')
         self.launchProtocol(protSynthesize)
+
+        protpdbdimred = self.newProtocol(FlexProtDimredPdb,
+                                         reducedDim=3)
+        protpdbdimred.pdbs.set(protSynthesize)
+        protpdbdimred.setObjLabel('pdb dimred')
+        self.launchProtocol(protpdbdimred)
+
+        # Post alignment classification (PCA+Kmeans)
+        protKmeans = self.newProtocol(FlexProtSubtomoClassify,
+                                                     numOfClasses=3,
+                                                     classifyTechnique=1,
+                                                     reducedDim=3)
+        protKmeans.ProtSynthesize.set(protSynthesize)
+        protKmeans.setObjLabel('Kmeans')
+        self.launchProtocol(protKmeans)
+
+        # Missing wedge filling and applying alignment:
+        protMissingWedgeFilling = self.newProtocol(FlexProtMissingWedgeFilling,
+                                                   StartingReference=1,
+                                                   AlignmentParameters=2)
+        protMissingWedgeFilling.STAVolume.set(protKmeans.GlobalAverage)
+        protMissingWedgeFilling.MetaDataSTS.set(protSynthesize)
+        protMissingWedgeFilling.inputVolumes.set(protSynthesize.outputVolumes)
+        protMissingWedgeFilling.setObjLabel('MW filling and alignment')
+        self.launchProtocol(protMissingWedgeFilling)
+
         # Perform StA
         protStA = self.newProtocol(FlexProtSubtomogramAveraging,
-                                    NumOfIters=3)
+                                    NumOfIters=4)
         protStA.inputVolumes.set(protSynthesize.outputVolumes)
         protStA.setObjLabel('StA')
         self.launchProtocol(protStA)
+
+        # Post alignment classification (PCA+Kmeans)
+        protclassifyKmeans = self.newProtocol(FlexProtSubtomoClassify,
+                                              SubtomoSource=1, #this is for StA
+                                              numOfClasses=3,
+                                              classifyTechnique=1,
+                                              reducedDim=3)
+        protclassifyKmeans.StA.set(protStA)
+        protclassifyKmeans.setObjLabel('Kmeans')
+        self.launchProtocol(protclassifyKmeans)
+
+        # Missing wedge filling and applying alignment:
+        protMissingWedgeFilling2 = self.newProtocol(FlexProtMissingWedgeFilling,
+                                                   StartingReference=1,
+                                                   AlignmentParameters=1)
+        protMissingWedgeFilling2.STAVolume.set(protStA.outputvolume)
+        protMissingWedgeFilling2.MetaDataSTA.set(protStA)
+        protMissingWedgeFilling2.inputVolumes.set(protSynthesize.outputVolumes)
+        protMissingWedgeFilling2.setObjLabel('MW filling and alignment')
+        self.launchProtocol(protMissingWedgeFilling2)
 
