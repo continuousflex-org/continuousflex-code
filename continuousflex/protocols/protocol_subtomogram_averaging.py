@@ -103,7 +103,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                       label='Maximum shift for rigid body search',
                       help='The maximum shift is a number between 1 and half the size of your volume. '
                            'Increase it if your target is far from the center of the volumes')
-        form.addParallelSection(threads=0, mpi=24)
+        form.addParallelSection(threads=0, mpi=5)
 
     # --------------------------- INSERT steps functions --------------------------------------------
 

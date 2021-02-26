@@ -27,6 +27,7 @@ from pwem.convert import cifToPdb
 from pyworkflow.utils.path import makePath, copyFile, removeBaseExt
 from pyworkflow.protocol import params
 
+from .protocol_subtomogram_averaging import FlexProtSubtomogramAveraging
 from sklearn.cluster import AgglomerativeClustering, KMeans
 import time
 import os
@@ -50,17 +51,17 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
         form.addSection(label='Input')
         form.addParam('SubtomoSource', EnumParam, default=0,
                       label='Source of Subtomograms',
-                      choices=['After subtomogram synthesis'],
+                      choices=['After subtomogram synthesis', 'After subtomogram averaging'],
                       help='Choose the source of the subtomograms that you want to classify')
         form.addParam('ProtSynthesize', params.PointerParam, pointerClass='FlexProtSynthesizeSubtomo',
                       condition='SubtomoSource == 0',
                       label="Subtomogram synthesis",
                       help='All PDBs should have the same size')
-        # TODO: add an option to classify subtomograms after StA
-        # form.addParam('StA', params.PointerParam,
-        #               condition='SubtomoSource == 1',pointerClass=
-        #               label="StA protocol",
-        #               help='Choose a subtomogram averaging previous run')
+        form.addParam('StA',params.PointerParam,
+                      condition='SubtomoSource == 1',
+                      pointerClass='FlexProtSubtomogramAveraging',
+                      label="StA protocol",
+                      help='Choose a subtomogram averaging previous run')
         form.addParam('classifyTechnique', EnumParam, default=0,
                       label='Classification techinque',
                       choices=['Hierarchical clustering', 'Dimentionality reduction then Clustering'],
@@ -142,15 +143,27 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
             shifty = str(subtomogramMD.getValue(md.MDL_SHIFT_Y, i))
             shiftz = str(subtomogramMD.getValue(md.MDL_SHIFT_Z, i))
             # align the subtomogram
-            params = '-i ' + fnsubtomo + ' -o ' + fnalignedsubtomo + ' '
+            if self.SubtomoSource.get() == 1:
+                args = '-i ' + fnsubtomo + ' -o ' + fnalignedsubtomo + ' --rotate_volume euler 0 90 0'
+                self.runJob('xmipp_transform_geometry', args)
+                params = '-i ' + fnalignedsubtomo + ' -o ' + fnalignedsubtomo + ' '
+            else:
+                params = '-i ' + fnsubtomo + ' -o ' + fnalignedsubtomo + ' '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
-            params += ' --inverse '
+            if self.SubtomoSource.get() == 0:
+                params += ' --inverse '
             self.runJob('xmipp_transform_geometry', params)
             # align the mask (no shift should be applied only angles)
-            params = '-i ' + fnmask + ' -o ' + fnalignedmask + ' '
+            if self.SubtomoSource.get() == 1:
+                args = '-i ' + fnmask + ' -o ' + fnalignedmask + ' --rotate_volume euler 0 90 0'
+                self.runJob('xmipp_transform_geometry', args)
+                params = '-i ' + fnalignedmask + ' -o ' + fnalignedmask + ' '
+            else:
+                params = '-i ' + fnmask + ' -o ' + fnalignedmask + ' '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
-            params += ' --inverse '
+            if self.SubtomoSource.get() == 0:
+                params += ' --inverse '
             self.runJob('xmipp_transform_geometry', params)
             subtomogaligneMD.setValue(md.MDL_IMAGE, fnalignedsubtomo, subtomogaligneMD.addObject())
             mwalignedMD.setValue(md.MDL_IMAGE, fnalignedmask, mwalignedMD.addObject())
@@ -321,18 +334,27 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
     def getSubtomoMetaData(self):
         if self.SubtomoSource.get()==0:
             return self.ProtSynthesize.get()._getExtraPath('GroundTruth.xmd')
+        if self.SubtomoSource.get()==1:
+            return self.StA.get()._getExtraPath('final_md.xmd')
 
     def getTiltRange(self):
         if self.SubtomoSource.get()==0:
             return [self.ProtSynthesize.get().tiltLow.get(), self.ProtSynthesize.get().tiltHigh.get()]
+        if self.SubtomoSource.get()==1:
+            return [self.StA.get().tiltLow.get(), self.StA.get().tiltHigh.get()]
 
     def getSamplingRate(self):
         if self.SubtomoSource.get()==0:
             return self.ProtSynthesize.get().samplingRate.get()
+        if self.SubtomoSource.get()==1:
+            return self.StA.get().inputVolumes.get().getSamplingRate()
 
     def getVolumeSize(self):
         if self.SubtomoSource.get() == 0:
             return self.ProtSynthesize.get().volumeSize.get()
+        if self.SubtomoSource.get() == 1:
+            return self.StA.get().outputvolume.getDim()[0]
+
 
     def getOutputMatrixFile(self):
         return self._getExtraPath('output_matrix.txt')

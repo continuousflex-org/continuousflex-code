@@ -105,7 +105,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                            'center1 = (-center_point, 0)'
                            'center2 = (center_point, 0)'
                            'center3 = (0, center_point)')
-        form.addParam('modesAmplitudeRange', params.IntParam, default=200,
+        form.addParam('modesAmplitudeRange', params.IntParam, default=150,
                       condition='modeRelationChoice==%d or modeRelationChoice==%d or modeRelationChoice==%d' % (MODE_RELATION_LINEAR,MODE_RELATION_MESH, MODE_RELATION_RANDOM),
                       label='Amplitude range N --> [-N, N]',
                       help='Choose the number N for which the generated normal mode amplitudes are in the range of [-N, N]')
