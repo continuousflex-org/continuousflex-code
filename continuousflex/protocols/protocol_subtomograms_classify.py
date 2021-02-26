@@ -36,6 +36,7 @@ import pwem.emlib.metadata as md
 from continuousflex.protocols.utilities.spider_files3 import save_volume, open_volume
 import xmipp3
 
+from pwem.objects import Volume
 import numpy as np
 import glob
 from sklearn import decomposition
@@ -91,6 +92,7 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
             self._insertFunctionStep('performHierarchicalClustering')
         else:
             self._insertFunctionStep('performKmeansClustering')
+        self._insertFunctionStep('findTotalAverage')
         self._insertFunctionStep('createOutputStep')
 
 
@@ -299,12 +301,29 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
         md_averages.write(self._getExtraPath('averages.xmd'))
         pass
 
+    def findTotalAverage(self):
+        N = self.getVolumeSize()
+        Average = np.zeros([N, N, N])
+        subtomogaligneMD = md.MetaData(self._getExtraPath('aligned_subtomograms.xmd'))
+        count = 0
+        for i in subtomogaligneMD:
+            name = subtomogaligneMD.getValue(md.MDL_IMAGE, i)
+            vol = open_volume(name)
+            Average[:, :, :] += vol
+            count+=1
+        name = self._getExtraPath('global_average.spi')
+        save_volume(np.array(Average[:, :, :] / count, dtype=np.float32), name)
+        pass
+
     def createOutputStep(self):
         out_mdfn = self._getExtraPath('averages.xmd')
         partSet = self._createSetOfVolumes('Averages')
         xmipp3.convert.readSetOfVolumes(out_mdfn, partSet)
         partSet.setSamplingRate(self.getSamplingRate())
-        self._defineOutputs(ClassAvarages=partSet)
+        outvolume = Volume()
+        outvolume.setSamplingRate(self.getSamplingRate())
+        outvolume.setFileName(self._getExtraPath('global_average.spi'))
+        self._defineOutputs(ClassAvarages=partSet, GlobalAverage=outvolume)
         pass
 
     # --------------------------- INFO functions --------------------------------------------

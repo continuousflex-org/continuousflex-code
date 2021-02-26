@@ -32,9 +32,11 @@ from .utilities.spider_files3 import save_volume, open_volume
 from pyworkflow.utils import replaceBaseExt
 import numpy as np
 from continuousflex.protocols.utilities.mwr import mwr
+from continuousflex.protocols.protocol_subtomogrmas_synthesize import FlexProtSynthesizeSubtomo
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
+REFERENCE_STS = 2
 
 METHOD_STAFILL = 0
 METHOD_MCSFILL = 1
@@ -84,7 +86,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
                       label="Volume (STA)",
                       help='Choose a reference, typically from a STA previous run')
         group1.addParam('AlignmentParameters', params.EnumParam, allowsNull=True,
-                      choices=['from input metadata file', 'from STA run'],
+                      choices=['from input metadata file', 'from STA run', 'from Subtomograms synthesize run'],
                       default=REFERENCE_EXT,
                       label='Alignment parameters', display=params.EnumParam.DISPLAY_COMBO,
                       help='either an external metadata file containing alignment parameters or STA run')
@@ -98,6 +100,11 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
                       condition='AlignmentParameters==%d' % REFERENCE_STA,
                       label="Subtomogram averaging run",
                       help='Alignment parameters, typically from a STA previous run')
+        group1.addParam('MetaDataSTS', params.PointerParam,
+                      pointerClass='FlexProtSynthesizeSubtomo', allowsNull=True,
+                      condition='AlignmentParameters==%d' % REFERENCE_STS,
+                      label="Subtomogram synthesize run",
+                      help='Point to the corresponding synthesize run where you imported the volumes')
         group1.addParam('applyParams', params.BooleanParam, allowsNull=True,
                       default=True,
                       label='Apply alignment after filling the wedge?',
@@ -125,9 +132,10 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         # Define some outputs filenames
         self.imgsFn = self._getExtraPath('volumes.xmd')
         makePath(self._getExtraPath() + '/mw_filled')
-
-        dynamoflag= self.MetaDataSTA.get().dynamoTable.get()
-        print(dynamoflag)
+        dynamoflag=False
+        if self.MetaDataFile.get()==REFERENCE_STA:
+            dynamoflag= self.MetaDataSTA.get().dynamoTable.get()
+            print(dynamoflag)
         self._insertFunctionStep('convertInputStep')
         if self.Method == METHOD_STAFILL:
             if dynamoflag:
@@ -150,6 +158,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self._getExtraPath('input.xmd'))
 
     def doAlignmentStep_STAFILL_dynamo(self):
+        # TODO: fix this bug
         pass
         tempdir = self._getTmpPath()
         imgFn = self.imgsFn
@@ -166,6 +175,8 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         if AlignmentParameters == REFERENCE_STA:
             MetaDataSTA = self.MetaDataSTA.get()._getExtraPath('final_md.xmd')
             MetaDataFile = MetaDataSTA
+
+
         copyFile(MetaDataFile, imgFn)
 
         tiltLow = self.tiltLow.get()
@@ -246,6 +257,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             params = '-i ' + STAVolume + ' -o ' + tempdir + '/temp.vol '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
+
             # print('xmipp_transform_geometry',params)
             self.runJob('xmipp_transform_geometry', params)
             # print('xmipp_transform_geometry',params)
@@ -286,6 +298,9 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         if AlignmentParameters == REFERENCE_STA:
             MetaDataSTA = self.MetaDataSTA.get()._getExtraPath('final_md.xmd')
             MetaDataFile = MetaDataSTA
+        if AlignmentParameters == REFERENCE_STS:
+            MetaDataSTS = self.MetaDataSTS.get()._getExtraPath('GroundTruth.xmd')
+            MetaDataFile = MetaDataSTS
         copyFile(MetaDataFile, imgFn)
 
         tiltLow = self.tiltLow.get()
@@ -366,13 +381,15 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             params = '-i ' + STAVolume + ' -o ' + tempdir + '/temp.vol '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
-            params += '--inverse'
+            if AlignmentParameters != REFERENCE_STS:
+                params += '--inverse'
             # print('xmipp_transform_geometry',params)
             self.runJob('xmipp_transform_geometry', params)
-            params = '-i ' + tempdir + '/temp.vol -o ' + tempdir + '/temp.vol '
-            params += '--rotate_volume euler 0 -90 0 '
-            # print('xmipp_transform_geometry',params)
-            self.runJob('xmipp_transform_geometry', params)
+            if AlignmentParameters != REFERENCE_STS:
+                params = '-i ' + tempdir + '/temp.vol -o ' + tempdir + '/temp.vol '
+                params += '--rotate_volume euler 0 -90 0 '
+                # print('xmipp_transform_geometry',params)
+                self.runJob('xmipp_transform_geometry', params)
             # Now the STA is aligned, add the missing wedge region to the subtomogram:
             v = open_volume(new_imgPath)
             I = fft(v)
@@ -390,6 +407,11 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             v_result = np.float32(ifft(I))
             #
             save_volume(v_result, new_imgPath)
+
+            # for debugging, save everything that was aligned in the first iteration
+            # if objId == 1:
+            #     v_ave = open_volume(tempdir + '/temp.vol')
+            #     save_volume(v_ave, self._getExtraPath('aligned_average_with_first_volume.spi'))
 
         mdImgs.write(self.imgsFn)
 
@@ -465,17 +487,20 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             shiftx = str(mdImgs.getValue(md.MDL_SHIFT_X, objId))
             shifty = str(mdImgs.getValue(md.MDL_SHIFT_Y, objId))
             shiftz = str(mdImgs.getValue(md.MDL_SHIFT_Z, objId))
-            # rotate 90 around y, align, then rotate -90 to get to neutral
             params = '-i ' + imgPath + ' -o ' + tempdir + '/temp.vol '
-            params += '--rotate_volume euler 0 90 0 '
+            # rotate 90 around y, then align
+            if self.AlignmentParameters.get() != REFERENCE_STS:
+                params += '--rotate_volume euler 0 90 0 '
+            else:
+                params += '--rotate_volume euler 0 0 0 '
             self.runJob('xmipp_transform_geometry', params)
             params = '-i ' + tempdir + '/temp.vol -o ' + new_imgPath + ' '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
+            if self.AlignmentParameters.get() == REFERENCE_STS:
+                params += '--inverse'
             # print('xmipp_transform_geometry',params)
             self.runJob('xmipp_transform_geometry', params)
-            # params = '-i ' + new_imgPath + ' --rotate_volume euler 0 90 0 '
-            # self.runJob('xmipp_transform_geometry', params)
         self.fnaligned = self._getExtraPath('volumes_aligned.xmd')
         mdImgs.write(self.fnaligned)
 
