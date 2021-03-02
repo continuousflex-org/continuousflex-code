@@ -81,7 +81,7 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
 
     def _defineParams(self, form):
         form.addSection(label='Visualization')
-        form.addParam('displayRawDeformation', StringParam, default='1',
+        form.addParam('displayRawDeformation', StringParam, default='1 2',
                       label='Display raw deformation',
                       help='Type 1 to see the histogram of reduced dimensions, '
                            'using axis 1; \n '
