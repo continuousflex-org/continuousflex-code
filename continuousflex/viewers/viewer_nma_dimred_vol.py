@@ -58,6 +58,7 @@ Y_LIMITS = 1
 Z_LIMITS_NONE = 0
 Z_LIMITS = 1
 
+
 class FlexDimredNMAVolViewer(ProtocolViewer):
     """ Visualization of results from the NMA protocol
     """
@@ -76,7 +77,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
 
     def _defineParams(self, form):
         form.addSection(label='Visualization')
-        form.addParam('displayRawDeformation', StringParam, default='1',
+        form.addParam('displayRawDeformation', StringParam, default='1 2',
                       label='Display raw deformation',
                       help='Type 1 to see the histogram of normal-mode amplitudes in the low-dimensional space, '
                            'using axis 1; \n '
@@ -200,6 +201,12 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         return views
 
     def _displayClustering(self, paramName):
+        # self.clusterWindow = self.tkWindow(ClusteringWindowVol,
+        #                                    title='Volume Clustering Tool',
+        #                                    dim=self.protocol.reducedDim.get(),
+        #                                    data=self.getData(),
+        #                                    callback=self._createCluster
+        #                                    )
         self.clusterWindow = self.tkWindow(ClusteringWindowVol,
                                            title='Volume Clustering Tool',
                                            dim=self.protocol.reducedDim.get(),
@@ -218,6 +225,14 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         return [self.clusterWindow]
 
     def _displayTrajectories(self, paramName):
+        # self.trajectoriesWindow = self.tkWindow(TrajectoriesWindowVol,
+        #                                         title='Trajectories Tool',
+        #                                         dim=self.protocol.reducedDim.get(),
+        #                                         data=self.getData(),
+        #                                         callback=self._generateAnimation,
+        #                                         loadCallback=self._loadAnimation,
+        #                                         numberOfPoints=10
+        #                                         )
         self.trajectoriesWindow = self.tkWindow(TrajectoriesWindowVol,
                                                 title='Trajectories Tool',
                                                 dim=self.protocol.reducedDim.get(),
@@ -332,7 +347,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
 
         if isfile(projectorFile):
             M = np.loadtxt(projectorFile)
-            if prot.getMethodName()=='sklearn_PCA':
+            if prot.getMethodName() == 'sklearn_PCA':
                 pca = load(prot._getExtraPath('pca_pickled.txt'))
                 deformations = pca.inverse_transform(trajectoryPoints)
             else:
@@ -362,7 +377,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         elif prot.getDataChoice() == 'PDBs':
             # There is incompatibility issue with the rest of the code, we have to use the fahterPDB as one of the
             # deformed PDBs (the first one)
-            #fatherPDB = prot._getExtraPath('pdb_file.pdb')
+            # fatherPDB = prot._getExtraPath('pdb_file.pdb')
             fatherPDB = prot._getExtraPath('generated_pdbs/000001.pdb')
             lines_father = self.readPDB(fatherPDB)
             list_father = self.PDB2List(lines_father)

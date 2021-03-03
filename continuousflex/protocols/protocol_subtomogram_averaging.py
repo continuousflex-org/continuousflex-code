@@ -36,6 +36,7 @@ WEDGE_MASK_THRE = 1
 
 REFERENCE_NONE = 0
 REFERENCE_EXISTS = 1
+REFERENCE_IMPORTED = 2
 
 
 class FlexProtSubtomogramAveraging(ProtAnalysis3D):
@@ -50,32 +51,43 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                       label="Input volume(s)", important=True,
                       help='Select volumes')
         form.addParam('StartingReference', params.EnumParam,
-                      choices=['start from scratch', 'start from a specific reference'],
+                      choices=['start from scratch', 'import a volume file and use it as reference',
+                               'select a volume and use as reference'],
                       default=REFERENCE_NONE,
                       label='Starting reference', display=params.EnumParam.DISPLAY_COMBO,
                       help='Align from scratch of choose a template')
         form.addParam('ReferenceVolume', params.FileParam,
                       pointerClass='params.FileParam', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_EXISTS,
-                      label="Starting Reference Volume",
-                      help='Choose a starting reference if you have a template (could cause bias to reference)')
+                      label="starting reference file",
+                      help='Choose a starting reference from an external volume file')
+        form.addParam('ReferenceImported', params.PointerParam,
+                      pointerClass='SetOfVolumes,Volume', allowsNull=True,
+                      condition='StartingReference==%d' % REFERENCE_IMPORTED,
+                      label="selected starting reference",
+                      help='Choose an imported volume as a starting reference')
         form.addParam('NumOfIters', params.IntParam, default=10,
                       label='Number of iterations', help='How many times you want to iterate while performing'
                                                          ' subtomogram alignment and averaging.')
+        form.addParam('dynamoTable', params.PathParam, allowsNull=True,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='Import a Dynamo table',
+                      help='import a Dynamo table that contains the STA parameters. This option will evaluate '
+                           'the average and transform the Dynamo table to Scipion metadata format')
         form.addSection(label='Missing-wedge Compensation')
         form.addParam('WedgeMode', params.EnumParam,
-                      choices=['Do not compensate', 'Compensate (Recommended)'],
+                      choices=['Do not compensate', 'Compensate'],
                       default=WEDGE_MASK_THRE,
                       label='Wedge mode', display=params.EnumParam.DISPLAY_COMBO,
                       help='Choose to compensate for the missing wedge if aligning subtomograms.'
                            ' However, if you are working with previously aligned subtomograms, then its better not to.')
         form.addParam('tiltLow', params.IntParam, default=-60,
-                      expertLevel=params.LEVEL_ADVANCED,
+                      # expertLevel=params.LEVEL_ADVANCED,
                       condition='WedgeMode==%d' % WEDGE_MASK_THRE,
                       label='Lower tilt value',
                       help='The lower tilt angle used in obtaining the tilt series')
         form.addParam('tiltHigh', params.IntParam, default=60,
-                      expertLevel=params.LEVEL_ADVANCED,
+                      # expertLevel=params.LEVEL_ADVANCED,
                       condition='WedgeMode==%d' % WEDGE_MASK_THRE,
                       label='Upper tilt value',
                       help='The upper tilt angle used in obtaining the tilt series')
@@ -83,15 +95,15 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         form.addParam('frm_freq', params.FloatParam, default=0.25,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='Maximum normalized pixel frequency',
-                      help='The normalized frequency should be a number between 0 and 1 '
+                      help='The normalized frequency should be a number between -0.5 and 0.5 '
                            'The more it is, the bigger the search frequency is, the more time it demands, '
-                           'keep it as default is recommended')
+                           'keeping it as default is recommended')
         form.addParam('frm_maxshift', params.IntParam, default=10,
                       expertlevel=params.LEVEL_ADVANCED,
                       label='Maximum shift for rigid body search',
                       help='The maximum shift is a number between 1 and half the size of your volume. '
                            'Increase it if your target is far from the center of the volumes')
-        form.addParallelSection(threads=0, mpi=24)
+        form.addParallelSection(threads=0, mpi=5)
 
     # --------------------------- INSERT steps functions --------------------------------------------
 
@@ -102,7 +114,10 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         self.outputMD = self._getExtraPath('final_md.xmd')
 
         self._insertFunctionStep('convertInputStep')
-        self._insertFunctionStep('doAlignmentStep')
+        if self.dynamoTable.empty():
+            self._insertFunctionStep('doAlignmentStep')
+        else:
+            self._insertFunctionStep('adaptDynamoStep', self.dynamoTable.get())
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
@@ -117,7 +132,11 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         frm_maxshift = self.frm_maxshift.get()
         max_itr = self.NumOfIters.get()
         iter_result = self._getExtraPath('result.xmd')
-        reference = self.ReferenceVolume.get()
+        reference = None
+        if self.StartingReference == REFERENCE_EXISTS:
+            reference = self.ReferenceVolume.get()
+        if self.StartingReference == REFERENCE_IMPORTED:
+            reference = self.ReferenceImported.get().getFileName()
 
         print('tempdir is ', tempdir)
         print('imgFn is ', imgFn)
@@ -138,7 +157,8 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                 counter = counter + 1
                 imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
                 if counter == 1:
-                    os.system("cp %(imgPath)s %(tempVol)s" % locals())
+                    args = '-i %(imgPath)s -o %(tempVol)s --type vol' % locals()
+                    self.runJob('xmipp_image_convert',args, numberOfMpi=1)
                 else:
                     params = '-i %(imgPath)s --plus %(tempVol)s -o %(tempVol)s ' % locals()
                     self.runJob('xmipp_image_operate', params, numberOfMpi=1)
@@ -243,6 +263,69 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             mdImgs.setValue(md.MDL_ITEM_ID, target_ID, objId)
 
         mdImgs.write(self.outputMD)
+
+    def adaptDynamoStep(self, dynamoTable):
+        volumes_in = self.imgsFn
+        volume_out = self.outputVolume
+        md_out = self.outputMD
+        from continuousflex.protocols.utilities.dynamo import tbl2metadata
+        tbl2metadata(dynamoTable, volumes_in, md_out)
+
+
+        ### here:
+        mdImgs = md.MetaData(md_out)
+        counter = 0
+        first = True
+
+        for objId in mdImgs:
+            counter = counter + 1
+
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+            tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+            psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+
+            x_shift = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+            y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+            z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+
+            flip = mdImgs.getValue(md.MDL_ANGLE_Y, objId)
+            tempVol = self._getExtraPath('temp.mrc')
+            extra = self._getExtraPath()
+
+            if flip == 0:
+                if first:
+                    print("Averaging based on Dynamo parameters")
+                    first = False
+
+                params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
+
+            else:
+                if first:
+                    print("THERE IS A COMPENSATION FOR THE MISSING WEDGE")
+                    first = False
+                # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
+                params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
+                self.runJob('xmipp_transform_geometry', params, numberOfMpi=1)
+                params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
+
+            self.runJob('xmipp_transform_geometry', params, numberOfMpi=1)
+
+            if counter == 1:
+                os.system("cp %(tempVol)s %(volume_out)s" % locals())
+
+            else:
+                params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
+                self.runJob('xmipp_image_operate', params, numberOfMpi=1)
+
+        params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
+        self.runJob('xmipp_image_operate', params, numberOfMpi=1)
+        os.system("rm -f %(tempVol)s" % locals())
+         # Averaging is done
+
+        pass
 
     def createOutputStep(self):
         inputSet = self.inputVolumes.get()

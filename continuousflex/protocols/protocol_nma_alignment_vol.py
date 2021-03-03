@@ -129,7 +129,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                       label='Maximum shift for rigid body search',
                       help='The maximum shift is a number between 1 and half the size of your volume. Keep as default'
                            ' if your target is near the center in your subtomograms')
-        form.addParallelSection(threads=0, mpi=24)
+        form.addParallelSection(threads=0, mpi=5)
 
     # --------------------------- INSERT steps functions --------------------------------------------
     def getInputPdb(self):

@@ -65,7 +65,7 @@ class FlexAlignmentNMAVolViewer(ProtocolViewer):
 
     def _defineParams(self, form):
         form.addSection(label='Visualization')
-        form.addParam('displayRawDeformation', StringParam, default='7',
+        form.addParam('displayRawDeformation', StringParam, default='7 8',
                       label='Display raw deformation',
                       help='Type 7 to see the histogram of raw deformation along mode 7; \n'
                            'type 8 to see the histogram of raw deformation along mode 8, etc.\n'
