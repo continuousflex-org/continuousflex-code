@@ -201,12 +201,6 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         return views
 
     def _displayClustering(self, paramName):
-        # self.clusterWindow = self.tkWindow(ClusteringWindowVol,
-        #                                    title='Volume Clustering Tool',
-        #                                    dim=self.protocol.reducedDim.get(),
-        #                                    data=self.getData(),
-        #                                    callback=self._createCluster
-        #                                    )
         self.clusterWindow = self.tkWindow(ClusteringWindowVol,
                                            title='Volume Clustering Tool',
                                            dim=self.protocol.reducedDim.get(),
@@ -225,14 +219,6 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         return [self.clusterWindow]
 
     def _displayTrajectories(self, paramName):
-        # self.trajectoriesWindow = self.tkWindow(TrajectoriesWindowVol,
-        #                                         title='Trajectories Tool',
-        #                                         dim=self.protocol.reducedDim.get(),
-        #                                         data=self.getData(),
-        #                                         callback=self._generateAnimation,
-        #                                         loadCallback=self._loadAnimation,
-        #                                         numberOfPoints=10
-        #                                         )
         self.trajectoriesWindow = self.tkWindow(TrajectoriesWindowVol,
                                                 title='Trajectories Tool',
                                                 dim=self.protocol.reducedDim.get(),
@@ -262,6 +248,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         prot = self.protocol
         project = prot.getProject()
         inputSet = prot.getInputParticles()
+        makePath(prot._getTmpPath())
         fnSqlite = prot._getTmpPath('cluster_particles.sqlite')
         cleanPath(fnSqlite)
         partSet = SetOfParticles(filename=fnSqlite)

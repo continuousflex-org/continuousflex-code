@@ -103,21 +103,21 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                            'This value should not be changed except by expert users. '
                            'Larger values (e.g., between 1 and 2) can be tried '
                            'for larger expected amplitudes of conformational change.')
-        form.addParam('rhoStartBase', params.FloatParam, default=250.0,
-                      expertLevel=params.LEVEL_ADVANCED,
-                      label='CONDOR optimiser parameter rhoStartBase',
-                      help='rhoStartBase > 0  : (rhoStart = rhoStartBase*trustRegionScale) the lower the better,'
-                           ' yet the slower')
-        form.addParam('rhoEndBase', params.FloatParam, default=50.0,
-                      expertLevel=params.LEVEL_ADVANCED,
-                      label='CONDOR optimiser parameter rhoEndBase ',
-                      help='rhoEndBase > 250  : (rhoEnd = rhoEndBase*trustRegionScale) no specific rule, '
-                           'however it is better to keep it < 1000 if set very high we risk distortions')
-        form.addParam('niter', params.IntParam, default=10000,
-                      expertLevel=params.LEVEL_ADVANCED,
-                      label='CONDOR optimiser parameter niter',
-                      help='niter should be big enough to guarantee that the search converges to the '
-                           'right set of nma deformation amplitudes')
+        # form.addParam('rhoStartBase', params.FloatParam, default=250.0,
+        #               expertLevel=params.LEVEL_ADVANCED,
+        #               label='CONDOR optimiser parameter rhoStartBase',
+        #               help='rhoStartBase > 0  : (rhoStart = rhoStartBase*trustRegionScale) the lower the better,'
+        #                    ' yet the slower')
+        # form.addParam('rhoEndBase', params.FloatParam, default=50.0,
+        #               expertLevel=params.LEVEL_ADVANCED,
+        #               label='CONDOR optimiser parameter rhoEndBase ',
+        #               help='rhoEndBase > 250  : (rhoEnd = rhoEndBase*trustRegionScale) no specific rule, '
+        #                    'however it is better to keep it < 1000 if set very high we risk distortions')
+        # form.addParam('niter', params.IntParam, default=10000,
+        #               expertLevel=params.LEVEL_ADVANCED,
+        #               label='CONDOR optimiser parameter niter',
+        #               help='niter should be big enough to guarantee that the search converges to the '
+        #                    'right set of nma deformation amplitudes')
         form.addParam('frm_freq', params.FloatParam, default=0.25,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='Maximum normalized pixel frequency',
@@ -235,9 +235,12 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         imgFn = self.imgsFn
         frm_freq = self.frm_freq.get()
         frm_maxshift = self.frm_maxshift.get()
-        rhoStartBase = self.rhoStartBase.get()
-        rhoEndBase = self.rhoEndBase.get()
-        niter = self.niter.get()
+        # rhoStartBase = self.rhoStartBase.get()
+        # rhoEndBase = self.rhoEndBase.get()
+        # niter = self.niter.get()
+        rhoStartBase = 250.0
+        rhoEndBase = 50.0
+        niter = 10000
 
         args = "-i %(imgFn)s --pdb %(atomsFn)s --modes %(modesFn)s --sampling_rate %(sampling)f "
         args += "--odir %(odir)s --centerPDB "

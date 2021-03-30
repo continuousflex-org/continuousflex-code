@@ -101,6 +101,7 @@ class TestHEMNMA3D(TestWorkflow):
         protImportVol = self.newProtocol(ProtImportVolumes,
                                          filesPath=self.ds.getFile('vol'),
                                          samplingRate=1.0)
+        protImportVol.setObjLabel('AK (EM map)')
         self.launchProtocol(protImportVol)
         # Convert the Volume to Pdb
         protConvertVol = self.newProtocol(FlexProtConvertToPseudoAtoms)
@@ -108,6 +109,7 @@ class TestHEMNMA3D(TestWorkflow):
         protConvertVol.maskMode.set(NMA_MASK_THRE)
         protConvertVol.maskThreshold.set(0.2)
         protConvertVol.pseudoAtomRadius.set(2.5)
+        protConvertVol.setObjLabel('AK pseudoatomic structure')
         self.launchProtocol(protConvertVol)
         # Launch NMA with Pseudoatoms
         protNMA2 = self.newProtocol(FlexProtNMA,
