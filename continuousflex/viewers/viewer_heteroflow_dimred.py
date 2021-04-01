@@ -262,6 +262,7 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         prot = self.protocol
         project = prot.getProject()
         inputSet = prot.getInputParticles().get()
+        makePath(prot._getTmpPath())
         fnSqlite = prot._getTmpPath('cluster_particles.sqlite')
         cleanPath(fnSqlite)
         partSet = SetOfParticles(filename=fnSqlite)
