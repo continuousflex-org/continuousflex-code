@@ -1,5 +1,5 @@
 include *.txt
 include MANIFEST.in
 include *.rst
-recursive-include protoclos/utilities *
+recursive-include continuousflex/protocols/utilities *
 
