@@ -31,7 +31,7 @@ from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
 from .utilities.spider_files3 import save_volume, open_volume
 from pyworkflow.utils import replaceBaseExt
 import numpy as np
-from continuousflex.protocols.utilities.mwr import mwr
+from continuousflex.protocols.utilities.mwr_wrapper import mwr
 from continuousflex.protocols.protocol_subtomogrmas_synthesize import FlexProtSynthesizeSubtomo
 
 REFERENCE_EXT = 0
