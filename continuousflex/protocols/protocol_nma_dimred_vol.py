@@ -78,7 +78,7 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
                       label="Conformational distribution",
                       help='Select a previous run of the NMA alignment Vol.')
 
-        form.addParam('dataChoice', EnumParam, default=USE_PDBS,
+        form.addParam('dataChoice', EnumParam, default=USE_NMA_AMP,
                       choices=['Use deformed (pseudo)atomic models',
                                'Use normal mode amplitudes'],
                       label='Data to analyze',
