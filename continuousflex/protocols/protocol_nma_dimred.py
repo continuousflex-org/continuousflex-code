@@ -72,7 +72,7 @@ class FlexProtDimredNMA(ProtAnalysis3D):
                       help='Select a previous run of the NMA alignment.')
 
         form.addParam('analyzeChoice', EnumParam, default=USE_PDBS,
-                      choices=['Use the fitted PDBs (recommended)',
+                      choices=['Use deformed (pseudo)atomic models',
                                'Use normal mode amplitudes'],
                       label='Data to analyze',
                       help='Choosing to analyze the fitted PDBs is slower but more accurate.'
