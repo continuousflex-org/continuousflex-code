@@ -33,9 +33,11 @@ class PointSelectorVol():
     from input Data as 'selected'.
     """
 
-    def __init__(self, ax, data, callback=None):
+    def __init__(self, ax, data, callback=None, LimitL=None, LimitH=None):
         self.ax = ax
         self.data = data
+        self.LimitL = LimitL
+        self.LimitH = LimitH
         self.createPlots(ax)
         self.press = None
         self.callback = callback
@@ -50,7 +52,10 @@ class PointSelectorVol():
     def createPlots(self, ax):
         # plotArray2D(ax, self.data)
         # To avoid plotting the sidebar twice
-        plotArray2D_xy(ax, self.data)
+        if(self.LimitL):
+            plotArray2D_xy(ax, self.data, vvmin=self.LimitL, vvmax=self.LimitH)
+        else:
+            plotArray2D_xy(ax, self.data)
         self.createSelectionPlot(ax)
 
     def getSelectedData(self):

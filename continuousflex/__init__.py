@@ -31,7 +31,7 @@ import pyworkflow.utils as pwutils
 getXmippPath = pwem.Domain.importFromPlugin("xmipp3.base", 'getXmippPath')
 
 _logo = "logo.png"
-__version__ = "3.0.6"
+__version__ = "3.0.7"
 
 class Plugin(pwem.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
