@@ -36,7 +36,7 @@ from continuousflex.protocols import (FlexProtNMA, FlexProtAlignmentNMA,
 from continuousflex.protocols.pdb.protocol_pseudoatoms_base import NMA_MASK_THRE
 
 
-class TestNMA(TestWorkflow):
+class TestHEMNMA(TestWorkflow):
     """ Check the images are converted properly to spider format. """
     
     @classmethod
