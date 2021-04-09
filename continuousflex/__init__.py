@@ -31,7 +31,7 @@ import pyworkflow.utils as pwutils
 getXmippPath = pwem.Domain.importFromPlugin("xmipp3.base", 'getXmippPath')
 
 _logo = "logo.png"
-__version__ = "3.0.8"
+__version__ = "3.0.9"
 
 class Plugin(pwem.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
@@ -101,6 +101,9 @@ class Plugin(pwem.Plugin):
                       ('cd ' + env.getTmpFolder() + '/arpack-96; make all',
                        env.getLibFolder() + '/libarpack.a')])
         # See http://modb.oce.ulg.ac.be/mediawiki/index.php/How_to_compile_ARPACK
+
+        # Cleaning the nma binaries files and folder before expanding
+        os.system('rm -rf ' + env.getEmFolder() + '/nma*')
 
         env.addPackage('nma', version='2.0', deps=[arpack, lapack],
                        url='https://github.com/slajo/NMA_basic_code/raw/master/nma_v3.tar',

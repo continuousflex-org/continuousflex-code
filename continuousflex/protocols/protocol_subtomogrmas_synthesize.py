@@ -321,7 +321,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             params+= " --deformations " + ' '.join(str(i) for i in deformations)
             runProgram('xmipp_pdb_nma_deform', params)
 
-            subtomogramMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i+1).zfill(5)+'_reconstructed'+'.vol'), subtomogramMD.addObject())
+            subtomogramMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i+1).zfill(5)+'_subtomogram'+'.vol'), subtomogramMD.addObject())
             subtomogramMD.setValue(md.MDL_NMA, list(deformations), i+1)
 
         subtomogramMD.write(deformationFile)
@@ -545,7 +545,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
 
         for i in range(numberOfVolumes):
             params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.sel')
-            params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_reconstructed.vol')
+            params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_subtomogram.vol')
 
             if self.reconstructionChoice == RECONSTRUCTION_FOURIER:
                 runProgram('xmipp_reconstruct_fourier', params)
@@ -555,7 +555,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
     def createOutputStep(self):
         # first making a metadata for only the subtomograms:
         out_mdfn = self._getExtraPath('subtomograms.xmd')
-        pattern = '"' + self._getExtraPath() + '/*_reconstructed.vol"'
+        pattern = '"' + self._getExtraPath() + '/*_subtomogram.vol"'
         command = '-p ' + pattern + ' -o ' + out_mdfn
         runProgram('xmipp_metadata_selfile_create', command)
         # now creating the output set of volumes as output:

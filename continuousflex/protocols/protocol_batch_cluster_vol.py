@@ -49,7 +49,7 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
 
     def _insertAllSteps(self):
         volumesMd = self._getExtraPath('volumes.xmd')
-        outputVol = self._getExtraPath('reconstruction.vol')
+        outputVol = self._getExtraPath('average.vol')
 
         self._insertFunctionStep('convertInputStep', volumesMd)
         self._insertFunctionStep('averagingStep')
@@ -96,7 +96,7 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
             # with xmipp_transform_geometry
             flip = mdVols.getValue(md.MDL_ANGLE_Y, objId)
 
-            outputVol = self._getExtraPath('reconstruction.vol')
+            outputVol = self._getExtraPath('average.vol')
             tempVol = self._getExtraPath('temp.vol')
             extra = self._getExtraPath()
 
