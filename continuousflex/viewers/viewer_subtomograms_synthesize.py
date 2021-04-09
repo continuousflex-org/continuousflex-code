@@ -35,7 +35,6 @@ from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 from continuousflex.protocols import FlexProtSynthesizeSubtomo
 import xmipp3
 import pwem.emlib.metadata as md
-from pyworkflow.utils.process import runJob
 from pwem.viewers import ObjectView
 
 class FlexProtSynthesizeSubtomoViewer(ProtocolViewer):
@@ -75,8 +74,7 @@ class FlexProtSynthesizeSubtomoViewer(ProtocolViewer):
     def _viewVolumes(self, paramName):
         volumes = self.protocol.outputVolumes
         return [ObjectView(self._project, volumes.strId(), volumes.getFileName())]
-        # mdfn = self.protocol._getExtraPath('subtomograms.xmd')
-        # runJob(None, 'xmipp_showj', mdfn)
+
 
     def _viewRawDeformation(self, paramName):
         components = self.displayRawDeformation.get()
@@ -137,7 +135,7 @@ class FlexProtSynthesizeSubtomoViewer(ProtocolViewer):
             # inserting 6 zeros for the first 6 never used modes
             for j in range(6):
                 pointData.insert(0, 0)
-            print(pointData)
+            # print(pointData)
             data.addPoint(Point(pointId=objId,
                                 data=pointData,
                                 weight=0.0))

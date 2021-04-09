@@ -24,7 +24,7 @@
 # **************************************************************************
 
 from os.path import basename
-
+import os
 from pyworkflow.utils import getListFromRangeString
 from pwem.protocols import ProtAnalysis3D
 from xmipp3.convert import (writeSetOfVolumes, xmippToLocation, createItemMatrix,
@@ -39,6 +39,7 @@ from pyworkflow.protocol.params import NumericRangeParam
 from .convert import modeToRow
 from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import replaceBaseExt
+from pwem.utils import runProgram
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -148,9 +149,9 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
             self.atomsFn = self._getExtraPath(basename(atomsFn))
             copyFile(atomsFn, self.atomsFn)
         else:
-            localFn = self._getExtraPath(replaceBaseExt(basename(atomsFn), 'pdb'))
-            cifToPdb(atomsFn, localFn)
-            self.atomsFn = self._getExtraPath(basename(localFn))
+            pdb_name = os.path.dirname(self.inputModes.get().getFileName()) + '/atoms.pdb'
+            self.atomsFn = self._getExtraPath(basename(pdb_name))
+            copyFile(pdb_name, self.atomsFn)
 
         self._insertFunctionStep('convertInputStep', atomsFn)
 
@@ -260,7 +261,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
             args += "--tilt_values %(tilt0)d %(tiltF)d "
 
         print(args % locals())
-        self.runJob("xmipp_nma_alignment_vol", args % locals())
+        runProgram("xmipp_nma_alignment_vol", args % locals())
 
         cleanPath(self._getPath('nmaTodo.xmd'))
 

@@ -28,6 +28,7 @@ from pwem.protocols import ProtAnalysis3D
 from pwem.convert import cifToPdb
 from pyworkflow.utils.path import makePath, copyFile
 from pyworkflow.protocol import params
+from pwem.utils import runProgram
 
 
 import numpy as np
@@ -191,7 +192,7 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
                     6) + '.pdb' + ' --pdb ' + pdbfn + ' --nma ' + selected_nma_modes + \
                       ' --deformations ' + ' '.join(map(str, line))
                 #print(cmd)
-                self.runJob('xmipp_pdb_nma_deform', cmd)
+                runProgram('xmipp_pdb_nma_deform', cmd)
                 i += 1
             pdbs_list = [f for f in glob.glob(pdbs_folder+'/*.pdb')]
             pdbs_list.sort()
@@ -241,7 +242,7 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
                 mappingFile = self._getExtraPath('projector.txt')
                 args += " --saveMapping %(mappingFile)s"
                 self.mappingFile.set(mappingFile)
-            self.runJob("xmipp_matrix_dimred", args % locals())
+            runProgram("xmipp_matrix_dimred", args % locals())
 
     def createOutputStep(self):
         pass

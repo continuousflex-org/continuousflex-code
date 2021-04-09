@@ -31,6 +31,7 @@ from pyworkflow.protocol import STEPS_PARALLEL, PointerParam, BooleanParam
 from xmipp3.convert import getImageLocation
 from . import FlexProtConvertToPseudoAtomsBase
 from .protocol_nma_base import *
+from pwem.utils import runProgram
 
 
 #from xmipp3.protocols.pdb.protocol_pseudoatoms_base import *
@@ -122,10 +123,10 @@ class FlexrotNMAChoose(FlexProtConvertToPseudoAtomsBase, FlexProtNMABase):
                               self.collectivityThreshold.get(), True)
         fnModes = self._getPath("modes.xmd")
         fnModesPrefix = self._getPath("modes%s.xmd" % prefix)
-        self.runJob("xmipp_metadata_utilities",
+        runProgram("xmipp_metadata_utilities",
                     "-i %s --operate modify_values \"nmaModeFile=replace(nmaModeFile,'/modes/','/modes%s/')\" -o %s" %
                     (fnModes, prefix, fnModesPrefix))
-        self.runJob("mv", "%s %s" % (
+        runProgram("mv", "%s %s" % (
         self._getPath('modes'), self._getPath('modes%s' % prefix)))
 
         # Remove intermediate files

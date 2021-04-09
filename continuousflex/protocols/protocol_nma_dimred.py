@@ -29,6 +29,7 @@ from pyworkflow.object import String
 from pyworkflow.protocol.params import (PointerParam, StringParam, EnumParam,
                                         IntParam, LEVEL_ADVANCED)
 from pwem.protocols import ProtAnalysis3D
+from pwem.utils import runProgram
 
 
 DIMRED_PCA = 0
@@ -175,7 +176,7 @@ class FlexProtDimredNMA(ProtAnalysis3D):
             mappingFile = self._getExtraPath('projector.txt')
             args += " --saveMapping %(mappingFile)s"
             self.mappingFile.set(mappingFile)
-        self.runJob("xmipp_matrix_dimred", args % locals())
+        runProgram("xmipp_matrix_dimred", args % locals())
         
     def createOutputStep(self):
         pass

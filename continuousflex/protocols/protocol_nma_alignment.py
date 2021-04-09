@@ -30,7 +30,7 @@
 
 
 from os.path import basename
-
+import os
 from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import replaceBaseExt
 
@@ -48,6 +48,8 @@ from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
                             getImageLocation, createItemMatrix,
                             setXmippAttributes)
 from .convert import modeToRow
+from pwem.utils import runProgram
+
 
 NMA_ALIGNMENT_WAV = 0
 NMA_ALIGNMENT_PROJ = 1
@@ -124,17 +126,15 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
             self.atomsFn = self._getExtraPath(basename(atomsFn))
             copyFile(atomsFn, self.atomsFn)
         else:
-            localFn = self._getExtraPath(replaceBaseExt(basename(atomsFn), 'pdb'))
-            cifToPdb(atomsFn, localFn)
-            self.atomsFn = self._getExtraPath(basename(localFn))
+            pdb_name = os.path.dirname(self.inputModes.get().getFileName()) + '/atoms.pdb'
+            self.atomsFn = self._getExtraPath(basename(pdb_name))
+            copyFile(pdb_name, self.atomsFn)
 
         self._insertFunctionStep('convertInputStep', atomsFn)
 
         if self.copyDeformations.empty():  # ONLY FOR DEBUGGING
             self._insertFunctionStep("performNmaStep", self.atomsFn, self.modesFn)
         else:
-            # TODO: for debugging and testing it will be useful to copy the deformations
-            # metadata file, not just the deformation.txt file         
             self._insertFunctionStep('copyDeformationsStep', self.copyDeformations.get())
 
         self._insertFunctionStep('createOutputStep')
@@ -215,7 +215,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
         if self.alignmentMethod == NMA_ALIGNMENT_PROJ:
             args += "--projMatch "
 
-        self.runJob("xmipp_nma_alignment", args % locals())
+        runProgram("xmipp_nma_alignment", args % locals())
 
         cleanPath(self._getPath('nmaTodo.xmd'))
 

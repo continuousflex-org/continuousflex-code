@@ -26,7 +26,7 @@
 from os.path import basename
 
 from pwem.convert.atom_struct import cifToPdb
-from pyworkflow.utils import replaceBaseExt, replaceExt
+from pyworkflow.utils import replaceBaseExt, replaceExt, getParentFolder
 
 from pyworkflow.utils import isPower2, getListFromRangeString
 from pyworkflow.utils.path import copyFile, cleanPath
@@ -45,6 +45,7 @@ from pwem.objects import AtomStruct, Volume
 import xmipp3
 import os
 import numpy as np
+from pwem.utils import runProgram
 
 
 np.random.seed(0)
@@ -196,8 +197,15 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
 
     # --------------------------- STEPS functions --------------------------------------------
     def generate_deformations(self):
+        # Find the right PDB file to use for data synthesis
+        pdb_name1 = os.path.dirname(self.inputModes.get().getFileName()) + '/atoms.pdb'
+        pdb_name2 = os.path.dirname(self.inputModes.get().getFileName()) + '/pseudoatoms.pdb'
+        if os.path.exists(pdb_name1):
+            fnPDB = pdb_name1
+        else:
+            fnPBD = pdb_name2
+        # fnPDB = self.inputModes.get().getPdb().getFileName()
         # use the input relationship between the modes to generate normal mode amplitudes metadata
-        fnPDB = self.inputModes.get().getPdb().getFileName()
         fnModeList = replaceExt(self.inputModes.get().getFileName(),'xmd')
         modeAmplitude = self.modesAmplitudeRange.get()
         meshRowPoints = self.meshRowPoints.get()
@@ -256,7 +264,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
             params+= " --nma " + fnModeList
             params+= " -o " + self._getExtraPath(str(i+1).zfill(5)+'_deformed.pdb')
             params+= " --deformations " + ' '.join(str(i) for i in deformations)
-            self.runJob('xmipp_pdb_nma_deform', params)
+            runProgram('xmipp_pdb_nma_deform', params)
 
             subtomogramMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i+1).zfill(5)+'_reconstructed'+'.vol'), subtomogramMD.addObject())
             subtomogramMD.setValue(md.MDL_NMA, list(deformations), i+1)
@@ -274,7 +282,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
             params += " --sampling " + str(self.samplingRate.get())
             params += " --size " + str(self.volumeSize.get())
             params += " -v 0 --centerPDB "
-            self.runJob('xmipp_volume_from_pdb', params)
+            runProgram('xmipp_volume_from_pdb', params)
 
     def generate_rotation_and_shift(self):
         subtomogramMD = md.MetaData(self._getExtraPath('GroundTruth.xmd'))
@@ -336,7 +344,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
             params = " -i " +  self._getExtraPath(str(i + 1).zfill(5) + volumeName)
             params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.spi')
             params += " --angles " + str(rot) + ' ' + str(tilt) + ' ' + str(psi) + ' ' + str(x) + ' ' + str(y)
-            self.runJob('xmipp_phantom_project', params)
+            runJob('xmipp_phantom_project', params)
 
     def apply_noise_and_ctf(self):
         pass
@@ -363,13 +371,13 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
             params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.spi')
             params += " --ctf " + self._getExtraPath('ctf.param')
             paramsNoiseCTF = params+ " --after_ctf_noise --targetSNR " + str(self.targetSNR.get())
-            self.runJob('xmipp_phantom_simulate_microscope', paramsNoiseCTF)
+            runProgram('xmipp_phantom_simulate_microscope', paramsNoiseCTF)
 
             # Phase flip:
             img_name = self._getExtraPath(str(i + 1).zfill(5)) + '_projected.spi'
             params_j = " -i " + img_name + " -o " + img_name
             params_j += " --ctf " + self._getExtraPath('ctf.param')
-            self.runJob('xmipp_ctf_phase_flip', params_j)
+            runProgram('xmipp_ctf_phase_flip', params_j)
 
 
     def createOutputStep(self):
@@ -377,7 +385,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
         out_mdfn = self._getExtraPath('images.xmd')
         pattern = '"' + self._getExtraPath() + '/*_projected.spi"'
         command = '-p ' + pattern + ' -o ' + out_mdfn
-        self.runJob('xmipp_metadata_selfile_create', command)
+        runProgram('xmipp_metadata_selfile_create', command)
         # now creating the output set of images as output:
         partSet = self._createSetOfParticles('images')
         xmipp3.convert.readSetOfParticles(out_mdfn, partSet)
