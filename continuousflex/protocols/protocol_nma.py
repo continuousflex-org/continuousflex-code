@@ -154,6 +154,16 @@ class FlexProtNMA(FlexProtNMABase):
 
         if not os.path.exists(fnOut):
             createLink(localFn, fnOut)
+
+        # Keeping only the lines that start with ATOM
+        newlines = []
+        with open(localFn) as f:
+            lines = f.readlines()
+        for line in lines:
+            if line.startswith("ATOM ") or line.startswith("TER ") or line.startswith("END"):
+                newlines.append(line)
+        with open(localFn, mode='w') as f:
+            f.writelines(newlines)
         
     def computePdbModesStep(self, numberOfModes, RTBblockSize, cutoffStr):
         rc = self._getRc(self._getExtraPath('atoms_distance.hist'))

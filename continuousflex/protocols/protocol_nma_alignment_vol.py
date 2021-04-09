@@ -24,7 +24,7 @@
 # **************************************************************************
 
 from os.path import basename
-
+import os
 from pyworkflow.utils import getListFromRangeString
 from pwem.protocols import ProtAnalysis3D
 from xmipp3.convert import (writeSetOfVolumes, xmippToLocation, createItemMatrix,
@@ -148,9 +148,9 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
             self.atomsFn = self._getExtraPath(basename(atomsFn))
             copyFile(atomsFn, self.atomsFn)
         else:
-            localFn = self._getExtraPath(replaceBaseExt(basename(atomsFn), 'pdb'))
-            cifToPdb(atomsFn, localFn)
-            self.atomsFn = self._getExtraPath(basename(localFn))
+            pdb_name = os.path.dirname(self.inputModes.get().getFileName()) + '/atoms.pdb'
+            self.atomsFn = self._getExtraPath(basename(pdb_name))
+            copyFile(pdb_name, self.atomsFn)
 
         self._insertFunctionStep('convertInputStep', atomsFn)
 

@@ -26,7 +26,7 @@
 from os.path import basename
 
 from pwem.convert.atom_struct import cifToPdb
-from pyworkflow.utils import replaceBaseExt, replaceExt
+from pyworkflow.utils import replaceBaseExt, replaceExt, getParentFolder
 
 from pyworkflow.utils import isPower2, getListFromRangeString
 from pyworkflow.utils.path import copyFile, cleanPath
@@ -196,8 +196,15 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
 
     # --------------------------- STEPS functions --------------------------------------------
     def generate_deformations(self):
+        # Find the right PDB file to use for data synthesis
+        pdb_name1 = os.path.dirname(self.inputModes.get().getFileName()) + '/atoms.pdb'
+        pdb_name2 = os.path.dirname(self.inputModes.get().getFileName()) + '/pseudoatoms.pdb'
+        if os.path.exists(pdb_name1):
+            fnPDB = pdb_name1
+        else:
+            fnPBD = pdb_name2
+        # fnPDB = self.inputModes.get().getPdb().getFileName()
         # use the input relationship between the modes to generate normal mode amplitudes metadata
-        fnPDB = self.inputModes.get().getPdb().getFileName()
         fnModeList = replaceExt(self.inputModes.get().getFileName(),'xmd')
         modeAmplitude = self.modesAmplitudeRange.get()
         meshRowPoints = self.meshRowPoints.get()

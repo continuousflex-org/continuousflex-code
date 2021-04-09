@@ -137,7 +137,7 @@ class FlexProtSynthesizeImageViewer(ProtocolViewer):
             # inserting 6 zeros for the first 6 never used modes
             for j in range(6):
                 pointData.insert(0, 0)
-            print(pointData)
+            # print(pointData)
             data.addPoint(Point(pointId=objId,
                                 data=pointData,
                                 weight=0.0))
