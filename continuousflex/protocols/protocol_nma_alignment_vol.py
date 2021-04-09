@@ -39,6 +39,7 @@ from pyworkflow.protocol.params import NumericRangeParam
 from .convert import modeToRow
 from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import replaceBaseExt
+from pwem.utils import runProgram
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -260,7 +261,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
             args += "--tilt_values %(tilt0)d %(tiltF)d "
 
         print(args % locals())
-        self.runJob("xmipp_nma_alignment_vol", args % locals())
+        runProgram("xmipp_nma_alignment_vol", args % locals())
 
         cleanPath(self._getPath('nmaTodo.xmd'))
 

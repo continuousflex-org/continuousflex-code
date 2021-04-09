@@ -48,6 +48,7 @@ from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
                             getImageLocation, createItemMatrix,
                             setXmippAttributes)
 from .convert import modeToRow
+from pwem.utils import runProgram
 
 
 NMA_ALIGNMENT_WAV = 0
@@ -214,7 +215,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
         if self.alignmentMethod == NMA_ALIGNMENT_PROJ:
             args += "--projMatch "
 
-        self.runJob("xmipp_nma_alignment", args % locals())
+        runProgram("xmipp_nma_alignment", args % locals())
 
         cleanPath(self._getPath('nmaTodo.xmd'))
 

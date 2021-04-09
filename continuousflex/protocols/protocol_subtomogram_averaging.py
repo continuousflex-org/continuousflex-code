@@ -30,6 +30,7 @@ import pwem as em
 from pwem.objects import Volume
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
+from pwem.utils import runProgram
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -158,12 +159,12 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                 imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
                 if counter == 1:
                     args = '-i %(imgPath)s -o %(tempVol)s --type vol' % locals()
-                    self.runJob('xmipp_image_convert',args, numberOfMpi=1)
+                    runProgram('xmipp_image_convert',args, numberOfMpi=1)
                 else:
                     params = '-i %(imgPath)s --plus %(tempVol)s -o %(tempVol)s ' % locals()
-                    self.runJob('xmipp_image_operate', params, numberOfMpi=1)
+                    runProgram('xmipp_image_operate', params, numberOfMpi=1)
             params = '-i %(tempVol)s --divide %(counter)s -o %(initialref)s ' % locals()
-            self.runJob('xmipp_image_operate', params, numberOfMpi=1)
+            runProgram('xmipp_image_operate', params, numberOfMpi=1)
             os.system("rm -f %(tempVol)s" % locals())
             reference = initialref
 
@@ -181,7 +182,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                 # args += " %(tilt0)d %(tiltF)d "
                 args += "--tilt_values %(tilt0)d %(tiltF)d "
 
-            self.runJob("xmipp_volumeset_align", args % locals())
+            runProgram("xmipp_volumeset_align", args % locals())
 
             # By now, the alignment is done, the averaging should take place
 
@@ -219,21 +220,21 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                         first = False
                     # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
                     params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
-                    self.runJob('xmipp_transform_geometry', params, numberOfMpi=1)
+                    runProgram('xmipp_transform_geometry', params, numberOfMpi=1)
                     params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
                              ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
 
-                self.runJob('xmipp_transform_geometry', params, numberOfMpi=1)
+                runProgram('xmipp_transform_geometry', params, numberOfMpi=1)
 
                 if counter == 1:
                     os.system("cp %(tempVol)s %(avr_itr)s" % locals())
 
                 else:
                     params = '-i %(tempVol)s --plus %(avr_itr)s -o %(avr_itr)s ' % locals()
-                    self.runJob('xmipp_image_operate', params, numberOfMpi=1)
+                    runProgram('xmipp_image_operate', params, numberOfMpi=1)
 
             params = '-i %(avr_itr)s --divide %(counter)s -o %(avr_itr)s ' % locals()
-            self.runJob('xmipp_image_operate', params, numberOfMpi=1)
+            runProgram('xmipp_image_operate', params, numberOfMpi=1)
             os.system("rm -f %(tempVol)s" % locals())
             # Updating the reference then realigning:
             reference = avr_itr
@@ -307,21 +308,21 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                     first = False
                 # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
                 params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
-                self.runJob('xmipp_transform_geometry', params, numberOfMpi=1)
+                runProgram('xmipp_transform_geometry', params, numberOfMpi=1)
                 params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
                          ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
 
-            self.runJob('xmipp_transform_geometry', params, numberOfMpi=1)
+            runProgram('xmipp_transform_geometry', params, numberOfMpi=1)
 
             if counter == 1:
                 os.system("cp %(tempVol)s %(volume_out)s" % locals())
 
             else:
                 params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
-                self.runJob('xmipp_image_operate', params, numberOfMpi=1)
+                runProgram('xmipp_image_operate', params, numberOfMpi=1)
 
         params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
-        self.runJob('xmipp_image_operate', params, numberOfMpi=1)
+        runProgram('xmipp_image_operate', params, numberOfMpi=1)
         os.system("rm -f %(tempVol)s" % locals())
          # Averaging is done
 

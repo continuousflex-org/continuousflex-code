@@ -44,6 +44,7 @@ from pwem.objects import AtomStruct, Volume
 import xmipp3
 import os
 import numpy as np
+from pwem.utils import runProgram
 
 
 np.random.seed(0)
@@ -318,7 +319,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             params+= " --nma " + fnModeList
             params+= " -o " + self._getExtraPath(str(i+1).zfill(5)+'_deformed.pdb')
             params+= " --deformations " + ' '.join(str(i) for i in deformations)
-            self.runJob('xmipp_pdb_nma_deform', params)
+            runProgram('xmipp_pdb_nma_deform', params)
 
             subtomogramMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i+1).zfill(5)+'_reconstructed'+'.vol'), subtomogramMD.addObject())
             subtomogramMD.setValue(md.MDL_NMA, list(deformations), i+1)
@@ -336,7 +337,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             params += " --sampling " + str(self.samplingRate.get())
             params += " --size " + str(self.volumeSize.get())
             params += " -v 0 --centerPDB "
-            self.runJob('xmipp_volume_from_pdb', params)
+            runProgram('xmipp_volume_from_pdb', params)
 
     def generate_rotation_and_shift(self):
         subtomogramMD = md.MetaData(self._getExtraPath('GroundTruth.xmd'))
@@ -358,7 +359,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             params += " --rotate_volume euler " + str(rot1) + ' ' + str(tilt1) + ' ' + str(psi1)
             params += " --shift " + str(shift_x1) + ' ' + str(shift_y1) + ' ' + str(shift_z1)
             params += " --dont_wrap "
-            self.runJob('xmipp_transform_geometry', params)
+            runProgram('xmipp_transform_geometry', params)
 
             subtomogramMD.setValue(md.MDL_SHIFT_X, shift_x1, i + 1)
             subtomogramMD.setValue(md.MDL_SHIFT_Y, shift_y1, i + 1)
@@ -393,7 +394,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         for i in range(self.numberOfTomograms.get()):
             params = " -i " + self._getExtraPath('tomogram.param')
             params += " -o " + self._getExtraPath(str(i+1).zfill(5) +'_tomogram.vol')
-            self.runJob('xmipp_phantom_create', params)
+            runProgram('xmipp_phantom_create', params)
 
     def map_volumes_to_tomogram(self):
         tomoSizeX = self.tomoSizeX.get()
@@ -441,7 +442,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                 params += " --geom " + self._getExtraPath(str(t+1).zfill(5) +"_"+str(i+1).zfill(5) +'_tomogram_map.xmd')
                 params += " --ref " + self._getExtraPath(str(i + t*particlesPerTomogram +1).zfill(5) + '_deformed.vol')
                 params += " --method copy "
-                self.runJob('xmipp_tomo_map_back', params)
+                runProgram('xmipp_tomo_map_back', params)
 
     def project_volumes(self):
         if self.fullTomogramChoice == FULL_TOMOGRAM_YES:
@@ -496,7 +497,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             params = " -i " +  self._getExtraPath(str(i + 1).zfill(5) + volumeName)
             params += " --oroot " + self._getExtraPath(str(i + 1).zfill(5) + '_projected')
             params += " --params " + self._getExtraPath('projection.param')
-            self.runJob('xmipp_tomo_project', params)
+            runProgram('xmipp_tomo_project', params)
 
     def apply_noise_and_ctf(self):
 
@@ -526,7 +527,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.sel')
             params += " --ctf " + self._getExtraPath('ctf.param')
             paramsNoiseCTF = params+ " --after_ctf_noise --targetSNR " + str(self.targetSNR.get())
-            self.runJob('xmipp_phantom_simulate_microscope', paramsNoiseCTF)
+            runProgram('xmipp_phantom_simulate_microscope', paramsNoiseCTF)
 
             # the metadata for the i_th stack is self._getExtraPath(str(i + 1).zfill(5) + '_projected.sel')
             MD_i = md.MetaData(self._getExtraPath(str(i + 1).zfill(5) + '_projected.sel'))
@@ -534,7 +535,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                 img_name = MD_i.getValue(md.MDL_IMAGE, objId)
                 params_j = " -i " + img_name + " -o " + img_name
                 params_j += " --ctf " + self._getExtraPath('ctf.param')
-                self.runJob('xmipp_ctf_phase_flip', params_j)
+                runProgram('xmipp_ctf_phase_flip', params_j)
 
     def reconstruct(self):
         if self.modeRelationChoice.get() is MODE_RELATION_MESH:
@@ -547,16 +548,16 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_reconstructed.vol')
 
             if self.reconstructionChoice == RECONSTRUCTION_FOURIER:
-                self.runJob('xmipp_reconstruct_fourier', params)
+                runProgram('xmipp_reconstruct_fourier', params)
             elif self.reconstructionChoice == RECONSTRUCTION_WBP:
-                self.runJob('xmipp_reconstruct_wbp', params)
+                runProgram('xmipp_reconstruct_wbp', params)
 
     def createOutputStep(self):
         # first making a metadata for only the subtomograms:
         out_mdfn = self._getExtraPath('subtomograms.xmd')
         pattern = '"' + self._getExtraPath() + '/*_reconstructed.vol"'
         command = '-p ' + pattern + ' -o ' + out_mdfn
-        self.runJob('xmipp_metadata_selfile_create', command)
+        runProgram('xmipp_metadata_selfile_create', command)
         # now creating the output set of volumes as output:
         partSet = self._createSetOfVolumes('subtomograms')
         xmipp3.convert.readSetOfVolumes(out_mdfn, partSet)

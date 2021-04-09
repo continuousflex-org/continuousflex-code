@@ -27,6 +27,7 @@ import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
 from pyworkflow.utils.path import makePath, copyFile
 from os.path import basename
+from pwem.utils import runProgram
 
 
 REFERENCE_EXT = 0
@@ -139,7 +140,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
                 params += '--rotate_volume euler 0 90 0 '
             else: # only to convert
                 params += '--rotate_volume euler 0 0 0 '
-            self.runJob('xmipp_transform_geometry', params)
+            runProgram('xmipp_transform_geometry', params)
             params = '-i ' + tempdir + '/temp.vol -o ' + new_imgPath + ' '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
@@ -147,9 +148,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
                 params += ' --inverse '
 
             # print('xmipp_transform_geometry',params)
-            self.runJob('xmipp_transform_geometry', params)
-            # params = '-i ' + new_imgPath + ' --rotate_volume euler 0 -90 0 '
-            # self.runJob('xmipp_transform_geometry', params)
+            runProgram('xmipp_transform_geometry', params)
         self.fnaligned = self._getExtraPath('volumes_aligned.xmd')
         mdImgs.write(self.fnaligned)
 

@@ -33,6 +33,7 @@ from pyworkflow.utils import replaceBaseExt
 import numpy as np
 from continuousflex.protocols.utilities.mwr_wrapper import mwr
 from continuousflex.protocols.protocol_subtomogrmas_synthesize import FlexProtSynthesizeSubtomo
+from pwem.utils import runProgram
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
@@ -205,7 +206,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         MW_mask[size[0] // 2, :, size[2] // 2] = 1
         fnmask = self._getExtraPath('Mask.spi')
         save_volume(np.float32(MW_mask), fnmask)
-        self.runJob('xmipp_transform_geometry', '-i ' + fnmask + ' --rotate_volume euler 0 90 0')
+        runProgram('xmipp_transform_geometry', '-i ' + fnmask + ' --rotate_volume euler 0 90 0')
         mdImgs = md.MetaData(imgFn)
         # in case of metadata from an external file, it has to be updated with the proper filenames from 'input.xmd'
         inputSet = self.inputVolumes.get()
@@ -242,7 +243,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
                 new_imgPath += basename(replaceBaseExt(basename(imgPath), 'spi'))
             # Get a copy of the volume converted to spider format
             params = '-i ' + imgPath + ' -o ' + new_imgPath + ' --type vol'
-            self.runJob('xmipp_image_convert', params)
+            runProgram('xmipp_image_convert', params)
             # print('xmipp_image_convert',params)
             # update the name in the metadata file
             mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
@@ -259,7 +260,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
 
             # print('xmipp_transform_geometry',params)
-            self.runJob('xmipp_transform_geometry', params)
+            runProgram('xmipp_transform_geometry', params)
             # print('xmipp_transform_geometry',params)
             # Now the STA is aligned, add the missing wedge region to the subtomogram:
             v = open_volume(new_imgPath)
@@ -329,7 +330,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         MW_mask[size[0] // 2, :, size[2] // 2] = 1
         fnmask = self._getExtraPath('Mask.spi')
         save_volume(np.float32(MW_mask), fnmask)
-        self.runJob('xmipp_transform_geometry', '-i ' + fnmask + ' --rotate_volume euler 0 90 0')
+        runProgram('xmipp_transform_geometry', '-i ' + fnmask + ' --rotate_volume euler 0 90 0')
         mdImgs = md.MetaData(imgFn)
         # in case of metadata from an external file, it has to be updated with the proper filenames from 'input.xmd'
         inputSet = self.inputVolumes.get()
@@ -366,7 +367,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
                 new_imgPath += basename(replaceBaseExt(basename(imgPath), 'spi'))
             # Get a copy of the volume converted to spider format
             params = '-i ' + imgPath + ' -o ' + new_imgPath + ' --type vol'
-            self.runJob('xmipp_image_convert', params)
+            runProgram('xmipp_image_convert', params)
             # print('xmipp_image_convert',params)
             # update the name in the metadata file
             mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
@@ -384,12 +385,12 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             if AlignmentParameters != REFERENCE_STS:
                 params += '--inverse'
             # print('xmipp_transform_geometry',params)
-            self.runJob('xmipp_transform_geometry', params)
+            runProgram('xmipp_transform_geometry', params)
             if AlignmentParameters != REFERENCE_STS:
                 params = '-i ' + tempdir + '/temp.vol -o ' + tempdir + '/temp.vol '
                 params += '--rotate_volume euler 0 -90 0 '
                 # print('xmipp_transform_geometry',params)
-                self.runJob('xmipp_transform_geometry', params)
+                runProgram('xmipp_transform_geometry', params)
             # Now the STA is aligned, add the missing wedge region to the subtomogram:
             v = open_volume(new_imgPath)
             I = fft(v)
@@ -442,7 +443,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         MW_mask[size[0] // 2, :, size[2] // 2] = 1
         fnmask = self._getExtraPath('Mask.spi')
         save_volume(np.float32(MW_mask), fnmask)
-        self.runJob('xmipp_transform_geometry', '-i ' + fnmask + ' --rotate_volume euler 0 90 0')
+        runProgram('xmipp_transform_geometry', '-i ' + fnmask + ' --rotate_volume euler 0 90 0')
         # done creating the missing wedge mask, getting the paremeters from the form:
         sigma_noise = self.sigma_noise.get()
         T = self.T.get()
@@ -462,7 +463,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             temp_path = self._getTmpPath('temp.spi')
             # params = '-i ' + imgPath + ' -o ' + new_imgPath + ' --type vol'
             params = '-i ' + imgPath + ' -o ' + temp_path + ' --type vol'
-            self.runJob('xmipp_image_convert', params)
+            runProgram('xmipp_image_convert', params)
             # perform the mwr:
             # in case the file exists (continuing or injecting)
             if (isfile(new_imgPath)):
@@ -493,14 +494,14 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
                 params += '--rotate_volume euler 0 90 0 '
             else:
                 params += '--rotate_volume euler 0 0 0 '
-            self.runJob('xmipp_transform_geometry', params)
+            runProgram('xmipp_transform_geometry', params)
             params = '-i ' + tempdir + '/temp.vol -o ' + new_imgPath + ' '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
             if self.AlignmentParameters.get() == REFERENCE_STS:
                 params += '--inverse'
             # print('xmipp_transform_geometry',params)
-            self.runJob('xmipp_transform_geometry', params)
+            runProgram('xmipp_transform_geometry', params)
         self.fnaligned = self._getExtraPath('volumes_aligned.xmd')
         mdImgs.write(self.fnaligned)
 
@@ -526,7 +527,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
             params += '--inverse'
 
             # print('xmipp_transform_geometry',params)
-            self.runJob('xmipp_transform_geometry', params)
+            runProgram('xmipp_transform_geometry', params)
         self.fnaligned = self._getExtraPath('volumes_aligned.xmd')
         mdImgs.write(self.fnaligned)
 

@@ -37,7 +37,6 @@ from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 
 from pyworkflow.protocol.params import StringParam, LabelParam
 from pwem.objects import SetOfParticles
-from pyworkflow.utils.process import runJob
 from pwem.viewers import VmdView
 from pyworkflow.gui.browser import FileBrowserWindow
 from continuousflex.protocols.protocol_nma_dimred_vol import FlexProtDimredNMAVol
@@ -47,6 +46,7 @@ from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVol
 from continuousflex.viewers.nma_vol_gui import ClusteringWindowVol
 from joblib import load
 from pyworkflow.protocol import params
+from pwem.utils import runProgram
 
 FIGURE_LIMIT_NONE = 0
 FIGURE_LIMITS = 1
@@ -359,7 +359,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
                 for l in d:
                     cmd += str(l) + ' '
                 # because it doesn't have an independent protocol we don't use self.runJob
-                runJob(None, 'xmipp_pdb_nma_deform', cmd, env=prot._getEnviron())
+                runProgram('xmipp_pdb_nma_deform', cmd)
 
         elif prot.getDataChoice() == 'PDBs':
             # There is incompatibility issue with the rest of the code, we have to use the fahterPDB as one of the

@@ -39,7 +39,6 @@ from pyworkflow.utils.path import cleanPath, makePath, cleanPattern
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.protocol.params import StringParam, LabelParam
 from pwem.objects import SetOfParticles
-from pyworkflow.utils.process import runJob
 from pwem.viewers import VmdView
 from pyworkflow.gui.browser import FileBrowserWindow
 
@@ -50,6 +49,7 @@ from continuousflex.protocols.data import Point, Data
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 
 from continuousflex.viewers.nma_gui import ClusteringWindow, TrajectoriesWindow
+from pwem.utils import runProgram
 
 
 class FlexDimredNMAViewer(ProtocolViewer):
@@ -263,7 +263,7 @@ class FlexDimredNMAViewer(ProtocolViewer):
         for i, d in enumerate(deformations):
             atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i + 1)
             cmd = '-o %s --pdb %s --nma %s --deformations %s' % (atomsFn, pdbFile, modesFn, str(d)[1:-1])
-            runJob(None, 'xmipp_pdb_nma_deform', cmd, env=prot._getEnviron())
+            runProgram('xmipp_pdb_nma_deform', cmd)
 
         # Join all deformations in a single pdb
         # iterating going up and down through all points

@@ -35,7 +35,6 @@ from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 from continuousflex.protocols import FlexProtSynthesizeImages
 import xmipp3
 import pwem.emlib.metadata as md
-from pyworkflow.utils.process import runJob
 from pwem.viewers import ObjectView
 
 class FlexProtSynthesizeImageViewer(ProtocolViewer):
@@ -75,8 +74,7 @@ class FlexProtSynthesizeImageViewer(ProtocolViewer):
     def _viewVolumes(self, paramName):
         volumes = self.protocol.outputImages
         return [ObjectView(self._project, volumes.strId(), volumes.getFileName())]
-        # mdfn = self.protocol._getExtraPath('subtomograms.xmd')
-        # runJob(None, 'xmipp_showj', mdfn)
+
 
     def _viewRawDeformation(self, paramName):
         components = self.displayRawDeformation.get()
