@@ -48,16 +48,12 @@ class FlexNmaVolPlotter(FlexPlotter):
         self.useLastPlot = False
 
     def createSubPlot(self, title, xlabel, ylabel):
-
         if self.useLastPlot and self.last_subplot:
             ax = self.last_subplot
             ax.cla()
             ax.set_title(title)
-
-
         else:
             ax = FlexPlotter.createSubPlot(self, title, xlabel, ylabel)
-
         return ax
 
     def plotArray1D(self, title, xlabel, ylabel):
@@ -68,19 +64,16 @@ class FlexNmaVolPlotter(FlexPlotter):
 
     def plotArray2D(self, title, xlabel, ylabel):
         ax = self.createSubPlot(title, xlabel, ylabel)
-
         lowx = lowy = None
         try:
             lowx = self._xlimlow.get()
             lowy = self._ylimlow.get()
         except:
             pass
-
         if lowx:
             ax.set_xlim([self._xlimlow.get(), self._xlimhigh.get()])
         if lowy:
             ax.set_ylim([self._ylimlow.get(), self._ylimhigh.get()])
-
         plotArray2D(ax, self._data, self._limitlow, self._limitup)
         return ax
 
