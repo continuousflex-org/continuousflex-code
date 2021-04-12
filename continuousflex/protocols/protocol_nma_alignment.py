@@ -107,7 +107,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
                            'is computed for rigid-body alignment in Projection Matching and Wavelets methods. \n'
                            'This alignment is refined with Splines method when Wavelets and Splines alignment is chosen.')
 
-        form.addParallelSection(threads=0, mpi=8)
+        form.addParallelSection(threads=0, mpi=5)
 
         # --------------------------- INSERT steps functions --------------------------------------------
 

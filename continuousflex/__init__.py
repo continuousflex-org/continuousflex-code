@@ -29,9 +29,10 @@ import pwem
 from continuousflex.constants import *
 import pyworkflow.utils as pwutils
 getXmippPath = pwem.Domain.importFromPlugin("xmipp3.base", 'getXmippPath')
+from pyworkflow.tests import DataSet
 
 _logo = "logo.png"
-__version__ = "3.0.13"
+__version__ = "3.0.14"
 
 class Plugin(pwem.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
@@ -73,7 +74,6 @@ class Plugin(pwem.Plugin):
             }, position=pos)
 
         return environ
-
 
 
     @classmethod
@@ -118,6 +118,13 @@ class Plugin(pwem.Plugin):
                        neededProgs=['gfortran'], default=True)
 
 
-
-
+files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol': 'volumes/AK_LP10.vol',
+                    'precomputed_atomic': 'gold/images_WS_atoms.xmd',
+                    'precomputed_pseudoatomic': 'gold/images_WS_pseudoatoms.xmd',
+                    'small_stk': 'test_alignment_10images/particles/smallstack_img.stk',
+                    'subtomograms':'HEMNMA_3D/subtomograms/*.vol',
+                    'precomputed_HEMNMA3D_atoms':'HEMNMA_3D/gold/precomputed_atomic.xmd',
+                    'precomputed_HEMNMA3D_pseudo':'HEMNMA_3D/gold/precomputed_pseudo.xmd'}
+DataSet(name='nma_V2.0', folder='nma_V2.0', files=files_dictionary,
+        url='https://raw.githubusercontent.com/MohamadHarastani/nma_V2.0/main/')
 

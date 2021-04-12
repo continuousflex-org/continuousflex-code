@@ -104,9 +104,9 @@ class FlexNmaPlotter(FlexPlotter):
             ax.set_zlim([self._zlimlow.get(), self._zlimhigh.get()])
 
         if self._limitlow == None or self._limitup == None:
-            cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights)
+            cax = ax.scatter3D(xdata, ydata, zdata, c= weights)
         else:
-            cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights, vmin=self._limitlow.get(),
+            cax = ax.scatter3D(xdata, ydata, zdata, c= weights, vmin=self._limitlow.get(),
                                vmax=self._limitup.get())
 
         x2, y2, z2 = [], [], []
