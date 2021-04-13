@@ -104,11 +104,18 @@ class FlexNmaVolPlotter(FlexPlotter):
         if lowz:
             ax.set_zlim([self._zlimlow.get(), self._zlimhigh.get()])
 
-        if self._limitlow == None or self._limitup == None:
+        color_low = color_high = None
+        try:
+            color_low = self._limitlow.get()
+            color_high = self._limitup.get()
+        except:
+            pass
+
+        if color_low is None or color_high is None:
             cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights)
         else:
-            cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights, vmin=self._limitlow.get(),
-                               vmax=self._limitup.get())
+            cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights, vmin=color_low,
+                               vmax=color_high)
 
 
         x2, y2, z2 = [], [], []
