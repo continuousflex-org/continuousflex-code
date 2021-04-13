@@ -94,11 +94,11 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                            ' "8, 10, 12" -> [8,10,12]\n'
                            ' "8 9, 10-12" -> [8,9,10,11,12])\n')
         form.addParam('modeRelationChoice', params.EnumParam, default=MODE_RELATION_LINEAR,
-                      choices=['Linear relationship', '3 Clusters', 'Mesh', 'Random'],
+                      choices=['Linear relationship', '3 Clusters', 'Grid', 'Random'],
                       label='Relationship between the modes',
                       help='linear relationship: all the selected modes will have equal amplitudes. \n'
                            '3 clusters: the volumes will be devided exactly into three classes.\n'
-                           'Mesh: the amplitudes will be in a mesh shape (mesh size is square of what mesh step).\n'
+                           'Grid: the amplitudes will be in a grid shape (grid size is square of what grid step).\n'
                            'Random: all the amplitudes will be random in the given range')
         form.addParam('centerPoint', params.IntParam, default=100,
                       condition='modeRelationChoice==%d' % MODE_RELATION_3CLUSTERS,
@@ -113,8 +113,8 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                       help='Choose the number N for which the generated normal mode amplitudes are in the range of [-N, N]')
         form.addParam('meshRowPoints', params.IntParam, default=6,
                       condition='modeRelationChoice==%d' % MODE_RELATION_MESH,
-                      label='Mesh number of steps',
-                      help='This number will be the number of points in the row and the column (mesh shape will be size*size)')
+                      label='Grid number of steps',
+                      help='This number will be the number of points in the row and the column (grid shape will be size*size)')
         form.addParam('numberOfVolumes', params.IntParam, default=36,
                       label='Number of images',
                       condition='modeRelationChoice!=%d'% MODE_RELATION_MESH,
@@ -130,7 +130,8 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
         form.addParam('noiseCTFChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
                       choices=['Yes', 'No'],
                       label='Apply Noise and CTF',
-                      help='If not selected, the CTF will not be simulated')
+                      help='If not selected, noise and CTF will not be simulated. If selected, noise and CTF will be applied'
+                           ' then the the projections are CTF phase inverted.')
         form.addParam('targetSNR', params.FloatParam, default=0.1,
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='Tagret SNR',
