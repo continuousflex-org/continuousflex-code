@@ -159,12 +159,12 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                 imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
                 if counter == 1:
                     args = '-i %(imgPath)s -o %(tempVol)s --type vol' % locals()
-                    runProgram('xmipp_image_convert',args, numberOfMpi=1)
+                    runProgram('xmipp_image_convert',args)
                 else:
                     params = '-i %(imgPath)s --plus %(tempVol)s -o %(tempVol)s ' % locals()
-                    runProgram('xmipp_image_operate', params, numberOfMpi=1)
+                    runProgram('xmipp_image_operate', params)
             params = '-i %(tempVol)s --divide %(counter)s -o %(initialref)s ' % locals()
-            runProgram('xmipp_image_operate', params, numberOfMpi=1)
+            runProgram('xmipp_image_operate', params)
             os.system("rm -f %(tempVol)s" % locals())
             reference = initialref
 
@@ -220,21 +220,21 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                         first = False
                     # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
                     params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
-                    runProgram('xmipp_transform_geometry', params, numberOfMpi=1)
+                    runProgram('xmipp_transform_geometry', params)
                     params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
                              ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
 
-                runProgram('xmipp_transform_geometry', params, numberOfMpi=1)
+                runProgram('xmipp_transform_geometry', params)
 
                 if counter == 1:
                     os.system("cp %(tempVol)s %(avr_itr)s" % locals())
 
                 else:
                     params = '-i %(tempVol)s --plus %(avr_itr)s -o %(avr_itr)s ' % locals()
-                    runProgram('xmipp_image_operate', params, numberOfMpi=1)
+                    runProgram('xmipp_image_operate', params)
 
             params = '-i %(avr_itr)s --divide %(counter)s -o %(avr_itr)s ' % locals()
-            runProgram('xmipp_image_operate', params, numberOfMpi=1)
+            runProgram('xmipp_image_operate', params)
             os.system("rm -f %(tempVol)s" % locals())
             # Updating the reference then realigning:
             reference = avr_itr
@@ -308,21 +308,21 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                     first = False
                 # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
                 params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
-                runProgram('xmipp_transform_geometry', params, numberOfMpi=1)
+                runProgram('xmipp_transform_geometry', params)
                 params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
                          ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
 
-            runProgram('xmipp_transform_geometry', params, numberOfMpi=1)
+            runProgram('xmipp_transform_geometry', params)
 
             if counter == 1:
                 os.system("cp %(tempVol)s %(volume_out)s" % locals())
 
             else:
                 params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
-                runProgram('xmipp_image_operate', params, numberOfMpi=1)
+                runProgram('xmipp_image_operate', params)
 
         params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
-        runProgram('xmipp_image_operate', params, numberOfMpi=1)
+        runProgram('xmipp_image_operate', params)
         os.system("rm -f %(tempVol)s" % locals())
          # Averaging is done
 
