@@ -35,6 +35,7 @@ from continuousflex.protocols import (FlexProtNMA, FlexProtAlignmentNMA,
                                       FlexProtConvertToPseudoAtoms, FlexBatchProtNMACluster)
 
 from continuousflex.protocols.pdb.protocol_pseudoatoms_base import NMA_MASK_THRE
+from continuousflex.protocols.protocol_nma_base import NMA_CUTOFF_REL
 from continuousflex.protocols.protocol_nma_alignment import NMA_ALIGNMENT_PROJ
 from xmipp3.protocols import XmippProtCropResizeParticles
 
@@ -126,8 +127,9 @@ class TestHEMNMA_1(TestWorkflow):
         
         # Launch NMA with Pseudoatoms
         protNMA2 = self.newProtocol(FlexProtNMA,
-                                    cutoffMode=NMA_CUTOFF_ABS)
+                                    cutoffMode=NMA_CUTOFF_REL)
         protNMA2.inputStructure.set(protConvertVol.outputPdb)
+        protNMA2.setObjLabel('NMA')
         self.launchProtocol(protNMA2)
                                           
         # Launch NMA alignment, but just reading result from a previous metadata

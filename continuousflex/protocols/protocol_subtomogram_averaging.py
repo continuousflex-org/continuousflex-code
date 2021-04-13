@@ -31,6 +31,7 @@ from pwem.objects import Volume
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
 from pwem.utils import runProgram
+from pwem import Domain
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -182,10 +183,12 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                 # args += " %(tilt0)d %(tiltF)d "
                 args += "--tilt_values %(tilt0)d %(tiltF)d "
 
-            runProgram("xmipp_volumeset_align", args % locals())
+            # This command does not allow mpi processing
+            # runProgram("xmipp_volumeset_align", args % locals())
+            self.runJob("xmipp_volumeset_align", args % locals(),
+                        env = Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
 
             # By now, the alignment is done, the averaging should take place
-
             mdImgs = md.MetaData(md_itr)
             counter = 0
             first = True
