@@ -96,15 +96,16 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         form.addSection(label='Advanced parameters')
         form.addParam('frm_freq', params.FloatParam, default=0.25,
                       expertLevel=params.LEVEL_ADVANCED,
-                      label='Maximum normalized pixel frequency',
-                      help='The normalized frequency should be a number between -0.5 and 0.5 '
+                      label='Maximum cross correlation frequency',
+                      help='The normalized frequency should be between 0 and 0.5 '
                            'The more it is, the bigger the search frequency is, the more time it demands, '
-                           'keeping it as default is recommended')
+                           'keeping it as default is recommended.')
         form.addParam('frm_maxshift', params.IntParam, default=10,
                       expertlevel=params.LEVEL_ADVANCED,
-                      label='Maximum shift for rigid body search',
+                      label='Maximum shift for rigid body alignment (in pixels)',
                       help='The maximum shift is a number between 1 and half the size of your volume. '
-                           'Increase it if your target is far from the center of the volumes')
+                           'It represents the maximum distance searched in x,y and z directions. Keep as default'
+                           ' if your target is near the center in your subtomograms')
         form.addParallelSection(threads=0, mpi=5)
 
     # --------------------------- INSERT steps functions --------------------------------------------

@@ -160,8 +160,26 @@ class FlexProtNMA(FlexProtNMABase):
         with open(localFn) as f:
             lines = f.readlines()
         for line in lines:
-            if line.startswith("ATOM ") or line.startswith("TER ") or line.startswith("END"):
+            if line.startswith("ATOM ") or line.startswith("TER ") or line.startswith("END "):
                 newlines.append(line)
+        with open(localFn, mode='w') as f:
+            f.writelines(newlines)
+
+        # Shifting the atom numbers after line 100000 one step to the left:
+        newlines = []
+        with open(localFn) as f:
+            lines = f.readlines()
+        for line in lines:
+            if line.startswith("ATOM ") or line.startswith("TER "):
+                # print(int(line.split()[1]))
+                if int(line.split()[1])>99999:
+                    if line.startswith("ATOM "):
+                        newline = line.replace("ATOM  1", "ATOM 1")
+                    else:
+                        newline = line.replace("TER   1", "TER  1")
+                    newlines.append(newline)
+                else:
+                    newlines.append(line)
         with open(localFn, mode='w') as f:
             f.writelines(newlines)
         
