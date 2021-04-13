@@ -35,7 +35,7 @@ from pwem.tests.workflows import TestWorkflow
 from pwem import Domain
 from pyworkflow.tests import setupTestProject, DataSet
 
-from continuousflex.protocols import (FlexProtNMA, FlexProtSynthesizeSubtomo, NMA_CUTOFF_ABS)
+from continuousflex.protocols import (FlexProtNMA, FlexProtSynthesizeSubtomo, NMA_CUTOFF_ABS, NMA_CUTOFF_REL)
 from continuousflex.protocols.protocol_subtomogrmas_synthesize import MODE_RELATION_LINEAR, MODE_RELATION_3CLUSTERS, \
     MODE_RELATION_MESH, MODE_RELATION_RANDOM
 from continuousflex.protocols.protocol_pdb_dimred import FlexProtDimredPdb
@@ -130,8 +130,9 @@ class TestHEMNMA3D_1(TestWorkflow):
         self.launchProtocol(protConvertVol)
         # Launch NMA with Pseudoatoms
         protNMA2 = self.newProtocol(FlexProtNMA,
-                                    cutoffMode=NMA_CUTOFF_ABS)
+                                    cutoffMode=NMA_CUTOFF_REL)
         protNMA2.inputStructure.set(protConvertVol.outputPdb)
+        protNMA2.setObjLabel('NMA')
         self.launchProtocol(protNMA2)
 
         # Launch HEMNMA-3D

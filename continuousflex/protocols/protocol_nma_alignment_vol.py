@@ -40,6 +40,7 @@ from .convert import modeToRow
 from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import replaceBaseExt
 from pwem.utils import runProgram
+from pwem import Domain
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -158,8 +159,6 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         if self.copyDeformations.empty():  # SERVES_FOR_DEBUGGING AND COMPUTING ON CLUSTERS
             self._insertFunctionStep("performNmaStep", self.atomsFn, self.modesFn)
         else:
-            # TODO: for debugging and testing it will be useful to copy the deformations
-            # metadata file, not just the deformation.txt file
             self._insertFunctionStep('copyDeformationsStep', self.copyDeformations.get())
 
         self._insertFunctionStep('createOutputStep')
@@ -260,8 +259,10 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
             tiltF = self.tiltHigh.get()
             args += "--tilt_values %(tilt0)d %(tiltF)d "
 
-        print(args % locals())
-        runProgram("xmipp_nma_alignment_vol", args % locals())
+        # print(args % locals())
+        # runProgram("xmipp_nma_alignment_vol", args % locals())
+        self.runJob("xmipp_nma_alignment_vol", args % locals(),
+                    env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
 
         cleanPath(self._getPath('nmaTodo.xmd'))
 
