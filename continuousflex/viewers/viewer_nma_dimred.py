@@ -105,16 +105,16 @@ class FlexDimredNMAViewer(ProtocolViewer):
         form.addParam('limits_modes', params.EnumParam,
                       choices=['Automatic (Recommended)', 'Set manually Use upper and lower values'],
                       default=FIGURE_LIMIT_NONE,
-                      label='(1 - CC) limits', display=params.EnumParam.DISPLAY_COMBO,
-                      help='If you want to use a range of (1-CC) choose to set it manually.')
+                      label='Error limits', display=params.EnumParam.DISPLAY_COMBO,
+                      help='If you want to use a range of Error in the color bar choose to set it manually.')
         form.addParam('LimitLow', params.FloatParam, default=None,
                       condition='limits_modes==%d' % FIGURE_LIMITS,
-                      label='Lower (1-CC) value',
-                      help='The lower (1-CC) used in the graph')
+                      label='Lower Error value',
+                      help='The lower Error used in the graph')
         form.addParam('LimitHigh', params.FloatParam, default=None,
                       condition='limits_modes==%d' % FIGURE_LIMITS,
-                      label='Upper (1-CC) value',
-                      help='The upper (1-CC) used in the graph')
+                      label='Upper Error value',
+                      help='The upper Error used in the graph')
         form.addParam('xlimits_mode', params.EnumParam,
                       choices=['Automatic (Recommended)', 'Set manually x-axis limits'],
                       default=X_LIMITS_NONE,
