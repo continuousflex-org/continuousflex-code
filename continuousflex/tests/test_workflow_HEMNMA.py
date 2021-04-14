@@ -214,4 +214,5 @@ class TestHEMNMA_2(TestWorkflow):
                                          alignmentMethod=NMA_ALIGNMENT_PROJ)
         protAlignment.inputModes.set(protNMA1.outputModes)
         protAlignment.inputParticles.set(protResizeParts.outputParticles)
+        protAlignment.setObjLabel('HEMNMA atomic ref')
         self.launchProtocol(protAlignment)
