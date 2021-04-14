@@ -345,7 +345,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
             params = " -i " +  self._getExtraPath(str(i + 1).zfill(5) + volumeName)
             params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.spi')
             params += " --angles " + str(rot) + ' ' + str(tilt) + ' ' + str(psi) + ' ' + str(x) + ' ' + str(y)
-            runJob('xmipp_phantom_project', params)
+            runProgram('xmipp_phantom_project', params)
 
     def apply_noise_and_ctf(self):
         pass
