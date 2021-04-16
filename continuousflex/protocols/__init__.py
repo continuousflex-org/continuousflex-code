@@ -37,9 +37,13 @@ from .protocol_nma_dimred_vol import FlexProtDimredNMAVol
 from .protocol_subtomogram_averaging import FlexProtSubtomogramAveraging
 from .protocol_missing_wedge_filling import FlexProtMissingWedgeFilling
 from .protocol_apply_volumeset_alignment import FlexProtApplyVolSetAlignment
+from .protocol_heteroflow import FlexProtHeteroFlow
+from .protocol_heteroflow_dimred import FlexProtDimredHeteroFlow
+from .protocol_batch_cluster_heteroflow import FlexBatchProtHeteroFlowCluster
 from .protocol_denoise_volumes import FlexProtVolumeDenoise
 from .data import *
 from .pdb import *
 from .protocol_pdb_dimred import FlexProtDimredPdb
 from .protocol_subtomograms_classify import FlexProtSubtomoClassify
 from .protocol_image_synthesize import FlexProtSynthesizeImages
+

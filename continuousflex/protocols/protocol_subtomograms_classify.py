@@ -44,6 +44,7 @@ from joblib import dump, load
 from pwem.utils import runProgram
 
 
+
 class FlexProtSubtomoClassify(ProtAnalysis3D):
     """ Protocol applying post alignment classification on subtomograms. """
     _label = 'classify subtomograms'

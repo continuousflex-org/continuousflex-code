@@ -34,6 +34,7 @@ import numpy as np
 from continuousflex.protocols.utilities.bm4d import bm4d
 from pwem.utils import runProgram
 
+
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
 
@@ -146,6 +147,7 @@ class FlexProtVolumeDenoise(ProtAnalysis3D):
             # params = '-i ' + imgPath + ' -o ' + new_imgPath + ' --type vol'
             params = '-i ' + imgPath + ' -o ' + temp_path + ' --type vol'
             runProgram('xmipp_image_convert', params)
+
             # perform the mwr:
             # in case the file exists (continuing or injecting)
             if (isfile(new_imgPath)):
