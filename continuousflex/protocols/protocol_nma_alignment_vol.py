@@ -24,7 +24,7 @@
 # **************************************************************************
 
 from os.path import basename
-
+import os
 from pyworkflow.utils import getListFromRangeString
 from pwem.protocols import ProtAnalysis3D
 from xmipp3.convert import (writeSetOfVolumes, xmippToLocation, createItemMatrix,
@@ -39,6 +39,8 @@ from pyworkflow.protocol.params import NumericRangeParam
 from .convert import modeToRow
 from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import replaceBaseExt
+from pwem.utils import runProgram
+from pwem import Domain
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -66,7 +68,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         form.addParam('inputVolumes', params.PointerParam,
                       pointerClass='SetOfVolumes,Volume',
                       label="Input volume(s)", important=True,
-                      help='Select one or more volumes')
+                      help='Select the set of volumes that will be analyzed using normal modes.')
         form.addParam('copyDeformations', params.PathParam,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='Precomputed results (for developmemt)',
@@ -75,60 +77,62 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                            'remaining steps using this file.')
         form.addSection(label='Missing-wedge Compensation')
         form.addParam('WedgeMode', params.EnumParam,
-                      choices=['Do not compensate', 'Compensate (Recommended)'],
+                      choices=['Do not compensate', 'Compensate'],
                       default=WEDGE_MASK_THRE,
                       label='Wedge mode', display=params.EnumParam.DISPLAY_COMBO,
                       help='Choose to compensate for the missing wedge if the data is subtomograms.'
-                           ' However, if you deal with missing wedge differently, then choose not to compensate.'
-                           ' You can also choose not to compensate if your data is not subtomograms but EM-maps')
+                           ' However, if you correct the missing wedge in advance, then choose not to compensate.'
+                           ' You can also choose not to compensate if your data is not subtomograms but EM-maps.'
+                           ' The missing wedge is assumed to be in the Y-axis direction.')
         form.addParam('tiltLow', params.IntParam, default=-60,
-                      expertLevel=params.LEVEL_ADVANCED,
+                      # expertLevel=params.LEVEL_ADVANCED,
                       condition='WedgeMode==%d' % WEDGE_MASK_THRE,
                       label='Lower tilt value',
                       help='The lower tilt angle used in obtaining the tilt series')
         form.addParam('tiltHigh', params.IntParam, default=60,
-                      expertLevel=params.LEVEL_ADVANCED,
+                      # expertLevel=params.LEVEL_ADVANCED,
                       condition='WedgeMode==%d' % WEDGE_MASK_THRE,
                       label='Upper tilt value',
                       help='The upper tilt angle used in obtaining the tilt series')
 
-        form.addSection(label='Search parameters')
+        form.addSection(label='Combined elastic and rigid-body alignment')
         form.addParam('trustRegionScale', params.FloatParam, default=1.0,
                       expertLevel=params.LEVEL_ADVANCED,
-                      label='CONDOR optimiser parameter trustRegionScale ',
+                      label='Elastic alignment trust region scale ',
                       help='For elastic alignment, this parameter scales the initial '
                            'value of the trust region radius of CONDOR optimization. '
                            'The default value of 1 works in majority of cases. \n'
                            'This value should not be changed except by expert users. '
                            'Larger values (e.g., between 1 and 2) can be tried '
                            'for larger expected amplitudes of conformational change.')
-        form.addParam('rhoStartBase', params.FloatParam, default=250.0,
-                      expertLevel=params.LEVEL_ADVANCED,
-                      label='CONDOR optimiser parameter rhoStartBase',
-                      help='rhoStartBase > 0  : (rhoStart = rhoStartBase*trustRegionScale) the lower the better,'
-                           ' yet the slower')
-        form.addParam('rhoEndBase', params.FloatParam, default=50.0,
-                      expertLevel=params.LEVEL_ADVANCED,
-                      label='CONDOR optimiser parameter rhoEndBase ',
-                      help='rhoEndBase > 250  : (rhoEnd = rhoEndBase*trustRegionScale) no specific rule, '
-                           'however it is better to keep it < 1000 if set very high we risk distortions')
-        form.addParam('niter', params.IntParam, default=10000,
-                      expertLevel=params.LEVEL_ADVANCED,
-                      label='CONDOR optimiser parameter niter',
-                      help='niter should be big enough to guarantee that the search converges to the '
-                           'right set of nma deformation amplitudes')
+        # form.addParam('rhoStartBase', params.FloatParam, default=250.0,
+        #               expertLevel=params.LEVEL_ADVANCED,
+        #               label='CONDOR optimiser parameter rhoStartBase',
+        #               help='rhoStartBase > 0  : (rhoStart = rhoStartBase*trustRegionScale) the lower the better,'
+        #                    ' yet the slower')
+        # form.addParam('rhoEndBase', params.FloatParam, default=50.0,
+        #               expertLevel=params.LEVEL_ADVANCED,
+        #               label='CONDOR optimiser parameter rhoEndBase ',
+        #               help='rhoEndBase > 250  : (rhoEnd = rhoEndBase*trustRegionScale) no specific rule, '
+        #                    'however it is better to keep it < 1000 if set very high we risk distortions')
+        # form.addParam('niter', params.IntParam, default=10000,
+        #               expertLevel=params.LEVEL_ADVANCED,
+        #               label='CONDOR optimiser parameter niter',
+        #               help='niter should be big enough to guarantee that the search converges to the '
+        #                    'right set of nma deformation amplitudes')
         form.addParam('frm_freq', params.FloatParam, default=0.25,
                       expertLevel=params.LEVEL_ADVANCED,
-                      label='Maximum normalized pixel frequency',
-                      help='The normalized frequency should be a number between 0 and 1 '
+                      label='Maximum cross correlation frequency',
+                      help='The normalized frequency should be between 0 and 0.5 '
                            'The more it is, the bigger the search frequency is, the more time it demands, '
                            'keeping it as default is recommended.')
         form.addParam('frm_maxshift', params.IntParam, default=10,
                       expertlevel=params.LEVEL_ADVANCED,
-                      label='Maximum shift for rigid body search',
-                      help='The maximum shift is a number between 1 and half the size of your volume. Keep as default'
+                      label='Maximum shift for rigid body alignment (in pixels)',
+                      help='The maximum shift is a number between 1 and half the size of your volume. '
+                           'It represents the maximum distance searched in x,y and z directions. Keep as default'
                            ' if your target is near the center in your subtomograms')
-        form.addParallelSection(threads=0, mpi=24)
+        form.addParallelSection(threads=0, mpi=5)
 
     # --------------------------- INSERT steps functions --------------------------------------------
     def getInputPdb(self):
@@ -146,17 +150,15 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
             self.atomsFn = self._getExtraPath(basename(atomsFn))
             copyFile(atomsFn, self.atomsFn)
         else:
-            localFn = self._getExtraPath(replaceBaseExt(basename(atomsFn), 'pdb'))
-            cifToPdb(atomsFn, localFn)
-            self.atomsFn = self._getExtraPath(basename(localFn))
+            pdb_name = os.path.dirname(self.inputModes.get().getFileName()) + '/atoms.pdb'
+            self.atomsFn = self._getExtraPath(basename(pdb_name))
+            copyFile(pdb_name, self.atomsFn)
 
         self._insertFunctionStep('convertInputStep', atomsFn)
 
         if self.copyDeformations.empty():  # SERVES_FOR_DEBUGGING AND COMPUTING ON CLUSTERS
             self._insertFunctionStep("performNmaStep", self.atomsFn, self.modesFn)
         else:
-            # TODO: for debugging and testing it will be useful to copy the deformations
-            # metadata file, not just the deformation.txt file
             self._insertFunctionStep('copyDeformationsStep', self.copyDeformations.get())
 
         self._insertFunctionStep('createOutputStep')
@@ -221,6 +223,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                         break
             mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
             mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
+        mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.imgsFn)
 
 
@@ -233,9 +236,12 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         imgFn = self.imgsFn
         frm_freq = self.frm_freq.get()
         frm_maxshift = self.frm_maxshift.get()
-        rhoStartBase = self.rhoStartBase.get()
-        rhoEndBase = self.rhoEndBase.get()
-        niter = self.niter.get()
+        # rhoStartBase = self.rhoStartBase.get()
+        # rhoEndBase = self.rhoEndBase.get()
+        # niter = self.niter.get()
+        rhoStartBase = 250.0
+        rhoEndBase = 50.0
+        niter = 10000
 
         args = "-i %(imgFn)s --pdb %(atomsFn)s --modes %(modesFn)s --sampling_rate %(sampling)f "
         args += "--odir %(odir)s --centerPDB "
@@ -253,8 +259,10 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
             tiltF = self.tiltHigh.get()
             args += "--tilt_values %(tilt0)d %(tiltF)d "
 
-        print(args % locals())
-        self.runJob("xmipp_nma_alignment_vol", args % locals())
+        # print(args % locals())
+        # runProgram("xmipp_nma_alignment_vol", args % locals())
+        self.runJob("xmipp_nma_alignment_vol", args % locals(),
+                    env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
 
         cleanPath(self._getPath('nmaTodo.xmd'))
 
@@ -281,6 +289,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                         break
             mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
             mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
+        mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.imgsFn)
 
         mdImgs.write(self.imgsFn)

@@ -36,7 +36,6 @@ from continuousflex.viewers.plotter_vol import FlexNmaVolPlotter
 FIGURE_LIMIT_NONE = 0
 FIGURE_LIMITS = 1
 
-
 class ClusteringWindowVol(gui.Window):
     """ This class creates a Window that will display some Point's
     contained in a Data object.
@@ -224,8 +223,9 @@ class ClusteringWindowVol(gui.Window):
                     #                                 *baseList)
 
                     ax = self.plotter.plotArray2D("Click and drag to add some points to the Cluster",
-                                                  *baseList)
-                    self.ps = PointSelectorVol(ax, self.data, callback=self._updateSelectionLabel)
+                                                   *baseList)
+                    self.ps = PointSelectorVol(ax, self.data, callback=self._updateSelectionLabel,
+                                               LimitL=self.LimitLow, LimitH=self.LimitHigh)
                     # self.ps = PointSelectorVol(ax, self.data, callback=None)
                 elif dim == 3:
                     try:

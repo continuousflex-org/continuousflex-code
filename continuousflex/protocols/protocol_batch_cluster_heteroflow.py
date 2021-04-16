@@ -43,7 +43,7 @@ class FlexBatchProtHeteroFlowCluster(BatchProtocol):
 
     def _insertAllSteps(self):
         volumesMd = self._getExtraPath('volumes.xmd')
-        outputVol = self._getExtraPath('reconstruction.spi')
+        outputVol = self._getExtraPath('average.spi')
 
         self._insertFunctionStep('convertInputStep', volumesMd)
         self._insertFunctionStep('averagingStep')
@@ -75,7 +75,7 @@ class FlexBatchProtHeteroFlowCluster(BatchProtocol):
         for objId in mdVols:
             counter = counter + 1
             imgPath = mdVols.getValue(md.MDL_IMAGE, objId)
-            outputVol = self._getExtraPath('reconstruction.spi')
+            outputVol = self._getExtraPath('average.spi')
             tempVol = self._getExtraPath('temp.spi')
             extra = self._getExtraPath()
 

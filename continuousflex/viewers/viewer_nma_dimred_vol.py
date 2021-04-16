@@ -37,7 +37,6 @@ from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 
 from pyworkflow.protocol.params import StringParam, LabelParam
 from pwem.objects import SetOfParticles
-from pyworkflow.utils.process import runJob
 from pwem.viewers import VmdView
 from pyworkflow.gui.browser import FileBrowserWindow
 from continuousflex.protocols.protocol_nma_dimred_vol import FlexProtDimredNMAVol
@@ -47,6 +46,7 @@ from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVol
 from continuousflex.viewers.nma_vol_gui import ClusteringWindowVol
 from joblib import load
 from pyworkflow.protocol import params
+from pwem.utils import runProgram
 
 FIGURE_LIMIT_NONE = 0
 FIGURE_LIMITS = 1
@@ -77,7 +77,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
 
     def _defineParams(self, form):
         form.addSection(label='Visualization')
-        form.addParam('displayRawDeformation', StringParam, default='1',
+        form.addParam('displayRawDeformation', StringParam, default='1 2',
                       label='Display raw deformation',
                       help='Type 1 to see the histogram of normal-mode amplitudes in the low-dimensional space, '
                            'using axis 1; \n '
@@ -201,12 +201,6 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         return views
 
     def _displayClustering(self, paramName):
-        # self.clusterWindow = self.tkWindow(ClusteringWindowVol,
-        #                                    title='Volume Clustering Tool',
-        #                                    dim=self.protocol.reducedDim.get(),
-        #                                    data=self.getData(),
-        #                                    callback=self._createCluster
-        #                                    )
         self.clusterWindow = self.tkWindow(ClusteringWindowVol,
                                            title='Volume Clustering Tool',
                                            dim=self.protocol.reducedDim.get(),
@@ -225,14 +219,6 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         return [self.clusterWindow]
 
     def _displayTrajectories(self, paramName):
-        # self.trajectoriesWindow = self.tkWindow(TrajectoriesWindowVol,
-        #                                         title='Trajectories Tool',
-        #                                         dim=self.protocol.reducedDim.get(),
-        #                                         data=self.getData(),
-        #                                         callback=self._generateAnimation,
-        #                                         loadCallback=self._loadAnimation,
-        #                                         numberOfPoints=10
-        #                                         )
         self.trajectoriesWindow = self.tkWindow(TrajectoriesWindowVol,
                                                 title='Trajectories Tool',
                                                 dim=self.protocol.reducedDim.get(),
@@ -262,6 +248,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         prot = self.protocol
         project = prot.getProject()
         inputSet = prot.getInputParticles()
+        makePath(prot._getTmpPath())
         fnSqlite = prot._getTmpPath('cluster_particles.sqlite')
         cleanPath(fnSqlite)
         partSet = SetOfParticles(filename=fnSqlite)
@@ -372,7 +359,7 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
                 for l in d:
                     cmd += str(l) + ' '
                 # because it doesn't have an independent protocol we don't use self.runJob
-                runJob(None, 'xmipp_pdb_nma_deform', cmd, env=prot._getEnviron())
+                runProgram('xmipp_pdb_nma_deform', cmd)
 
         elif prot.getDataChoice() == 'PDBs':
             # There is incompatibility issue with the rest of the code, we have to use the fahterPDB as one of the

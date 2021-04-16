@@ -25,7 +25,7 @@
 # **************************************************************************
 
 from math import sqrt
-from continuousflex.viewers.nma_plotter import plotArray2D
+from continuousflex.viewers.nma_plotter import plotArray2D_xy
 
 STATE_NO_POINTS = 0  # no points have been selected, double-click will add first one
 STATE_DRAW_POINTS = 1  # still adding points, double-click will set the last one
@@ -38,11 +38,15 @@ class PointPath():
     It also allow to modify the point positions on the path.
     """
 
-    def __init__(self, ax, data, pathData, callback=None, tolerance=3, maxPoints=10):
+    def __init__(self, ax, data, pathData, callback=None, tolerance=3, maxPoints=10, LimitL = None, LimitH = None):
         self.ax = ax
         self.data = data
 
-        plotArray2D(ax, self.data)
+        # plotArray2D(ax, self.data)
+        if(LimitL):
+            plotArray2D_xy(ax, self.data, vvmin=LimitL, vvmax=LimitH)
+        else:
+            plotArray2D_xy(ax, self.data)
         self.callback = callback
 
         self.dragIndex = None

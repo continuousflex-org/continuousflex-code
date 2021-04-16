@@ -154,6 +154,34 @@ class FlexProtNMA(FlexProtNMABase):
 
         if not os.path.exists(fnOut):
             createLink(localFn, fnOut)
+
+        # Keeping only the lines that start with ATOM
+        newlines = []
+        with open(localFn) as f:
+            lines = f.readlines()
+        for line in lines:
+            if line.startswith("ATOM ") or line.startswith("TER ") or line.startswith("END "):
+                newlines.append(line)
+        with open(localFn, mode='w') as f:
+            f.writelines(newlines)
+
+        # Shifting the atom numbers after line 100000 one step to the left:
+        newlines = []
+        with open(localFn) as f:
+            lines = f.readlines()
+        for line in lines:
+            if line.startswith("ATOM ") or line.startswith("TER "):
+                # print(int(line.split()[1]))
+                if int(line.split()[1])>99999:
+                    if line.startswith("ATOM "):
+                        newline = line.replace("ATOM  1", "ATOM 1")
+                    else:
+                        newline = line.replace("TER   1", "TER  1")
+                    newlines.append(newline)
+                else:
+                    newlines.append(line)
+        with open(localFn, mode='w') as f:
+            f.writelines(newlines)
         
     def computePdbModesStep(self, numberOfModes, RTBblockSize, cutoffStr):
         rc = self._getRc(self._getExtraPath('atoms_distance.hist'))

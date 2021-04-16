@@ -35,6 +35,7 @@ from continuousflex.protocols.utilities.OF_plots import plot_quiver_3d, plot_qui
 from continuousflex.protocols.utilities.spider_files3 import open_volume, open_image
 import pyworkflow.protocol.params as params
 from pyworkflow.utils.process import runJob
+from pyworkflow.utils.path import makePath
 
 
 XY = 0
@@ -85,11 +86,11 @@ class FlexHeteroFlowViewer(EmProtocolViewer):
                       help="Histogram of the normalized cross correlation between the input volumes and "
                            "the warped reference")
         form.addParam('displayHistmsd', LabelParam,
-                      label="Histogram of mean absolute distance",
+                      label="Histogram of mean square distance",
                       help="Histogram of the mean square distance between the input volumes and "
                            "the warped reference")
         form.addParam('displayHistmad', LabelParam,
-                      label="Histogram of normalized cross correlation",
+                      label="Histogram of normalized mean absolute distance",
                       help="Histogram of the mean absolute distance between the input volumes and "
                            "the warped reference")
 
@@ -151,6 +152,7 @@ class FlexHeteroFlowViewer(EmProtocolViewer):
         path_flowx = op_path + str(number).zfill(6) + '_opflowx.spi'
         path_flowy = op_path + str(number).zfill(6) + '_opflowy.spi'
         path_flowz = op_path + str(number).zfill(6) + '_opflowz.spi'
+        makePath(self.protocol._getTmpPath())
         proj_x = self.protocol._getTmpPath('proj_x.spi')
         proj_y = self.protocol._getTmpPath('proj_y.spi')
         proj_z = self.protocol._getTmpPath('proj_z.spi')

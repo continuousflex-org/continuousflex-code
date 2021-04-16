@@ -41,6 +41,8 @@ import numpy as np
 import glob
 from sklearn import decomposition
 from joblib import dump, load
+from pwem.utils import runProgram
+
 
 
 class FlexProtSubtomoClassify(ProtAnalysis3D):
@@ -121,7 +123,7 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
         fnmask = self._getExtraPath('missing_wedge.spi')
         save_volume(np.float32(MW_mask), fnmask)
         args = ' -i ' + fnmask + ' --rotate_volume euler 0 90 0'
-        self.runJob('xmipp_transform_geometry',args)
+        runProgram('xmipp_transform_geometry',args)
         # Now aligning each subtomogram and its missing wedge version
         mw_path = self._getExtraPath('mw_masks/')
         subtom_aligned_path = self._getExtraPath('aligned_subtomograms/')
@@ -147,7 +149,7 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
             # align the subtomogram
             if self.SubtomoSource.get() == 1:
                 args = '-i ' + fnsubtomo + ' -o ' + fnalignedsubtomo + ' --rotate_volume euler 0 90 0'
-                self.runJob('xmipp_transform_geometry', args)
+                runProgram('xmipp_transform_geometry', args)
                 params = '-i ' + fnalignedsubtomo + ' -o ' + fnalignedsubtomo + ' '
             else:
                 params = '-i ' + fnsubtomo + ' -o ' + fnalignedsubtomo + ' '
@@ -155,18 +157,18 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
             if self.SubtomoSource.get() == 0:
                 params += ' --inverse '
-            self.runJob('xmipp_transform_geometry', params)
+            runProgram('xmipp_transform_geometry', params)
             # align the mask (no shift should be applied only angles)
             if self.SubtomoSource.get() == 1:
                 args = '-i ' + fnmask + ' -o ' + fnalignedmask + ' --rotate_volume euler 0 90 0'
-                self.runJob('xmipp_transform_geometry', args)
+                runProgram('xmipp_transform_geometry', args)
                 params = '-i ' + fnalignedmask + ' -o ' + fnalignedmask + ' '
             else:
                 params = '-i ' + fnmask + ' -o ' + fnalignedmask + ' '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             if self.SubtomoSource.get() == 0:
                 params += ' --inverse '
-            self.runJob('xmipp_transform_geometry', params)
+            runProgram('xmipp_transform_geometry', params)
             subtomogaligneMD.setValue(md.MDL_IMAGE, fnalignedsubtomo, subtomogaligneMD.addObject())
             mwalignedMD.setValue(md.MDL_IMAGE, fnalignedmask, mwalignedMD.addObject())
         subtomogaligneMD.write(self._getExtraPath('aligned_subtomograms.xmd'))

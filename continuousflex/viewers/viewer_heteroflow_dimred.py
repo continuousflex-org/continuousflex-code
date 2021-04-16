@@ -103,17 +103,17 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
                       help='Open a GUI to visualize the volumes as points'
                            ' to draw and adjust trajectories.')
         form.addParam('graylevel',params.FloatParam, label='Gray-level threshold level for animations',
-                      default=0.2, expertLevel=params.LEVEL_ADVANCED)
-        form.addParam('limits_modes', params.EnumParam,
+                      default=0.1, expertLevel=params.LEVEL_ADVANCED)
+        form.addHidden('limits_modes', params.EnumParam,
                       choices=['Automatic (Recommended)', 'Set manually Use upper and lower values'],
                       default=FIGURE_LIMIT_NONE,
                       label='(1 - CC) limits', display=params.EnumParam.DISPLAY_COMBO,
                       help='If you want to use a range of (1-CC) choose to set it manually.')
-        form.addParam('LimitLow', params.FloatParam, default=None,
+        form.addHidden('LimitLow', params.FloatParam, default=None,
                       condition='limits_modes==%d' % FIGURE_LIMITS,
                       label='Lower (1-CC) value',
                       help='The lower (1-CC) used in the graph')
-        form.addParam('LimitHigh', params.FloatParam, default=None,
+        form.addHidden('LimitHigh', params.FloatParam, default=None,
                       condition='limits_modes==%d' % FIGURE_LIMITS,
                       label='Upper (1-CC) value',
                       help='The upper (1-CC) used in the graph')
@@ -262,6 +262,7 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         prot = self.protocol
         project = prot.getProject()
         inputSet = prot.getInputParticles().get()
+        makePath(prot._getTmpPath())
         fnSqlite = prot._getTmpPath('cluster_particles.sqlite')
         cleanPath(fnSqlite)
         partSet = SetOfParticles(filename=fnSqlite)

@@ -32,16 +32,16 @@ from pyworkflow.utils import replaceBaseExt, replaceExt
 
 from continuousflex.protocols.data import Point, Data
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
-from continuousflex.protocols import FlexProtSynthesizeSubtomo
+from continuousflex.protocols import FlexProtSynthesizeImages
 import xmipp3
 import pwem.emlib.metadata as md
 from pwem.viewers import ObjectView
 
-class FlexProtSynthesizeSubtomoViewer(ProtocolViewer):
-    """ Visualization of results from synthesized subtomogrmas
+class FlexProtSynthesizeImageViewer(ProtocolViewer):
+    """ Visualization of results from synthesized images
     """
-    _label = 'viewer synthetic subtomograms'
-    _targets = [FlexProtSynthesizeSubtomo]
+    _label = 'viewer synthetic images'
+    _targets = [FlexProtSynthesizeImages]
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
 
     def __init__(self, **kwargs):
@@ -63,7 +63,7 @@ class FlexProtSynthesizeSubtomoViewer(ProtocolViewer):
                            'Type 7 8 9 to see the 3D plot of amplitudes along modes 7, 8 and 9; etc.'
                            )
         form.addParam('displayVolumes', LabelParam,
-                      label="Display volumes",
+                      label="Display images",
                       help="Display the volumes that are generated")
 
     def _getVisualizeDict(self):
@@ -72,7 +72,7 @@ class FlexProtSynthesizeSubtomoViewer(ProtocolViewer):
                 } 
                         
     def _viewVolumes(self, paramName):
-        volumes = self.protocol.outputVolumes
+        volumes = self.protocol.outputImages
         return [ObjectView(self._project, volumes.strId(), volumes.getFileName())]
 
 

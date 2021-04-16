@@ -65,7 +65,7 @@ class FlexAlignmentNMAVolViewer(ProtocolViewer):
 
     def _defineParams(self, form):
         form.addSection(label='Visualization')
-        form.addParam('displayRawDeformation', StringParam, default='7',
+        form.addParam('displayRawDeformation', StringParam, default='7 8',
                       label='Display raw deformation',
                       help='Type 7 to see the histogram of raw deformation along mode 7; \n'
                            'type 8 to see the histogram of raw deformation along mode 8, etc.\n'
@@ -123,10 +123,6 @@ class FlexAlignmentNMAVolViewer(ProtocolViewer):
         return {'displayRawDeformation': self._viewRawDeformation,
                 }
 
-    #     def _viewWithMatlab(self, paramName):
-    #         xmippLib = join(os.environ['XMIPP_HOME'], 'libraries', 'bindings', 'matlab')
-    #         command = "path(path, '%s');xmipp_nma_selection_tool('%s')" % (xmippLib, self._getPath())
-    #         return [CommandView('matlab -r "%s"' % command)]
 
     def _viewRawDeformation(self, paramName):
         components = self.displayRawDeformation.get()
@@ -200,9 +196,7 @@ class FlexAlignmentNMAVolViewer(ProtocolViewer):
         data = Data()
         for i, particle in enumerate(particles):
             pointData = list(map(float, particle._xmipp_nmaDisplacements))
-
             data.addPoint(Point(pointId=particle.getObjId(),
                                 data=pointData,
                                 weight=particle._xmipp_maxCC.get()))
-
         return data

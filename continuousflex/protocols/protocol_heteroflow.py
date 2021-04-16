@@ -259,6 +259,9 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
         vol0 = open_volume(path_vol1)
         vol1 = open_volume(path_vol0)
         # ranges are between 0 and 3.09, the values should be changed with some factor, otherwise the output is zero
+        # TODO: the normalization could be tried out with a proper scale, it is not needed if the StA average is used
+        # vol0 = self.normalize(vol0)
+        # vol1 = self.normalize(vol1)
         vol0 = vol0 * factor1
         vol1 = vol1 * factor2
         optflow = farneback3d.Farneback(
