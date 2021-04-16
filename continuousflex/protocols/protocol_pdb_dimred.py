@@ -26,6 +26,7 @@ from pwem.protocols import ProtAnalysis3D
 from pwem.convert import cifToPdb
 from pyworkflow.utils.path import makePath, copyFile
 from pyworkflow.protocol import params
+from pwem.utils import runProgram
 
 
 import numpy as np
@@ -173,7 +174,7 @@ class FlexProtDimredPdb(ProtAnalysis3D):
             if method in DIMRED_MAPPINGS:
                 mappingFile = self._getExtraPath('projector.txt')
                 args += " --saveMapping %(mappingFile)s"
-            self.runJob("xmipp_matrix_dimred", args % locals())
+            runProgram("xmipp_matrix_dimred", args % locals())
 
 
         print(pdb_mat)

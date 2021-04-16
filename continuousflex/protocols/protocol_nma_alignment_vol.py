@@ -24,7 +24,7 @@
 # **************************************************************************
 
 from os.path import basename
-
+import os
 from pyworkflow.utils import getListFromRangeString
 from pwem.protocols import ProtAnalysis3D
 from xmipp3.convert import (writeSetOfVolumes, xmippToLocation, createItemMatrix,
@@ -39,6 +39,8 @@ from pyworkflow.protocol.params import NumericRangeParam
 from .convert import modeToRow
 from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import replaceBaseExt
+from pwem.utils import runProgram
+from pwem import Domain
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -93,10 +95,10 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                       label='Upper tilt value',
                       help='The upper tilt angle used in obtaining the tilt series')
 
-        form.addSection(label='Search parameters')
+        form.addSection(label='Combined elastic and rigid-body alignment')
         form.addParam('trustRegionScale', params.FloatParam, default=1.0,
                       expertLevel=params.LEVEL_ADVANCED,
-                      label='CONDOR optimiser parameter trustRegionScale ',
+                      label='Elastic alignment trust region scale ',
                       help='For elastic alignment, this parameter scales the initial '
                            'value of the trust region radius of CONDOR optimization. '
                            'The default value of 1 works in majority of cases. \n'
@@ -120,14 +122,15 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         #                    'right set of nma deformation amplitudes')
         form.addParam('frm_freq', params.FloatParam, default=0.25,
                       expertLevel=params.LEVEL_ADVANCED,
-                      label='Maximum normalized pixel frequency',
-                      help='The normalized frequency should be a number between -0.5 and 0.5 '
+                      label='Maximum cross correlation frequency',
+                      help='The normalized frequency should be between 0 and 0.5 '
                            'The more it is, the bigger the search frequency is, the more time it demands, '
                            'keeping it as default is recommended.')
         form.addParam('frm_maxshift', params.IntParam, default=10,
                       expertlevel=params.LEVEL_ADVANCED,
-                      label='Maximum shift for rigid body search',
-                      help='The maximum shift is a number between 1 and half the size of your volume. Keep as default'
+                      label='Maximum shift for rigid body alignment (in pixels)',
+                      help='The maximum shift is a number between 1 and half the size of your volume. '
+                           'It represents the maximum distance searched in x,y and z directions. Keep as default'
                            ' if your target is near the center in your subtomograms')
         form.addParallelSection(threads=0, mpi=5)
 
@@ -147,17 +150,15 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
             self.atomsFn = self._getExtraPath(basename(atomsFn))
             copyFile(atomsFn, self.atomsFn)
         else:
-            localFn = self._getExtraPath(replaceBaseExt(basename(atomsFn), 'pdb'))
-            cifToPdb(atomsFn, localFn)
-            self.atomsFn = self._getExtraPath(basename(localFn))
+            pdb_name = os.path.dirname(self.inputModes.get().getFileName()) + '/atoms.pdb'
+            self.atomsFn = self._getExtraPath(basename(pdb_name))
+            copyFile(pdb_name, self.atomsFn)
 
         self._insertFunctionStep('convertInputStep', atomsFn)
 
         if self.copyDeformations.empty():  # SERVES_FOR_DEBUGGING AND COMPUTING ON CLUSTERS
             self._insertFunctionStep("performNmaStep", self.atomsFn, self.modesFn)
         else:
-            # TODO: for debugging and testing it will be useful to copy the deformations
-            # metadata file, not just the deformation.txt file
             self._insertFunctionStep('copyDeformationsStep', self.copyDeformations.get())
 
         self._insertFunctionStep('createOutputStep')
@@ -258,8 +259,10 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
             tiltF = self.tiltHigh.get()
             args += "--tilt_values %(tilt0)d %(tiltF)d "
 
-        print(args % locals())
-        self.runJob("xmipp_nma_alignment_vol", args % locals())
+        # print(args % locals())
+        # runProgram("xmipp_nma_alignment_vol", args % locals())
+        self.runJob("xmipp_nma_alignment_vol", args % locals(),
+                    env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
 
         cleanPath(self._getPath('nmaTodo.xmd'))
 

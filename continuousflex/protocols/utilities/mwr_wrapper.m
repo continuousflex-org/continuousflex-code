@@ -15,8 +15,16 @@
 %                     if it is maintaind as missing fftn region then false (default is false)
 
 
-% A wrapper for the implementation of the method described in E. Moebel & C. Kervrann "A Monte Carlo framework 
-% for noise removal and missing wedge restoration in cryo-electron tomography"
+% A wrapper for the implementation of the method described in
+% Emmanuel Moebel, Charles Kervrann,
+% A Monte Carlo framework for missing wedge restoration and noise removal in cryo-electron tomography,
+% Journal of Structural Biology: X,
+% Volume 4,
+% 2020,
+% 100013,
+% ISSN 2590-1524,
+% https://doi.org/10.1016/j.yjsbx.2019.100013.
+% (https://www.sciencedirect.com/science/article/pii/S259015241930011X)
 
 % by Mohamad Harastani (mohamad.harastani@upmc.fr)
 

@@ -34,7 +34,6 @@ from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 from continuousflex.protocols import FlexProtSubtomoClassify
 import xmipp3
 import pwem.emlib.metadata as md
-from pyworkflow.utils.process import runJob
 from pwem.viewers import ObjectView
 import matplotlib.pyplot as plt
 from joblib import load

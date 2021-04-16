@@ -43,6 +43,7 @@ from continuousflex.protocols.pdb import FlexProtConvertToPseudoAtomsBase
 #from xmipp3.protocols.pdb.protocol_pseudoatoms_base import XmippProtConvertToPseudoAtomsBase
 #from ..pdb.protocol_pseudoatoms_base import XmippProtConvertToPseudoAtomsBase
 from .protocol_nma_base import FlexProtNMABase, NMA_CUTOFF_REL
+from pwem.utils import runProgram
 
 
 def mds(d, dimensions = 2):
@@ -180,7 +181,7 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
             args += " --dontScale"
         args += " --copyGeo %s" % (
                 self._getExtraPath('transformation-matrix_vol%06d.txt'%volId))        
-        self.runJob("xmipp_volume_align", args)
+        runProgram("xmipp_volume_align", args)
 
     def elasticAlignmentStep(self, nVoli, Ts, nVolj, fnAlignedVolj):
         fnVolOut = self._getExtraPath('DeformedVolume_Vol_%d_To_Vol_%d' % (nVolj, nVoli))
@@ -206,11 +207,11 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
         sigma = Ts * self.pseudoAtomRadius.get()
         fnPseudoOut = self._getExtraPath('PseudoatomsDeformedPDB_Vol_%d_To_Vol_%d.pdb' % 
                                          (nVolj, nVoli))
-        self.runJob('xmipp_nma_alignment_vol', 
+        runProgram('xmipp_nma_alignment_vol',
                     "-i %s --pdb %s --modes %s --sampling_rate %s -o %s --fixed_Gaussian %s --opdb %s"%\
                    (fnOutMeta, fnPseudo, fnModes, Ts, fnDeform, sigma, fnPseudoOut))
         
-        self.runJob('xmipp_volume_from_pdb', "-i %s -o %s --sampling %s --fixed_Gaussian %s" % 
+        runProgram('xmipp_volume_from_pdb', "-i %s -o %s --sampling %s --fixed_Gaussian %s" %
                     (fnPseudoOut, fnVolOut, Ts, sigma))
     
     def gatherSingleVolumeStep(self):

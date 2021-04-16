@@ -225,7 +225,8 @@ class ClusteringWindowVol(gui.Window):
 
                     ax = self.plotter.plotArray2D("Click and drag to add some points to the Cluster",
                                                    *baseList)
-                    self.ps = PointSelectorVol(ax, self.data, callback=self._updateSelectionLabel)
+                    self.ps = PointSelectorVol(ax, self.data, callback=self._updateSelectionLabel,
+                                               LimitL=self.LimitLow, LimitH=self.LimitHigh)
                     # self.ps = PointSelectorVol(ax, self.data, callback=None)
                 elif dim == 3:
                     try:

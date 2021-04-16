@@ -30,6 +30,8 @@ from pwem.objects import Volume, SetOfVolumes
 from xmipp3.convert import writeSetOfVolumes
 import pwem.emlib.metadata as md
 import os
+from pwem.utils import runProgram
+
 
 
 class FlexBatchProtNMAClusterVol(BatchProtocol):
@@ -47,7 +49,7 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
 
     def _insertAllSteps(self):
         volumesMd = self._getExtraPath('volumes.xmd')
-        outputVol = self._getExtraPath('reconstruction.vol')
+        outputVol = self._getExtraPath('average.vol')
 
         self._insertFunctionStep('convertInputStep', volumesMd)
         self._insertFunctionStep('averagingStep')
@@ -94,7 +96,7 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
             # with xmipp_transform_geometry
             flip = mdVols.getValue(md.MDL_ANGLE_Y, objId)
 
-            outputVol = self._getExtraPath('reconstruction.vol')
+            outputVol = self._getExtraPath('average.vol')
             tempVol = self._getExtraPath('temp.vol')
             extra = self._getExtraPath()
 
@@ -112,21 +114,21 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
                     first = False
                 # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
                 params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
-                self.runJob('xmipp_transform_geometry', params)
+                runProgram('xmipp_transform_geometry', params)
                 params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
                          ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
 
-            self.runJob('xmipp_transform_geometry', params)
+            runProgram('xmipp_transform_geometry', params)
 
             if counter == 1 :
                 os.system("mv %(tempVol)s %(outputVol)s" % locals())
 
             else:
                 params = '-i %(tempVol)s --plus %(outputVol)s -o %(outputVol)s ' % locals()
-                self.runJob('xmipp_image_operate', params)
+                runProgram('xmipp_image_operate', params)
 
         params = '-i %(outputVol)s --divide %(counter)s -o %(outputVol)s ' % locals()
-        self.runJob('xmipp_image_operate', params)
+        runProgram('xmipp_image_operate', params)
         os.system("rm -f %(tempVol)s" % locals())
 
 

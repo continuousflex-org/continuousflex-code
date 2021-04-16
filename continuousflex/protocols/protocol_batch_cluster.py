@@ -30,6 +30,7 @@ from pwem.protocols import BatchProtocol
 from pwem.objects import SetOfParticles, Volume
 
 from xmipp3.convert import writeSetOfParticles
+from pwem.utils import runProgram
 
 
 class FlexBatchProtNMACluster(BatchProtocol):
@@ -72,7 +73,7 @@ class FlexBatchProtNMACluster(BatchProtocol):
         writeSetOfParticles(partSet, imagesMd)
 
     def reconstructStep(self, params):
-        self.runJob('xmipp_reconstruct_fourier_accel', params)
+        runProgram('xmipp_reconstruct_fourier_accel', params)
     
     def createOutputStep(self, outputVol):
         vol = Volume()

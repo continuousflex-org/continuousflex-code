@@ -247,7 +247,8 @@ class TrajectoriesWindowVol(gui.Window):
                     ax = self.plotter.plotArray2D("Click and drag to add points to the Cluster",
                                                     *baseList)
                     self.ps = PointPathVol(ax, self.data, self.pathData,
-                                           callback=self._checkNumberOfPoints)
+                                           callback=self._checkNumberOfPoints,
+                                           LimitL = self.LimitLow, LimitH = self.LimitHigh)
                 elif dim == 3:
                     # del self.ps # Remove PointSelector
                     self.setDataIndex('ZIND', modeList[2])

@@ -48,16 +48,12 @@ class FlexNmaVolPlotter(FlexPlotter):
         self.useLastPlot = False
 
     def createSubPlot(self, title, xlabel, ylabel):
-
         if self.useLastPlot and self.last_subplot:
             ax = self.last_subplot
             ax.cla()
             ax.set_title(title)
-
-
         else:
             ax = FlexPlotter.createSubPlot(self, title, xlabel, ylabel)
-
         return ax
 
     def plotArray1D(self, title, xlabel, ylabel):
@@ -68,19 +64,16 @@ class FlexNmaVolPlotter(FlexPlotter):
 
     def plotArray2D(self, title, xlabel, ylabel):
         ax = self.createSubPlot(title, xlabel, ylabel)
-
         lowx = lowy = None
         try:
             lowx = self._xlimlow.get()
             lowy = self._ylimlow.get()
         except:
             pass
-
         if lowx:
             ax.set_xlim([self._xlimlow.get(), self._xlimhigh.get()])
         if lowy:
             ax.set_ylim([self._ylimlow.get(), self._ylimhigh.get()])
-
         plotArray2D(ax, self._data, self._limitlow, self._limitup)
         return ax
 
@@ -111,11 +104,18 @@ class FlexNmaVolPlotter(FlexPlotter):
         if lowz:
             ax.set_zlim([self._zlimlow.get(), self._zlimhigh.get()])
 
-        if self._limitlow == None or self._limitup == None:
+        color_low = color_high = None
+        try:
+            color_low = self._limitlow.get()
+            color_high = self._limitup.get()
+        except:
+            pass
+
+        if color_low is None or color_high is None:
             cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights)
         else:
-            cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights, vmin=self._limitlow.get(),
-                               vmax=self._limitup.get())
+            cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights, vmin=color_low,
+                               vmax=color_high)
 
 
         x2, y2, z2 = [], [], []

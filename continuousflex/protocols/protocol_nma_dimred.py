@@ -29,6 +29,7 @@ from pyworkflow.object import String
 from pyworkflow.protocol.params import (PointerParam, StringParam, EnumParam,
                                         IntParam, LEVEL_ADVANCED)
 from pwem.protocols import ProtAnalysis3D
+from pwem.utils import runProgram
 
 
 DIMRED_PCA = 0
@@ -71,8 +72,8 @@ class FlexProtDimredNMA(ProtAnalysis3D):
                       label="Conformational distribution",                        
                       help='Select a previous run of the NMA alignment.')
 
-        form.addParam('analyzeChoice', EnumParam, default=USE_PDBS,
-                      choices=['Use the fitted PDBs (recommended)',
+        form.addParam('analyzeChoice', EnumParam, default=USE_NMA_AMP,
+                      choices=['Use deformed (pseudo)atomic models',
                                'Use normal mode amplitudes'],
                       label='Data to analyze',
                       help='Choosing to analyze the fitted PDBs is slower but more accurate.'
@@ -175,7 +176,7 @@ class FlexProtDimredNMA(ProtAnalysis3D):
             mappingFile = self._getExtraPath('projector.txt')
             args += " --saveMapping %(mappingFile)s"
             self.mappingFile.set(mappingFile)
-        self.runJob("xmipp_matrix_dimred", args % locals())
+        runProgram("xmipp_matrix_dimred", args % locals())
         
     def createOutputStep(self):
         pass

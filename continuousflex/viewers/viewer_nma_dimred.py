@@ -1,7 +1,7 @@
 # **************************************************************************
-# *
 # * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
 # *              Slavica Jonic  (slavica.jonic@upmc.fr)
+# *              Mohamad Harastani (mohamad.harastani@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -39,7 +39,6 @@ from pyworkflow.utils.path import cleanPath, makePath, cleanPattern
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.protocol.params import StringParam, LabelParam
 from pwem.objects import SetOfParticles
-from pyworkflow.utils.process import runJob
 from pwem.viewers import VmdView
 from pyworkflow.gui.browser import FileBrowserWindow
 
@@ -50,7 +49,18 @@ from continuousflex.protocols.data import Point, Data
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 
 from continuousflex.viewers.nma_gui import ClusteringWindow, TrajectoriesWindow
+from pwem.utils import runProgram
+from pyworkflow.protocol import params
 
+FIGURE_LIMIT_NONE = 0
+FIGURE_LIMITS = 1
+
+X_LIMITS_NONE = 0
+X_LIMITS = 1
+Y_LIMITS_NONE = 0
+Y_LIMITS = 1
+Z_LIMITS_NONE = 0
+Z_LIMITS = 1
 
 class FlexDimredNMAViewer(ProtocolViewer):
     """ Visualization of results from the NMA protocol
@@ -70,7 +80,7 @@ class FlexDimredNMAViewer(ProtocolViewer):
 
     def _defineParams(self, form):
         form.addSection(label='Visualization')
-        form.addParam('displayRawDeformation', StringParam, default='1',
+        form.addParam('displayRawDeformation', StringParam, default='1 2',
                       label='Display normal-mode amplitudes in the low-dimensional space',
                       help='Type 1 to see the histogram of normal-mode amplitudes in the low-dimensional space, '
                            'using axis 1; \n '
@@ -91,6 +101,53 @@ class FlexDimredNMAViewer(ProtocolViewer):
                       label='Open trajectories tool?',
                       help='Open a GUI to visualize the images as points, '
                            'draw and adjust trajectories, and animate them.')
+
+        form.addParam('limits_modes', params.EnumParam,
+                      choices=['Automatic (Recommended)', 'Set manually Use upper and lower values'],
+                      default=FIGURE_LIMIT_NONE,
+                      label='Error limits', display=params.EnumParam.DISPLAY_COMBO,
+                      help='If you want to use a range of Error in the color bar choose to set it manually.')
+        form.addParam('LimitLow', params.FloatParam, default=None,
+                      condition='limits_modes==%d' % FIGURE_LIMITS,
+                      label='Lower Error value',
+                      help='The lower Error used in the graph')
+        form.addParam('LimitHigh', params.FloatParam, default=None,
+                      condition='limits_modes==%d' % FIGURE_LIMITS,
+                      label='Upper Error value',
+                      help='The upper Error used in the graph')
+        form.addParam('xlimits_mode', params.EnumParam,
+                      choices=['Automatic (Recommended)', 'Set manually x-axis limits'],
+                      default=X_LIMITS_NONE,
+                      label='x-axis limits', display=params.EnumParam.DISPLAY_COMBO,
+                      help='This allows you to use a specific range of x-axis limits')
+        form.addParam('xlim_low', params.FloatParam, default=None,
+                      condition='xlimits_mode==%d' % X_LIMITS,
+                      label='Lower x-axis limit')
+        form.addParam('xlim_high', params.FloatParam, default=None,
+                      condition='xlimits_mode==%d' % X_LIMITS,
+                      label='Upper x-axis limit')
+        form.addParam('ylimits_mode', params.EnumParam,
+                      choices=['Automatic (Recommended)', 'Set manually y-axis limits'],
+                      default=Y_LIMITS_NONE,
+                      label='y-axis limits', display=params.EnumParam.DISPLAY_COMBO,
+                      help='This allows you to use a specific range of y-axis limits')
+        form.addParam('ylim_low', params.FloatParam, default=None,
+                      condition='ylimits_mode==%d' % Y_LIMITS,
+                      label='Lower y-axis limit')
+        form.addParam('ylim_high', params.FloatParam, default=None,
+                      condition='ylimits_mode==%d' % Y_LIMITS,
+                      label='Upper y-axis limit')
+        form.addParam('zlimits_mode', params.EnumParam,
+                      choices=['Automatic (Recommended)', 'Set manually z-axis limits'],
+                      default=Z_LIMITS_NONE,
+                      label='z-axis limits', display=params.EnumParam.DISPLAY_COMBO,
+                      help='This allows you to use a specific range of z-axis limits')
+        form.addParam('zlim_low', params.FloatParam, default=None,
+                      condition='zlimits_mode==%d' % Z_LIMITS,
+                      label='Lower z-axis limit')
+        form.addParam('zlim_high', params.FloatParam, default=None,
+                      condition='zlimits_mode==%d' % Z_LIMITS,
+                      label='Upper z-axis limit')
 
     def _getVisualizeDict(self):
         return {'displayRawDeformation': self._viewRawDeformation,
@@ -117,7 +174,17 @@ class FlexDimredNMAViewer(ProtocolViewer):
                                           title="Invalid input")]
 
             # Actually plot
-            plotter = FlexNmaPlotter(data=self.getData())
+            if self.limits_modes == FIGURE_LIMIT_NONE:
+                plotter = FlexNmaPlotter(data=self.getData(),
+                                            xlim_low=self.xlim_low, xlim_high=self.xlim_high,
+                                            ylim_low=self.ylim_low, ylim_high=self.ylim_high,
+                                            zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+            else:
+                plotter = FlexNmaPlotter(data=self.getData(),
+                                            LimitL=self.LimitLow, LimitH=self.LimitHigh,
+                                            xlim_low=self.xlim_low, xlim_high=self.xlim_high,
+                                            ylim_low=self.ylim_low, ylim_high=self.ylim_high,
+                                            zlim_low=self.zlim_low, zlim_high=self.zlim_high)
             baseList = [basename(n) for n in modeNameList]
 
             self.getData().XIND = modeList[0]
@@ -142,7 +209,16 @@ class FlexDimredNMAViewer(ProtocolViewer):
                                            title='Clustering Tool',
                                            dim=self.protocol.reducedDim.get(),
                                            data=self.getData(),
-                                           callback=self._createCluster
+                                           callback=self._createCluster,
+                                           limits_mode=self.limits_modes,
+                                           LimitL=self.LimitLow,
+                                           LimitH=self.LimitHigh,
+                                           xlim_low=self.xlim_low,
+                                           xlim_high=self.xlim_high,
+                                           ylim_low=self.ylim_low,
+                                           ylim_high=self.ylim_high,
+                                           zlim_low=self.zlim_low,
+                                           zlim_high=self.zlim_high,
                                            )
         return [self.clusterWindow]
 
@@ -153,7 +229,16 @@ class FlexDimredNMAViewer(ProtocolViewer):
                                                 data=self.getData(),
                                                 callback=self._generateAnimation,
                                                 loadCallback=self._loadAnimation,
-                                                numberOfPoints=10
+                                                numberOfPoints=10,
+                                                limits_mode=self.limits_modes,
+                                                LimitL=self.LimitLow,
+                                                LimitH=self.LimitHigh,
+                                                xlim_low=self.xlim_low,
+                                                xlim_high=self.xlim_high,
+                                                ylim_low=self.ylim_low,
+                                                ylim_high=self.ylim_high,
+                                                zlim_low=self.zlim_low,
+                                                zlim_high=self.zlim_high,
                                                 )
         return [self.trajectoriesWindow]
 
@@ -166,6 +251,7 @@ class FlexDimredNMAViewer(ProtocolViewer):
         prot = self.protocol
         project = prot.getProject()
         inputSet = prot.getInputParticles()
+        makePath(prot._getTmpPath())
         fnSqlite = prot._getTmpPath('cluster_particles.sqlite')
         cleanPath(fnSqlite)
         partSet = SetOfParticles(filename=fnSqlite)
@@ -262,7 +348,7 @@ class FlexDimredNMAViewer(ProtocolViewer):
         for i, d in enumerate(deformations):
             atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i + 1)
             cmd = '-o %s --pdb %s --nma %s --deformations %s' % (atomsFn, pdbFile, modesFn, str(d)[1:-1])
-            runJob(None, 'xmipp_pdb_nma_deform', cmd, env=prot._getEnviron())
+            runProgram('xmipp_pdb_nma_deform', cmd)
 
         # Join all deformations in a single pdb
         # iterating going up and down through all points

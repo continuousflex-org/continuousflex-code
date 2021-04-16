@@ -34,6 +34,8 @@ from continuousflex.protocols.data import Point
 from . import PointSelector
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 
+FIGURE_LIMIT_NONE = 0
+FIGURE_LIMITS = 1
 
 class ClusteringWindow(gui.Window):
     """ This class creates a Window that will display some Point's
@@ -53,6 +55,17 @@ class ClusteringWindow(gui.Window):
         self.data = kwargs.get('data')
         self.callback = kwargs.get('callback', None)
         self.plotter = None
+
+        # Adding figure limits option
+        self.limits_modes = kwargs.get('limits_mode')
+        self.LimitLow = kwargs.get('LimitL')
+        self.LimitHigh = kwargs.get('LimitH')
+        self.xlim_low = kwargs.get('xlim_low')
+        self.xlim_high = kwargs.get('xlim_high')
+        self.ylim_low = kwargs.get('ylim_low')
+        self.ylim_high = kwargs.get('ylim_high')
+        self.zlim_low = kwargs.get('zlim_low')
+        self.zlim_high = kwargs.get('zlim_high')
 
         content = tk.Frame(self.root)
         self._createContent(content)
@@ -165,7 +178,7 @@ class ClusteringWindow(gui.Window):
         dim = len(components)
 
         if not dim:
-            self.showWarning("Please select some Axis before update plots.")
+            self.showWarning("Please select some Axis before updating plots.")
         else:
             modeList = components
             modeNameList = ['x%d' % (m + 1) for m in components]
@@ -176,7 +189,18 @@ class ClusteringWindow(gui.Window):
                                           title="Invalid input")]
 
             if self.plotter is None or self.plotter.isClosed():
-                self.plotter = FlexNmaPlotter(data=self.data)
+                # self.plotter = FlexNmaPlotter(data=self.data)
+                if self.limits_modes == FIGURE_LIMIT_NONE:
+                    self.plotter = FlexNmaPlotter(data=self.data,
+                                                xlim_low=self.xlim_low, xlim_high=self.xlim_high,
+                                                ylim_low=self.ylim_low, ylim_high=self.ylim_high,
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                else:
+                    self.plotter = FlexNmaPlotter(data=self.data,
+                                                LimitL=self.LimitLow, LimitH=self.LimitHigh,
+                                                xlim_low=self.xlim_low, xlim_high=self.xlim_high,
+                                                ylim_low=self.ylim_low, ylim_high=self.ylim_high,
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
 
                 doShow = True
             else:
@@ -196,9 +220,12 @@ class ClusteringWindow(gui.Window):
                 if dim == 2:
                     self._evalExpression()
                     self._updateSelectionLabel()
-                    ax = self.plotter.createSubPlot("Click and drag to add points to the Cluster",
-                                                    *baseList)
-                    self.ps = PointSelector(ax, self.data, callback=self._updateSelectionLabel)
+                    # ax = self.plotter.createSubPlot("Click and drag to add points to the Cluster",
+                    #                                 *baseList)
+                    ax = self.plotter.plotArray2D("Click and drag to add points to the Cluster",
+                                                  *baseList)
+                    self.ps = PointSelector(ax, self.data, callback=self._updateSelectionLabel,
+                                            LimitL=self.LimitLow, LimitH=self.LimitHigh)
                 elif dim == 3:
                     del self.ps  # Remove PointSelector
                     self.data.ZIND = modeList[2]
