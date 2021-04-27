@@ -100,13 +100,13 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                            ' "8 9, 10-12" -> [8,9,10,11,12])\n')
         group2.addParam('modeRelationChoice', params.EnumParam, default=MODE_RELATION_LINEAR,
                       allowsNull=True,
-                      choices=['Linear relationship', '3 Clusters', 'Grid', 'Random', 'Parabolic'],
+                      choices=['Linear relationship', '3 Clusters', 'Grid', 'Random', 'Upper half circle'],
                       label='Relationship between the modes',
                       help='linear relationship: all the selected modes will have equal amplitudes. \n'
                            '3 clusters: the volumes will be devided exactly into three classes.\n'
                            'Grid: the amplitudes will be in a grid shape (grid size is square of what grid step).\n'
                            'Random: all the amplitudes will be random in the given range.\n'
-                           'Parabolic: The relationship between two modes will be parabolic.')
+                           'Parabolic: The relationship between two modes will be upper half circle.')
         group2.addParam('centerPoint', params.IntParam, default=100,
                       allowsNull=True,
                       condition='modeRelationChoice==%d' % MODE_RELATION_3CLUSTERS,
@@ -180,10 +180,6 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                       label='Simulate Rotations and Shifts',
                       help='If yes, the images will be rotated and shifted randomly in the range,'
                            ' otherwise no rotations nor shifts will be applied')
-        # form.addParam('maxShift', params.FloatParam, default=5.0,
-        #               condition='rotationShiftChoice==%d' % ROTATION_SHIFT_YES,
-        #               label='Maximum Shift',
-        #               help='The maximum shift from the center that will be applied')
         form.addParam('shiftx', params.EnumParam, label='Shift-X distribution',
                       condition='rotationShiftChoice==%d' % ROTATION_SHIFT_YES,
                       choices=['Uniform distribution', 'Gaussian distribution'],
