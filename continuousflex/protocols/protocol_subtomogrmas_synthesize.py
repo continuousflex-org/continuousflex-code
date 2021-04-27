@@ -259,7 +259,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         if os.path.exists(pdb_name1):
             fnPDB = pdb_name1
         else:
-            fnPBD = pdb_name2
+            fnPDB = pdb_name2
         # fnPDB = self.inputModes.get().getPdb().getFileName()
         # use the input relationship between the modes to generate normal mode amplitudes metadata
         fnModeList = replaceExt(self.inputModes.get().getFileName(),'xmd')
