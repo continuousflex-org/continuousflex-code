@@ -136,6 +136,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                       label='Sampling rate',
                       help='The sampling rate (pixel size in Angstroms)')
         form.addParam('volumeSize', params.IntParam, default=64,
+                      condition='confVar==%d or refAtomic!=None' % NMA_YES,
                       label='Image size',
                       help='Image size in voxels (all volumes will be cubes)')
 
