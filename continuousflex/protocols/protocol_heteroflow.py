@@ -44,7 +44,7 @@ REFERENCE_STA = 1
 
 
 class FlexProtHeteroFlow(ProtAnalysis3D):
-    """ Protocol for subtomogram missingwedge filling. """
+    """ Protocol for HeteroFlow. """
     _label = 'heteroflow protocol'
 
     # --------------------------- DEFINE param functions --------------------------------------------
@@ -95,15 +95,19 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
         form.addParam('poly_sigma', params.FloatParam, default=1.2,
                       label='poly_sigma',
                       help='polynomial constant')
-        form.addParam('flags', params.IntParam, default=0,
+        form.addHidden('flags', params.IntParam, default=0,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='flags',
                       help='flag to pass for the optical flow')
-        form.addParam('factor1', params.IntParam, default=100,
+        form.addHidden('use_gaussian_kernel', params.BooleanParam, default=True,
+                      label='use_gaussian_kernel',
+                      help='If yes, there will be a Guassian filter applied locally to '
+                           'denoise and smooth the optical flow')
+        form.addHidden('factor1', params.IntParam, default=100,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='factor1',
                       help='this factor will be multiplied by the gray levels of each subtomogram')
-        form.addParam('factor2', params.IntParam, default=100,
+        form.addHidden('factor2', params.IntParam, default=100,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='factor2',
                       help='this factor will be multiplied by the gray levels of the reference')
@@ -149,6 +153,7 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
         flags = self.flags.get()
         factor1 = self.factor1.get()
         factor2 = self.factor2.get()
+        use_gaussian_kernel = self.use_gaussian_kernel.get()
 
         mdImgs = md.MetaData(imgFn)
         of_root = self._getExtraPath() + '/optical_flows/'
@@ -170,8 +175,8 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
                 continue
             else:
                 volumes_op_flowi = self.opflow_vols(path_vol0, path_vol_i, pyr_scale, levels, winsize, iterations,
-                                                    poly_n,
-                                                    poly_sigma, factor1, factor2, path_flowx, path_flowy, path_flowz)
+                                                    poly_n, poly_sigma, use_gaussian_kernel, factor1, factor2,
+                                                    path_flowx, path_flowy, path_flowz)
 
         metric_mat = np.zeros([N, N])
 
@@ -253,8 +258,9 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
         pass
 
     # --------------------------- UTILS functions --------------------------------------------
-    def opflow_vols(self, path_vol0, path_vol1, pyr_scale, levels, winsize, iterations, poly_n, poly_sigma, factor1=100,
-                    factor2=100, path_volx='x_OF_3D.vol', path_voly='y_OF_3D.vol', path_volz='z_OF_3D.vol'):
+    def opflow_vols(self, path_vol0, path_vol1, pyr_scale, levels, winsize, iterations, poly_n, poly_sigma,
+                    use_gaussian_kernel = True, factor1=100, factor2=100,
+                    path_volx='x_OF_3D.vol', path_voly='y_OF_3D.vol', path_volz='z_OF_3D.vol'):
         # Convention here is in reverse order
         vol0 = open_volume(path_vol1)
         vol1 = open_volume(path_vol0)
@@ -271,6 +277,7 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
             num_iterations=iterations,  # Iterations on each multi-scale level
             poly_n=poly_n,  # Size of window for weighted least-square estimation of polynomial coefficients
             poly_sigma=poly_sigma,  # Sigma for Gaussian weighting of least-square estimation of polynomial coefficients
+            use_gaussian_kernel=use_gaussian_kernel,
         )
         t0 = time.time()
         # perform OF:

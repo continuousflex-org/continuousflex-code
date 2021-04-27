@@ -60,6 +60,9 @@ MODE_RELATION_RANDOM = 3
 MISSINGWEDGE_YES = 0
 MISSINGWEDGE_NO = 1
 
+LOWPASS_YES = 0
+LOWPASS_NO = 1
+
 ROTATION_SHIFT_YES = 0
 ROTATION_SHIFT_NO = 1
 
@@ -176,6 +179,25 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='CTF Q0',
                       help='Microscope attribute')
+
+        form.addSection(label='Low pass filtering')
+        form.addParam('lowPassChoice', params.EnumParam, default=LOWPASS_NO,
+                      choices=['Add extra dose accumulation', 'Stay with only CTF'],
+                      label='Use low pass filtering',
+                      help='The generated volumes will be low pass filtered before projection into a tilt series.'
+                           ' This simulates extra distortions similar to dose accumulation.'
+                           ' However, CTF will already have such an effect.')
+        form.addParam('w1', params.FloatParam, default=0.25,
+                      condition='lowPassChoice==%d' % LOWPASS_YES,
+                      label='Cutoff frequency (0 -> 0.5)',
+                      help='This is the cufoff frequency of the low pass filter.'
+                           ' For details: see "xmipp_transform_filter --fourier low_pass"')
+        form.addParam('raisedw', params.FloatParam, default=0.02,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      condition='lowPassChoice==%d' % LOWPASS_YES,
+                      label='Raised cosine wedth',
+                      help='Pixels around the central frequency for the raised cosine,'
+                           ' For details: see "xmipp_transform_filter --fourier low_pass"')
 
         form.addSection('Reconstruction')
         form.addParam('reconstructionChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
@@ -339,6 +361,14 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             params += " --size " + str(self.volumeSize.get())
             params += " -v 0 --centerPDB "
             runProgram('xmipp_volume_from_pdb', params)
+
+        if self.lowPassChoice.get() is LOWPASS_YES:
+            cutoff = self.w1.get()
+            raisedw = self.raisedw.get()
+            for i in range(numberOfVolumes):
+                params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_deformed.vol')
+                params += " --fourier low_pass " + str(cutoff) + ' ' + str(raisedw)
+                runProgram('xmipp_transform_filter', params)
 
     def generate_rotation_and_shift(self):
         subtomogramMD = md.MetaData(self._getExtraPath('GroundTruth.xmd'))
