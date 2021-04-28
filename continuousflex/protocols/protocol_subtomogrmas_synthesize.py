@@ -141,7 +141,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         form.addParam('numberOfVolumes', params.IntParam, default=36,
                       label='Number of volumes',
                       condition='modeRelationChoice!=%d'% MODE_RELATION_MESH,
-                      help='Number of images that will be generated')
+                      help='Number of volumes that will be generated')
         form.addParam('samplingRate', params.FloatParam, default=2.2,
                       condition='confVar==%d or refAtomic!=None' % NMA_YES,
                       label='Sampling rate',
