@@ -114,11 +114,6 @@ class FlexProtSynthesizeImageViewer(ProtocolViewer):
 
 
 
-        for ax in fig.get_axes():
-            ax.label_outer()
-
-
-
 
     def _viewRawDeformation(self, paramName):
         components = self.displayRawDeformation.get()

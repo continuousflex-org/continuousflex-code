@@ -275,12 +275,6 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                       label='Mean value for the Gaussian distribution')
         group.addParam('StdPsi', params.FloatParam, default=90.0,
                       label='Standard deviation for the Gaussian distribution')
-
-
-
-
-
-
         # form.addParallelSection(threads=0, mpi=8)
 
         # --------------------------- INSERT steps functions --------------------------------------------
