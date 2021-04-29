@@ -25,12 +25,12 @@
 from os.path import basename
 
 from pwem.convert.atom_struct import cifToPdb
-from pyworkflow.utils import replaceBaseExt, replaceExt
+from pyworkflow.utils import replaceBaseExt, replaceExt, getExt
 from pyworkflow.utils import isPower2, getListFromRangeString
 from pyworkflow.utils.path import copyFile, cleanPath, createLink
 import pyworkflow.protocol.params as params
 from pwem.protocols import ProtAnalysis3D
-
+from pwem.convert import cifToPdb
 from pyworkflow.protocol.params import NumericRangeParam
 import pwem as em
 import pwem.emlib.metadata as md
@@ -740,7 +740,12 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
     def generate_copies_of_volume(self):
         fn_volume = self._getExtraPath('reference')
         if(self.refAtomic.get()):
-            params = " -i " + self.refAtomic.get().getFileName()
+            pdbFn = self.refAtomic.get().getFileName()
+            if getExt(pdbFn) == ".cif":
+                pdbFn2 = replaceBaseExt(pdbFn, 'pdb')
+                cifToPdb(pdbFn, pdbFn2)
+                pdbFn = pdbFn2
+            params = " -i " + pdbFn
             params += " -o " + fn_volume
             params += " --sampling " + str(self.samplingRate.get())
             params += " --size " + str(self.volumeSize.get())
