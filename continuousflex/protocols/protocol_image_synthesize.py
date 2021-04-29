@@ -1,4 +1,3 @@
-# **************************************************************************
 # * Authors:  Mohamad Harastani          (mohamad.harastani@upmc.fr)
 # *           Rémi Vuillemot             (remi.vuillemot@upmc.fr)
 # *
@@ -31,7 +30,8 @@ from pwem.protocols import ProtAnalysis3D
 from pwem.utils import runProgram
 from pyworkflow.protocol.params import NumericRangeParam
 from pyworkflow.utils import getListFromRangeString
-from pyworkflow.utils import replaceExt
+from pyworkflow.utils import replaceExt, getExt, replaceBaseExt
+from pwem.convert import cifToPdb
 from xmipp3.convert import (writeSetOfParticles)
 from pyworkflow.utils.path import copyFile, createLink
 import numpy as np
@@ -512,7 +512,12 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
     def generate_links_to_volume(self):
         fn_volume = self._getExtraPath('reference')
         if(self.refAtomic.get()):
-            params = " -i " + self.refAtomic.get().getFileName()
+            pdbFn = self.refAtomic.get().getFileName()
+            if getExt(pdbFn) == ".cif":
+                pdbFn2 = replaceBaseExt(pdbFn, 'pdb')
+                cifToPdb(pdbFn, pdbFn2)
+                pdbFn = pdbFn2
+            params = " -i " + pdbFn
             params += " -o " + fn_volume
             params += " --sampling " + str(self.samplingRate.get())
             params += " --size " + str(self.volumeSize.get())
