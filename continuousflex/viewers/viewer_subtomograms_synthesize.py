@@ -36,6 +36,8 @@ from continuousflex.protocols import FlexProtSynthesizeSubtomo
 import xmipp3
 import pwem.emlib.metadata as md
 from pwem.viewers import ObjectView
+import matplotlib.pyplot as plt
+from continuousflex.protocols.protocol_subtomogrmas_synthesize import NMA_YES
 
 class FlexProtSynthesizeSubtomoViewer(ProtocolViewer):
     """ Visualization of results from synthesized subtomogrmas
@@ -56,18 +58,23 @@ class FlexProtSynthesizeSubtomoViewer(ProtocolViewer):
     def _defineParams(self, form):
         form.addSection(label='Visualization')
         form.addParam('displayRawDeformation', StringParam, default='7 8',
+                      condition=self.protocol.confVar.get() == NMA_YES,
                       label='Display the computed normal-mode amplitudes',
                       help='Type 7 to see the histogram of amplitudes along mode 7; \n'
                            'type 8 to see the histogram of amplitudes along mode 8, etc.\n'
                            'Type 7 8 to see the 2D plot of amplitudes along modes 7 and 8.\n'
                            'Type 7 8 9 to see the 3D plot of amplitudes along modes 7, 8 and 9; etc.'
                            )
+        form.addParam('displayHists', LabelParam,
+                      label="Display shift and angle histograms",
+                      help="Display shift and angle histograms")
         form.addParam('displayVolumes', LabelParam,
                       label="Display volumes",
                       help="Display the volumes that are generated")
 
     def _getVisualizeDict(self):
         return {'displayRawDeformation': self._viewRawDeformation,
+                'displayHists': self._viewHists,
                 'displayVolumes': self._viewVolumes,
                 } 
                         
@@ -75,6 +82,38 @@ class FlexProtSynthesizeSubtomoViewer(ProtocolViewer):
         volumes = self.protocol.outputVolumes
         return [ObjectView(self._project, volumes.strId(), volumes.getFileName())]
 
+    def _viewHists(self, paramName):
+        mdVolumes = md.MetaData(self.protocol._getExtraPath('GroundTruth.xmd'))
+        X = []
+        Y = []
+        Z = []
+        Rot = []
+        Tilt= []
+        Psi = []
+        for objId in mdVolumes:
+            X.append(mdVolumes.getValue(md.MDL_SHIFT_X,objId))
+            Y.append(mdVolumes.getValue(md.MDL_SHIFT_Y, objId))
+            Z.append(mdVolumes.getValue(md.MDL_SHIFT_Z, objId))
+            Rot.append(mdVolumes.getValue(md.MDL_ANGLE_ROT, objId))
+            Tilt.append(mdVolumes.getValue(md.MDL_ANGLE_TILT, objId))
+            Psi.append(mdVolumes.getValue(md.MDL_ANGLE_PSI, objId))
+
+        fig, ax = plt.subplots(2, 3)
+
+        fig.suptitle('Histogram of generated rigid-body paramerers')
+        ax[0,0].hist(X, bins=25)
+        ax[0,0].set_title('Shift X')
+        ax[0,1].hist(Y, bins=25)
+        ax[0,1].set_title('Shift Y')
+        ax[0,2].hist(Z, bins=25)
+        ax[0,2].set_title('Shift Z')
+        ax[1,0].hist(Rot, bins=25)
+        ax[1,0].set_title('Rot')
+        ax[1,1].hist(Tilt, bins=25)
+        ax[1,1].set_title('Tilt')
+        ax[1,2].hist(Psi, bins=25)
+        ax[1,2].set_title('Psi')
+        plt.show()
 
     def _viewRawDeformation(self, paramName):
         components = self.displayRawDeformation.get()

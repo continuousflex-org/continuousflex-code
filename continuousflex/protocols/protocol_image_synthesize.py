@@ -23,30 +23,19 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
 
-from os.path import basename
-
-from pwem.convert.atom_struct import cifToPdb
-from pyworkflow.utils import replaceBaseExt, replaceExt, getParentFolder
-
-from pyworkflow.utils import isPower2, getListFromRangeString
-from pyworkflow.utils.path import copyFile, cleanPath
-import pyworkflow.protocol.params as params
-from pwem.protocols import ProtAnalysis3D
-
-from pyworkflow.protocol.params import NumericRangeParam
-import pwem as em
-import pwem.emlib.metadata as md
-from xmipp3.base import XmippMdRow
-from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
-                            getImageLocation, createItemMatrix,
-                            setXmippAttributes)
-from .convert import modeToRow
-from pwem.objects import AtomStruct, Volume
-import xmipp3
 import os
-import numpy as np
+import pwem.emlib.metadata as md
+import pyworkflow.protocol.params as params
+import xmipp3
+from pwem.protocols import ProtAnalysis3D
 from pwem.utils import runProgram
-
+from pyworkflow.protocol.params import NumericRangeParam
+from pyworkflow.utils import getListFromRangeString
+from pyworkflow.utils import replaceExt
+from xmipp3.convert import (writeSetOfParticles)
+from pyworkflow.utils.path import copyFile, createLink
+import numpy as np
+from math import cos, sin, pi
 
 np.random.seed(0)
 
@@ -57,6 +46,7 @@ MODE_RELATION_LINEAR = 0
 MODE_RELATION_3CLUSTERS = 1
 MODE_RELATION_MESH = 2
 MODE_RELATION_RANDOM = 3
+MODE_RELATION_PARABOLA = 4
 
 MISSINGWEDGE_YES = 0
 MISSINGWEDGE_NO = 1
@@ -70,8 +60,12 @@ RECONSTRUCTION_WBP = 1
 NOISE_CTF_YES = 0
 NOISE_CTF_NO = 1
 
-FULL_TOMOGRAM_YES= 0
-FULL_TOMOGRAM_NO = 1
+NMA_NO = 0
+NMA_YES = 1
+
+ROTATION_UNIFORM = 0
+ROTATION_GAUSS = 1
+
 
 class FlexProtSynthesizeImages(ProtAnalysis3D):
     """ Protocol for synthesizing images. """
@@ -80,11 +74,22 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
-        form.addParam('inputModes', params.PointerParam, pointerClass='SetOfNormalModes',
+        form.addParam('confVar', params.BooleanParam, default=NMA_YES,
+                      label='Simulate conformational variability?',
+                      help='If yes, you need to use normal mode analysis. If no, the given volume or atomic structure '
+                           'will be projected into simulated particle images.')
+        group1 = form.addGroup('Select an atomic structure OR an EM volume', condition='confVar==%d' % NMA_NO)
+        group1.addParam('refAtomic', params.PointerParam ,pointerClass='AtomStruct', allowsNull=True, label='atomic structure')
+        group1.addParam('refVolume', params.PointerParam ,pointerClass='Volume', allowsNull=True, label='EM volume')
+
+        group2 = form.addGroup('conformational variability', condition='confVar==%d' % NMA_YES)
+        group2.addParam('inputModes', params.PointerParam, pointerClass='SetOfNormalModes',
+                      allowsNull=True,
                       label="Normal modes",
                       help='Set of modes computed by normal mode analysis.')
-        form.addParam('modeList', NumericRangeParam,
+        group2.addParam('modeList', NumericRangeParam,
                       label="Modes selection",
+                      allowsNull=True,
                       default='7-8',
                       help='Select the normal modes that will be used for image synthesis. \n'
                            'It is usually two modes that should be selected, unless if the relationship is linear or random.\n'
@@ -93,25 +98,32 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                            ' "7,8-10" -> [7,8,9,10]\n'
                            ' "8, 10, 12" -> [8,10,12]\n'
                            ' "8 9, 10-12" -> [8,9,10,11,12])\n')
-        form.addParam('modeRelationChoice', params.EnumParam, default=MODE_RELATION_LINEAR,
-                      choices=['Linear relationship', '3 Clusters', 'Grid', 'Random'],
+        group2.addParam('modeRelationChoice', params.EnumParam, default=MODE_RELATION_LINEAR,
+                      allowsNull=True,
+                      choices=['Linear relationship', '3 Clusters', 'Grid', 'Random', 'Upper half circle'],
                       label='Relationship between the modes',
                       help='linear relationship: all the selected modes will have equal amplitudes. \n'
                            '3 clusters: the volumes will be devided exactly into three classes.\n'
                            'Grid: the amplitudes will be in a grid shape (grid size is square of what grid step).\n'
-                           'Random: all the amplitudes will be random in the given range')
-        form.addParam('centerPoint', params.IntParam, default=100,
+                           'Random: all the amplitudes will be random in the given range.\n'
+                           'Parabolic: The relationship between two modes will be upper half circle.')
+        group2.addParam('centerPoint', params.IntParam, default=100,
+                      allowsNull=True,
                       condition='modeRelationChoice==%d' % MODE_RELATION_3CLUSTERS,
                       label='Center point',
                       help='This number will be used to determine the distance between the clusters'
                            'center1 = (-center_point, 0)'
                            'center2 = (center_point, 0)'
                            'center3 = (0, center_point)')
-        form.addParam('modesAmplitudeRange', params.IntParam, default=150,
-                      condition='modeRelationChoice==%d or modeRelationChoice==%d or modeRelationChoice==%d' % (MODE_RELATION_LINEAR,MODE_RELATION_MESH, MODE_RELATION_RANDOM),
-                      label='Amplitude range N --> [-N, N]',
-                      help='Choose the number N for which the generated normal mode amplitudes are in the range of [-N, N]')
-        form.addParam('meshRowPoints', params.IntParam, default=6,
+        group2.addParam('modesAmplitudeRange', params.IntParam, default=150,
+                        allowsNull=True,
+                        condition='modeRelationChoice==%d or modeRelationChoice==%d or modeRelationChoice==%d'
+                                  ' or modeRelationChoice==%d' % (MODE_RELATION_LINEAR, MODE_RELATION_MESH,
+                                                                  MODE_RELATION_RANDOM, MODE_RELATION_PARABOLA),
+                        label='Amplitude range N --> [-N, N]',
+                        help='Choose the number N for which the generated normal mode amplitudes are in the range of [-N, N]')
+        group2.addParam('meshRowPoints', params.IntParam, default=6,
+                      allowsNull=True,
                       condition='modeRelationChoice==%d' % MODE_RELATION_MESH,
                       label='Grid number of steps',
                       help='This number will be the number of points in the row and the column (grid shape will be size*size)')
@@ -120,9 +132,11 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                       condition='modeRelationChoice!=%d'% MODE_RELATION_MESH,
                       help='Number of images that will be generated')
         form.addParam('samplingRate', params.FloatParam, default=2.2,
+                      condition='confVar==%d or refAtomic!=None' % NMA_YES,
                       label='Sampling rate',
                       help='The sampling rate (pixel size in Angstroms)')
         form.addParam('volumeSize', params.IntParam, default=64,
+                      condition='confVar==%d or refAtomic!=None' % NMA_YES,
                       label='Image size',
                       help='Image size in voxels (all volumes will be cubes)')
 
@@ -167,10 +181,100 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                       label='Simulate Rotations and Shifts',
                       help='If yes, the images will be rotated and shifted randomly in the range,'
                            ' otherwise no rotations nor shifts will be applied')
-        form.addParam('maxShift', params.FloatParam, default=5.0,
-                      label='Maximum Shift',
-                      help='The maximum shift from the center that will be applied')
+        form.addParam('shiftx', params.EnumParam, label='Shift-X distribution',
+                      condition='rotationShiftChoice==%d' % ROTATION_SHIFT_YES,
+                      choices=['Uniform distribution', 'Gaussian distribution'],
+                      default=ROTATION_UNIFORM,
+                      display=params.EnumParam.DISPLAY_COMBO,
+                      help='The distribution of random values')
+        groupx_uni = form.addGroup('Shift-X Uniform distribution', condition='rotationShiftChoice==%d and shiftx==%d'
+                                                                             % (ROTATION_SHIFT_YES,ROTATION_UNIFORM))
+        groupx_uni.addParam('LowX', params.FloatParam, default=-5.0,
+                      label='Lower value')
+        groupx_uni.addParam('HighX', params.FloatParam, default=5.0,
+                      label='Higher value')
+        groupx_gas = form.addGroup('Shift-X Gaussian distribution', condition='rotationShiftChoice==%d and shiftx==%d'
+                                                                             % (ROTATION_SHIFT_YES,ROTATION_GAUSS))
+        groupx_gas.addParam('MeanX', params.FloatParam, default=0.0,
+                      label='Mean value for the Gaussian distribution')
+        groupx_gas.addParam('StdX', params.FloatParam, default=2.0,
+                      label='Standard deviation for the Gaussian distribution')
 
+        form.addParam('shifty', params.EnumParam, label='Shift-Y distribution',
+                      condition='rotationShiftChoice==%d' % ROTATION_SHIFT_YES,
+                      choices=['Uniform distribution', 'Gaussian distribution'],
+                      default=ROTATION_UNIFORM,
+                      display=params.EnumParam.DISPLAY_COMBO,
+                      help='The distribution of random values')
+        group = form.addGroup('Shift-Y Uniform distribution', condition='rotationShiftChoice==%d and shifty==%d'
+                                                                             % (ROTATION_SHIFT_YES,ROTATION_UNIFORM))
+        group.addParam('LowY', params.FloatParam, default=-5.0,
+                      label='Lower value')
+        group.addParam('HighY', params.FloatParam, default=5.0,
+                      label='Higher value')
+        group = form.addGroup('Shift-Y Gaussian distribution', condition='rotationShiftChoice==%d and shifty==%d'
+                                                                             % (ROTATION_SHIFT_YES,ROTATION_GAUSS))
+        group.addParam('MeanY', params.FloatParam, default=0.0,
+                      label='Mean value for the Gaussian distribution')
+        group.addParam('StdY', params.FloatParam, default=2.0,
+                      label='Standard deviation for the Gaussian distribution')
+
+        form.addParam('rot', params.EnumParam, label='Rot angle distribution',
+                      condition='rotationShiftChoice==%d' % ROTATION_SHIFT_YES,
+                      choices=['Uniform distribution', 'Gaussian distribution'],
+                      default=ROTATION_UNIFORM,
+                      display=params.EnumParam.DISPLAY_COMBO,
+                      help='The distribution of random values')
+        group = form.addGroup('Rot angle Uniform distribution', condition='rotationShiftChoice==%d and rot==%d'
+                                                                             % (ROTATION_SHIFT_YES,ROTATION_UNIFORM))
+        group.addParam('LowRot', params.FloatParam, default=0.0,
+                      label='Lower value')
+        group.addParam('HighRot', params.FloatParam, default=360.0,
+                      label='Higher value')
+        group = form.addGroup('Rot angle Gaussian distribution', condition='rotationShiftChoice==%d and rot==%d'
+                                                                             % (ROTATION_SHIFT_YES,ROTATION_GAUSS))
+        group.addParam('MeanRot', params.FloatParam, default=180.0,
+                      label='Mean value for the Gaussian distribution')
+        group.addParam('StdRot', params.FloatParam, default=90.0,
+                      label='Standard deviation for the Gaussian distribution')
+
+        form.addParam('tilt', params.EnumParam, label='Tilt angle distribution',
+                      condition='rotationShiftChoice==%d' % ROTATION_SHIFT_YES,
+                      choices=['Uniform distribution', 'Gaussian distribution'],
+                      default=ROTATION_UNIFORM,
+                      display=params.EnumParam.DISPLAY_COMBO,
+                      help='The distribution of random values')
+        group = form.addGroup('Tilt angle Uniform distribution', condition='rotationShiftChoice==%d and tilt==%d'
+                                                                             % (ROTATION_SHIFT_YES,ROTATION_UNIFORM))
+        group.addParam('LowTilt', params.FloatParam, default=0.0,
+                      label='Lower value')
+        group.addParam('HighTilt', params.FloatParam, default=180.0,
+                      label='Higher value')
+        group = form.addGroup('Tilt angle Gaussian distribution', condition='rotationShiftChoice==%d and tilt==%d'
+                                                                             % (ROTATION_SHIFT_YES,ROTATION_GAUSS))
+        group.addParam('MeanTilt', params.FloatParam, default=90.0,
+                      label='Mean value for the Gaussian distribution')
+        group.addParam('StdTilt', params.FloatParam, default=45.0,
+                      label='Standard deviation for the Gaussian distribution')
+
+        form.addParam('psi', params.EnumParam, label='Psi angle distribution',
+                      condition='rotationShiftChoice==%d' % ROTATION_SHIFT_YES,
+                      choices=['Uniform distribution', 'Gaussian distribution'],
+                      default=ROTATION_UNIFORM,
+                      display=params.EnumParam.DISPLAY_COMBO,
+                      help='The distribution of random values')
+        group = form.addGroup('Psi angle Uniform distribution', condition='rotationShiftChoice==%d and psi==%d'
+                                                                             % (ROTATION_SHIFT_YES,ROTATION_UNIFORM))
+        group.addParam('LowPsi', params.FloatParam, default=0.0,
+                      label='Lower value')
+        group.addParam('HighPsi', params.FloatParam, default=360.0,
+                      label='Higher value')
+        group = form.addGroup('Psi angle Gaussian distribution', condition='rotationShiftChoice==%d and psi==%d'
+                                                                             % (ROTATION_SHIFT_YES,ROTATION_GAUSS))
+        group.addParam('MeanPsi', params.FloatParam, default=180.0,
+                      label='Mean value for the Gaussian distribution')
+        group.addParam('StdPsi', params.FloatParam, default=90.0,
+                      label='Standard deviation for the Gaussian distribution')
         # form.addParallelSection(threads=0, mpi=8)
 
         # --------------------------- INSERT steps functions --------------------------------------------
@@ -180,20 +284,25 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
         return self.inputModes.get().getPdb()
 
     def _insertAllSteps(self):
-        self._insertFunctionStep("generate_deformations")
-        self._insertFunctionStep("generate_volume_from_pdb")
-
-        if self.rotationShiftChoice == ROTATION_SHIFT_YES:
-            self._insertFunctionStep("generate_rotation_and_shift")
-
-        if self.rotationShiftChoice == ROTATION_SHIFT_NO:
-            self._insertFunctionStep("generate_zero_rotation_and_shift")
-
-        self._insertFunctionStep("project_volumes")
-
-        if self.noiseCTFChoice == NOISE_CTF_YES:
-            self._insertFunctionStep("apply_noise_and_ctf")
-
+        if(self.confVar.get()==NMA_YES):
+            self._insertFunctionStep("generate_deformations")
+            self._insertFunctionStep("generate_volume_from_pdb")
+            if self.rotationShiftChoice == ROTATION_SHIFT_YES:
+                self._insertFunctionStep("generate_rotation_and_shift")
+            if self.rotationShiftChoice == ROTATION_SHIFT_NO:
+                self._insertFunctionStep("generate_zero_rotation_and_shift")
+            self._insertFunctionStep("project_volumes")
+            if self.noiseCTFChoice == NOISE_CTF_YES:
+                self._insertFunctionStep("apply_noise_and_ctf")
+        else:
+            self._insertFunctionStep("generate_links_to_volume")
+            if self.rotationShiftChoice == ROTATION_SHIFT_YES:
+                self._insertFunctionStep("generate_rotation_and_shift")
+            if self.rotationShiftChoice == ROTATION_SHIFT_NO:
+                self._insertFunctionStep("generate_zero_rotation_and_shift")
+            self._insertFunctionStep("project_volumes")
+            if self.noiseCTFChoice == NOISE_CTF_YES:
+                self._insertFunctionStep("apply_noise_and_ctf")
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
@@ -204,7 +313,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
         if os.path.exists(pdb_name1):
             fnPDB = pdb_name1
         else:
-            fnPBD = pdb_name2
+            fnPDB = pdb_name2
         # fnPDB = self.inputModes.get().getPdb().getFileName()
         # use the input relationship between the modes to generate normal mode amplitudes metadata
         fnModeList = replaceExt(self.inputModes.get().getFileName(),'xmd')
@@ -254,6 +363,12 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
             elif self.modeRelationChoice == MODE_RELATION_RANDOM:
                 amplitude=self.modesAmplitudeRange.get()
                 deformations[modeSelection-1] = np.random.uniform(-amplitude, amplitude, len(modeSelection))
+            elif self.modeRelationChoice == MODE_RELATION_PARABOLA:
+                amplitude=self.modesAmplitudeRange.get()
+                rv = np.random.uniform(0,1)
+                point = (amplitude*cos(rv*pi), amplitude*sin(rv*pi))
+                deformations[modeSelection-1] = point
+
             elif self.modeRelationChoice == MODE_RELATION_MESH:
                 new_point=(mode7_samples[i],mode8_samples[i])
                 deformations[modeSelection - 1] = new_point
@@ -263,14 +378,15 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
 
             params = " --pdb " + fnPDB
             params+= " --nma " + fnModeList
-            params+= " -o " + self._getExtraPath(str(i+1).zfill(5)+'_deformed.pdb')
+            params+= " -o " + self._getExtraPath(str(i+1).zfill(5)+'_df.pdb')
             params+= " --deformations " + ' '.join(str(i) for i in deformations)
             runProgram('xmipp_pdb_nma_deform', params)
 
-            subtomogramMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i+1).zfill(5)+'_reconstructed'+'.vol'), subtomogramMD.addObject())
+            subtomogramMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i+1).zfill(5)+'_projected'+'.spi'), subtomogramMD.addObject())
             subtomogramMD.setValue(md.MDL_NMA, list(deformations), i+1)
 
         subtomogramMD.write(deformationFile)
+
 
 
     def generate_volume_from_pdb(self):
@@ -279,7 +395,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
         else:
             numberOfVolumes = self.numberOfVolumes.get()
         for i in range(numberOfVolumes):
-            params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_deformed.pdb')
+            params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_df.pdb')
             params += " --sampling " + str(self.samplingRate.get())
             params += " --size " + str(self.volumeSize.get())
             params += " -v 0 --centerPDB "
@@ -293,11 +409,26 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
             numberOfVolumes = self.numberOfVolumes.get()
 
         for i in range(numberOfVolumes):
-            rot1 = 360 * np.random.uniform()
-            tilt1 = 180 * np.random.uniform()
-            psi1 = 360 * np.random.uniform()
-            shift_x1 = self.maxShift.get() * np.random.uniform(-1,1)
-            shift_y1 = self.maxShift.get() * np.random.uniform(-1,1)
+            if (self.shiftx.get()==ROTATION_UNIFORM):
+                shift_x1 = np.random.uniform(self.LowX.get(), self.HighX.get())
+            else:
+                shift_x1 = np.random.normal(self.MeanX.get(), self.StdX.get())
+            if (self.shifty.get()==ROTATION_UNIFORM):
+                shift_y1 = np.random.uniform(self.LowY.get(), self.HighY.get())
+            else:
+                shift_y1 = np.random.normal(self.MeanY.get(), self.StdY.get())
+            if (self.rot.get()==ROTATION_UNIFORM):
+                rot1 = np.random.uniform(self.LowRot.get(), self.HighRot.get())
+            else:
+                rot1 = np.random.normal(self.MeanRot.get(), self.StdRot.get())
+            if (self.tilt.get()==ROTATION_UNIFORM):
+                tilt1 = np.random.uniform(self.LowTilt.get(), self.HighTilt.get())
+            else:
+                tilt1 = np.random.normal(self.MeanTilt.get(), self.StdTilt.get())
+            if (self.psi.get()==ROTATION_UNIFORM):
+                psi1 = np.random.uniform(self.LowPsi.get(), self.HighPsi.get())
+            else:
+                psi1 = np.random.normal(self.MeanPsi.get(), self.StdPsi.get())
             subtomogramMD.setValue(md.MDL_SHIFT_X, shift_x1, i + 1)
             subtomogramMD.setValue(md.MDL_SHIFT_Y, shift_y1, i + 1)
             subtomogramMD.setValue(md.MDL_ANGLE_ROT, rot1, i + 1)
@@ -333,7 +464,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
             numberOfVolumes = self.numberOfVolumes.get()
         sizeX = self.volumeSize.get()
         sizeY = self.volumeSize.get()
-        volumeName = "_deformed.vol"
+        volumeName = "_df.vol"
         subtomogramMD = md.MetaData(self._getExtraPath('GroundTruth.xmd'))
         for i in range(numberOfVolumes):
             rot = subtomogramMD.getValue(md.MDL_ANGLE_ROT, i+1)
@@ -348,8 +479,6 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
             runProgram('xmipp_phantom_project', params)
 
     def apply_noise_and_ctf(self):
-        pass
-
         if self.modeRelationChoice.get() is MODE_RELATION_MESH:
             numberOfVolumes = self.meshRowPoints.get() * self.meshRowPoints.get()
         else:
@@ -380,6 +509,36 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
             params_j += " --ctf " + self._getExtraPath('ctf.param')
             runProgram('xmipp_ctf_phase_flip', params_j)
 
+    def generate_links_to_volume(self):
+        fn_volume = self._getExtraPath('reference')
+        if(self.refAtomic.get()):
+            params = " -i " + self.refAtomic.get().getFileName()
+            params += " -o " + fn_volume
+            params += " --sampling " + str(self.samplingRate.get())
+            params += " --size " + str(self.volumeSize.get())
+            params += " -v 0 --centerPDB "
+            runProgram('xmipp_volume_from_pdb', params)
+        else:
+            # Convert to spider format in case it is MRC
+            params = "-i " + self.refVolume.get().getFileName()
+            params += " -o " + fn_volume + ".vol --type vol"
+            runProgram('xmipp_image_convert', params)
+            # print(self.refVolume.get().getFileName())
+
+        if self.modeRelationChoice.get() is MODE_RELATION_MESH:
+            numberOfVolumes = self.meshRowPoints.get()*self.meshRowPoints.get()
+        else:
+            numberOfVolumes = self.numberOfVolumes.get()
+
+        deformationFile = self._getExtraPath('GroundTruth.xmd')
+        imagesMD = md.MetaData()
+        for i in range(numberOfVolumes):
+            Vol_i = self._getExtraPath(str(i + 1).zfill(5) + '_df.vol')
+            createLink(fn_volume+'.vol',Vol_i)
+            imagesMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i + 1).zfill(5) + '_projected' + '.spi'),
+                                   imagesMD.addObject())
+
+        imagesMD.write(deformationFile)
 
     def createOutputStep(self):
         # first making a metadata for only the images:
@@ -390,7 +549,11 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
         # now creating the output set of images as output:
         partSet = self._createSetOfParticles('images')
         xmipp3.convert.readSetOfParticles(out_mdfn, partSet)
-        partSet.setSamplingRate(self.samplingRate.get())
+        if (self.refVolume.get()):
+            sr = self.refVolume.get().getSamplingRate()
+        else:
+            sr = self.samplingRate.get()
+        partSet.setSamplingRate(sr)
         self._defineOutputs(outputImages=partSet)
 
     # --------------------------- INFO functions --------------------------------------------
