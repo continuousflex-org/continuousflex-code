@@ -71,21 +71,21 @@ class FlexProtVolumeDenoise(ProtAnalysis3D):
                       label='Noise distribution', display=params.EnumParam.DISPLAY_COMBO,
                       help='Noise distribution (either Gaussian or Rician)')
         form.addParam('sigma_choice', params.EnumParam,
-                      choices=['Automatically estimate sigma', 'Set a value for sigma'],
-                      default=0,
+                      choices=['Automatically estimate sigma', 'Set a value for sigma (recommended)'],
+                      default=1,
                       label='Sigma choice', display=params.EnumParam.DISPLAY_COMBO,
                       help='Sigma is the standard deviation of data noise')
-        form.addParam('sigma', params.FloatParam, default=0, allowsNull=True,
+        form.addParam('sigma', params.FloatParam, default=0.2, allowsNull=True,
                       condition='sigma_choice==%d' % 1,
                       label='Sigma',
                       help='estimated standard deviation of data noise '
                            'defines the strength of the processing (high value gives smooth images)')
         form.addParam('profile', params.EnumParam,
-                      choices=['lc', 'np', 'mp'],
+                      choices=['low complexity profile', 'normal profile', 'modified profile (recommended)'],
                       default=PROFILE_MP,
                       label='Noise profile', display=params.EnumParam.DISPLAY_COMBO,
                       help='lc --> low complexity profile, '
-                           ' np --> normal profile'
+                           ' np --> normal profile,'
                            ' mp --> modified profile')
         form.addParam('do_wiener', params.BooleanParam, allowsNull=True,
                       default=False,
@@ -106,8 +106,13 @@ class FlexProtVolumeDenoise(ProtAnalysis3D):
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
         # Write a metadata with the volumes
-        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
-
+        try:
+            xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
+        except:
+            mdF = md.MetaData()
+            mdF.setValue(md.MDL_IMAGE, self.inputVolumes.get().getFileName(), mdF.addObject())
+            mdF.write(self.imgsFn)
+            pass
 
     def denoise_b4md(self):
         distribution = ''

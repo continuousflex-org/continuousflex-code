@@ -54,6 +54,35 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
+        form.addSection(label='Settings')
+        group = form.addGroup('Choose what processes you want to perform:')
+        group.addParam('FillWedge', params.BooleanParam, default=True,
+                       label='Correct the missing wedge?',
+                       help='This step will correct the missing wedge by filling it with the average'
+                            ' of each iteration.')
+        group.addParam('tiltLow', params.IntParam, default=-60,
+                      condition='FillWedge==%d' % True,
+                      label='Lower tilt value',
+                      help='The lower tilt angle used in obtaining the tilt series')
+        group.addParam('tiltHigh', params.IntParam, default=60,
+                      condition='FillWedge==%d' % True,
+                      label='Upper tilt value',
+                      help='The upper tilt angle used in obtaining the tilt series')
+        group.addParam('Alignment_refine', params.BooleanParam, default=True,
+                       label='Refine the rigid-body alignment?',
+                       help='This step will refine the rigid-body alignment given a previous run of subtomogram averaging'
+                            ' in the workspace')
+        group.addParam('NumOfIters', params.IntParam, default=3,
+                       condition='Alignment_refine',
+                       label='Refinment iterations', help='How many times you want to iterate to perform'
+                                                         ' subtomogram alignment refinement.')
+        group.addParam('ApplyAlignment', params.EnumParam,
+                       label='Apply volume/subtomogam alignment?',
+                       choices=['Yes'],
+                       default=REFERENCE_EXT,
+                       display=params.EnumParam.DISPLAY_HLIST,
+                       help='This protocol by default applies previous StA alignment on the subtomograms.')
+
         form.addSection(label='Input')
         form.addParam('inputVolumes', params.PointerParam,
                       pointerClass='SetOfVolumes,Volume',
@@ -94,66 +123,47 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                       label='Are those parameters come from Scipion/Xmipp?',
                       help='If the original alignment was done on Dynamo or if the alignment was done '
                            'without missing wedge compensation, switch this to no')
-        form.addParam('NumOfIters', params.IntParam, default=1,
-                      label='Refinment iterations', help='How many times you want to iterate while performing'
-                                                         ' subtomogram alignment refinement.')
-        form.addSection(label='Missing wedge correction')
-        form.addParam('FillWedge', params.BooleanParam,
-                      default=True,
-                      label='Do you want to correct the missing wedge at each iteration?',
-                      help='If true, at each iteration, the missing wedge will be corrected by adding the average.'
-                           ' Choose NO if the data was missing wedge corrected using another method.')
-        form.addParam('tiltLow', params.IntParam, default=-60,
-                      # expertLevel=params.LEVEL_ADVANCED,
-                      condition='FillWedge==%d' % True,
-                      label='Lower tilt value',
-                      help='The lower tilt angle used in obtaining the tilt series')
-        form.addParam('tiltHigh', params.IntParam, default=60,
-                      # expertLevel=params.LEVEL_ADVANCED,
-                      condition='FillWedge==%d' % True,
-                      label='Upper tilt value',
-                      help='The upper tilt angle used in obtaining the tilt series')
 
-        form.addSection(label='3D OpticalFLow parameters')
-        form.addParam('pyr_scale', params.FloatParam, default=0.5,
+        form.addSection(label='combined rigid-body & elastic alignment')
+        group = form.addGroup('Optical flow parameters', condition='Alignment_refine')
+        group.addParam('pyr_scale', params.FloatParam, default=0.5,
                       label='pyr_scale',
                       help='Multiscaling relationship')
-        form.addParam('levels', params.IntParam, default=4,
+        group.addParam('levels', params.IntParam, default=4,
                       label='levels',
                       help='Number of pyramid levels')
-        form.addParam('winsize', params.IntParam, default=10,
+        group.addParam('winsize', params.IntParam, default=10,
                       label='winsize',
                       help='window size')
-        form.addParam('iterations', params.IntParam, default=10,
+        group.addParam('iterations', params.IntParam, default=10,
                       label='iterations',
                       help='iterations')
-        form.addParam('poly_n', params.IntParam, default=5,
+        group.addParam('poly_n', params.IntParam, default=5,
                       label='poly_n',
                       help='Polynomial order for the relationship between the neighborhood pixels')
-        form.addParam('poly_sigma', params.FloatParam, default=1.2,
+        group.addParam('poly_sigma', params.FloatParam, default=1.2,
                       label='poly_sigma',
                       help='polynomial constant')
-        form.addHidden('flags', params.IntParam, default=0,
+        group.addHidden('flags', params.IntParam, default=0,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='flags',
                       help='flag to pass for the optical flow')
-        form.addHidden('factor1', params.IntParam, default=100,
+        group.addHidden('factor1', params.IntParam, default=100,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='factor1',
                       help='this factor will be multiplied by the gray levels of each subtomogram')
-        form.addHidden('factor2', params.IntParam, default=100,
+        group.addHidden('factor2', params.IntParam, default=100,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='factor2',
                       help='this factor will be multiplied by the gray levels of the reference')
-
-        form.addSection(label='rigid-body alignment')
-        form.addParam('frm_freq', params.FloatParam, default=0.25,
+        group = form.addGroup('rigid-body alignment (refinement)', condition='Alignment_refine',)
+        group.addParam('frm_freq', params.FloatParam, default=0.25,
                       # expertLevel=params.LEVEL_ADVANCED,
                       label='Maximum cross correlation frequency',
                       help='The normalized frequency should be between 0 and 0.5 '
                            'The more it is, the bigger the search frequency is, the more time it demands, '
                            'keeping it as default is recommended.')
-        form.addParam('frm_maxshift', params.IntParam, default=4,
+        group.addParam('frm_maxshift', params.IntParam, default=4,
                       # expertlevel=params.LEVEL_ADVANCED,
                       label='Maximum shift for rigid body refinement (in pixels)',
                       help='The maximum shift is a number between 1 and half the size of your volume. '

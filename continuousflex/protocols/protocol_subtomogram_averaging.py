@@ -49,12 +49,12 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
     def _defineParams(self, form):
         form.addSection(label='Input')
         form.addParam('inputVolumes', params.PointerParam,
-                      pointerClass='SetOfVolumes,Volume',
+                      pointerClass='SetOfVolumes',
                       label="Input volume(s)", important=True,
                       help='Select volumes')
         form.addParam('StartingReference', params.EnumParam,
-                      choices=['start from scratch', 'import a volume file and use it as reference',
-                               'select a volume and use as reference'],
+                      choices=['start from scratch', 'browse for a volume file and use it as reference',
+                               'select a volume from the workspace and use as reference'],
                       default=REFERENCE_NONE,
                       label='Starting reference', display=params.EnumParam.DISPLAY_COMBO,
                       help='Align from scratch of choose a template')
@@ -71,7 +71,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         form.addParam('NumOfIters', params.IntParam, default=10,
                       label='Number of iterations', help='How many times you want to iterate while performing'
                                                          ' subtomogram alignment and averaging.')
-        form.addParam('dynamoTable', params.PathParam, allowsNull=True,
+        form.addParam('dynamoTable (Beta)', params.PathParam, allowsNull=True,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='Import a Dynamo table',
                       help='import a Dynamo table that contains the STA parameters. This option will evaluate '
@@ -101,7 +101,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                            'The more it is, the bigger the search frequency is, the more time it demands, '
                            'keeping it as default is recommended.')
         form.addParam('frm_maxshift', params.IntParam, default=10,
-                      expertlevel=params.LEVEL_ADVANCED,
+                      # expertlevel=params.LEVEL_ADVANCED,
                       label='Maximum shift for rigid body alignment (in pixels)',
                       help='The maximum shift is a number between 1 and half the size of your volume. '
                            'It represents the maximum distance searched in x,y and z directions. Keep as default'

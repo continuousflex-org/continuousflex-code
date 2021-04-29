@@ -45,7 +45,7 @@ METHOD_MCSFILL = 1
 
 class FlexProtMissingWedgeFilling(ProtAnalysis3D):
     """ Protocol for subtomogram missingwedge filling. """
-    _label = 'missing wedge filling'
+    _label = 'missing wedge correction'
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
@@ -64,7 +64,7 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         form.addSection('Method')
         form.addParam('Method', params.EnumParam,
                       choices=['MW fill with the average', 'MW restoration using monte carlo simulation'],
-                      default=METHOD_STAFILL,
+                      default=METHOD_MCSFILL,
                       label='Missing wedge (MW) correction method', display=params.EnumParam.DISPLAY_COMBO,
                       help='Fill the wedge by the average will use the subtomogram averaging process to fill the wedge'
                            ' of each subtomogram by the corresponding average region in Fourier space.'
@@ -113,18 +113,21 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         group2 = form.addGroup('MW restoration using monte carlo simulation',
                       condition='Method==%d' % METHOD_MCSFILL)
         group2.addParam('sigma_noise', params.FloatParam, default=0.2, allowsNull=True,
-                       label='noise sigma',
+                       label='noise sigma', important= True,
                        help='estimated standard deviation of data noise '
                             'defines the strength of the processing (high value gives smooth images)')
         group2.addParam('T', params.IntParam, default=300, allowsNull=True,
-                       label='number of iterations',
-                       help='number of iterations (default: 300)')
+                        label='number of iterations',
+                        expertLevel=params.LEVEL_ADVANCED,
+                        help='number of iterations (default: 300)')
         group2.addParam('Tb', params.IntParam, default=100, allowsNull=True,
-                       label='length of the burn-in phase (Tb)',
-                       help='First Tb samples are discarded (default: 100)')
+                        label='length of the burn-in phase (Tb)',
+                        expertLevel=params.LEVEL_ADVANCED,
+                        help='First Tb samples are discarded (default: 100)')
         group2.addParam('beta', params.FloatParam, default=0.00004, allowsNull=True,
-                       label='scale parameter (beta)',
-                       help='scale parameter, affects the acceptance rate (default: 0.00004)')
+                        label='scale parameter (beta)',
+                        expertLevel=params.LEVEL_ADVANCED,
+                        help='scale parameter, affects the acceptance rate (default: 0.00004)')
 
 
     # --------------------------- INSERT steps functions --------------------------------------------
@@ -156,7 +159,13 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
         # Write a metadata with the volumes
-        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self._getExtraPath('input.xmd'))
+        try:
+            xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self._getExtraPath('input.xmd'))
+        except:
+            mdF = md.MetaData()
+            mdF.setValue(md.MDL_IMAGE, self.inputVolumes.get().getFileName(), mdF.addObject())
+            mdF.write(self.imgsFn)
+            pass
 
     def doAlignmentStep_STAFILL_dynamo(self):
         # TODO: fix this bug
@@ -417,8 +426,11 @@ class FlexProtMissingWedgeFilling(ProtAnalysis3D):
         mdImgs.write(self.imgsFn)
 
     def doAlignmentStep_MCSFILL(self):
-        # get a copy of the input metadata
-        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
+        # get a copy of the input metadata unless if one volume is passed
+        try:
+            xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
+        except:
+            pass
         tempdir = self._getTmpPath()
         imgFn = self.imgsFn
         tiltLow = self.tiltLow.get()
