@@ -9,7 +9,7 @@ Installation
 ------------
 
 You will need to use `3.0 <https://github.com/I2PC/scipion/releases>`_ version of Scipion to be able to run these protocols. To install the plugin, you have two options:
-We you need help installing Scipion3, please refer to the Scipion Documentation `here <https://scipion-em.github.io/docs/docs/scipion-modes/how-to-install.html>`_
+We you need help installing Scipion3, please refer to the Scipion Documentation `here <https://scipion-em.github.io/docs/docs/scipion-modes/how-to-install.html>`__
 
 Make sure that you have cmake installed on your Linux system. For example, if you are using Ubuntu
  .. code-block::
@@ -67,17 +67,17 @@ Notes:
 
 References
 ----------
-[1] Jin Q, Sorzano CO, de la Rosa-Trevin JM, Bilbao-Castro JR, Nunez-Ramirez R, Llorca O, Tama F, Jonic S: Iterative elastic 3D-to-2D alignment method using normal modes for studying structural dynamics of large macromolecular complexes. Structure 2014, 22:496-506. `[Open-access] <http://www-ext.impmc.upmc.fr/~jonic/Papers/HEMNMA.pdf>`_
+[1] Jin Q, Sorzano CO, de la Rosa-Trevin JM, Bilbao-Castro JR, Nunez-Ramirez R, Llorca O, Tama F, Jonic S: Iterative elastic 3D-to-2D alignment method using normal modes for studying structural dynamics of large macromolecular complexes. Structure 2014, 22:496-506. `[Open-access] <http://www-ext.impmc.upmc.fr/~jonic/Papers/HEMNMA.pdf>`__
 
-[2] Jonic S: Computational methods for analyzing conformational variability of macromolecular complexes from cryo-electron microscopy images. Curr Opin Struct Biol 2017, 43:114-121. `[Link] <http://dx.doi.org/10.1016/j.sbi.2016.12.011>`_ `[Author’s version] <http://www-ext.impmc.upmc.fr/~jonic/Papers/CurrentOpinionStructBiol_Jonic_2017.pdf>`_
+[2] Jonic S: Computational methods for analyzing conformational variability of macromolecular complexes from cryo-electron microscopy images. Curr Opin Struct Biol 2017, 43:114-121. `[Link] <http://dx.doi.org/10.1016/j.sbi.2016.12.011>`__ `[Author’s version] <http://www-ext.impmc.upmc.fr/~jonic/Papers/CurrentOpinionStructBiol_Jonic_2017.pdf>`__
 
-[3] Harastani M, Sorzano CO, Jonic S: Hybrid Electron Microscopy Normal Mode Analysis with Scipion. Protein Sci 2020, 29:223-36. `[Open-access] <https://onlinelibrary.wiley.com/doi/epdf/10.1002/pro.3772>`_
+[3] Harastani M, Sorzano CO, Jonic S: Hybrid Electron Microscopy Normal Mode Analysis with Scipion. Protein Sci 2020, 29:223-36. `[Open-access] <https://onlinelibrary.wiley.com/doi/epdf/10.1002/pro.3772>`__
 
-[4] Sanchez Sorzano CO, Alvarez-Cabrera AL, Kazemi M, Carazo JM, Jonic S: StructMap: Elastic Distance Analysis of Electron Microscopy Maps for Studying Conformational Changes. Biophys J 2016, 110:1753-1765. `[Open-access] <http://www-ext.impmc.upmc.fr/~jonic/Papers/StructMap.pdf>`_
+[4] Sanchez Sorzano CO, Alvarez-Cabrera AL, Kazemi M, Carazo JM, Jonic S: StructMap: Elastic Distance Analysis of Electron Microscopy Maps for Studying Conformational Changes. Biophys J 2016, 110:1753-1765. `[Open-access] <http://www-ext.impmc.upmc.fr/~jonic/Papers/StructMap.pdf>`__
 
-[5] Harastani M, Eltsov M, Leforestier A, Jonic S: HEMNMA-3D: Cryo Electron Tomography Method Based on Normal Mode Analysis to Study Continuous Conformational Variability of Macromolecular Complexes. Front Mol Biosci 2021. `[Open-access] <https://www.frontiersin.org/articles/10.3389/fmolb.2021.663121/abstract>`_ (in press)
+[5] Harastani M, Eltsov M, Leforestier A, Jonic S: HEMNMA-3D: Cryo Electron Tomography Method Based on Normal Mode Analysis to Study Continuous Conformational Variability of Macromolecular Complexes. Front Mol Biosci 2021. `[Open-access] <https://www.frontiersin.org/articles/10.3389/fmolb.2021.663121/abstract>`__ (in press)
 
-[6] Jonic S, Sorzano CO, Thevenaz P, El-Bez C, De Carlo S, Unser M: Spline-based image-to-volume registration for three-dimensional electron microscopy. Ultramicroscopy 2005, 103:303-317. `[Author’s version] <http://www-ext.impmc.upmc.fr/~jonic/Papers/Ultramicroscopy_2005_v103_p303.pdf>`_
+[6] Jonic S, Sorzano CO, Thevenaz P, El-Bez C, De Carlo S, Unser M: Spline-based image-to-volume registration for three-dimensional electron microscopy. Ultramicroscopy 2005, 103:303-317. `[Author’s version] <http://www-ext.impmc.upmc.fr/~jonic/Papers/Ultramicroscopy_2005_v103_p303.pdf>`__
 
 
 # scipion-em-continuousflex
