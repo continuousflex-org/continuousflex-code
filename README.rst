@@ -52,20 +52,32 @@ versions > 3.0.15
 Protocols
 ---------
 
-* HEMNMA: Hybrid Electron-Microscopy Normal-Mode-Analysis
-* HEMNMA-3D: Extension of HEMNMA for cryo-ET macromolecular continuous conformational variability analysis
-* StructMap: Structural Mapping
+* HEMNMA: Hybrid Electron Microscopy Normal Mode Analysis method to interpret heterogeneity of a set of single particle cryo-EM images in terms of continuous macromolecular conformational transitions [1-3]
+* StructMap: Structural Mapping method to interpret heterogeneity of a set of single particle cryo-EM maps in terms of continuous conformational transitions [4]
+* HEMNMA-3D: Extension of HEMNMA to continuous conformational variability analysis of macromolecules from in situ cryo-ET subtomograms [5]
 
-Note: A reproduction of some utility codes with their corresponding licenses are contained in this plugin for subtomogram averaging, missing wedge correction, denoising and data reading. These codes are not used in the methods above, but they are made optional for data preprocessing and visualization.
+
+Notes:
+
+* The plugin additionally provides the test data and automated tests of the protocols in Scipion 3. The following two types of tests of HEMNMA and HEMNMA-3D can be produced by running, in the terminal, "scipion3 tests continuousflex.tests.test_workflow_HEMNMA" and “scipion3 tests continuousflex.tests.test_workflow_HEMNMA3D”, respectively: (1) tests of the entire protocol with the flexible references coming from an atomic structure and from an EM map; and (2) test of the alignment module (test run using 5 MPI threads).
+* HEMNMA additionally provides tools for synthesizing noisy and CTF-affected single particle cryo-EM images with flexible or rigid biomolecular conformations, for several types of conformational distributions, from a given atomic structure or an EM map. One part of the noise is applied on the ideal projections before and the other after the CTF, as described in [6].
+* HEMNMA-3D additionally provides tools for synthesizing noisy, CTF and missing wedge affected cryo-ET tomograms and single particle subtomograms with flexible or rigid biomolecular conformations, for several types of conformational distributions, from a given atomic structure or an EM map. One part of the noise is applied on the ideal projections before and the other after the CTF, as described in [6].
+* A reproduction of some utility codes with their corresponding licenses are contained in this plugin for subtomogram averaging, missing wedge correction, denoising and data reading. These codes are not used in the methods above, but they are made optional for data preprocessing and visualization.
+
 
 References
 ----------
-1. Harastani M, Sorzano CO, Jonić S. Hybrid Electron Microscopy Normal Mode Analysis with Scipion. Protein Science. 2020 Jan;29(1):223-36.
-2. Harastani M, Eltsove M, Leforestier A, Jonić S. HEMNMA-3D: Cryo Electron Tomography Method Based on Normal Mode Analysis to Study Continuous Conformational Variability of Macromolecular Complexes. Front. Mol. Biosci 2021.
-3. Jin Q, Sorzano CO, de la Rosa-Trevin JM, Bilbao-Castro JR, Nunez-Ramirez R, Llorca O, Tama F,Jonic S: Iterative elastic 3D-to-2D alignment method using normal modes for studying structural dynamics of large macromolecular complexes. Structure 2014, 22:496-506.
-4. Sorzano CO, de la Rosa-Trevin JM, Tama F, Jonic S: Hybrid Electron Microscopy Normal Mode Analysis graphical interface and protocol. J Struct Biol 2014, 188:134-141.
-5. Sanchez Sorzano CO, Alvarez-Cabrera AL, Kazemi M, Carazo JM, Jonic S: StructMap: Elastic Distance Analysis of Electron Microscopy Maps for Studying Conformational Changes. Biophys J 2016, 110:1753-1765.
+[1] Jin Q, Sorzano CO, de la Rosa-Trevin JM, Bilbao-Castro JR, Nunez-Ramirez R, Llorca O, Tama F, Jonic S: Iterative elastic 3D-to-2D alignment method using normal modes for studying structural dynamics of large macromolecular complexes. Structure 2014, 22:496-506. `[Open-access] <http://www-ext.impmc.upmc.fr/~jonic/Papers/HEMNMA.pdf>`_
 
+[2] Jonic S: Computational methods for analyzing conformational variability of macromolecular complexes from cryo-electron microscopy images. Curr Opin Struct Biol 2017, 43:114-121. `[Link] <http://dx.doi.org/10.1016/j.sbi.2016.12.011>`_ `[Author’s version] <http://www-ext.impmc.upmc.fr/~jonic/Papers/CurrentOpinionStructBiol_Jonic_2017.pdf>`_
+
+[3] Harastani M, Sorzano CO, Jonic S: Hybrid Electron Microscopy Normal Mode Analysis with Scipion. Protein Sci 2020, 29:223-36. `[Open-access] <https://onlinelibrary.wiley.com/doi/epdf/10.1002/pro.3772>`_
+
+[4] Sanchez Sorzano CO, Alvarez-Cabrera AL, Kazemi M, Carazo JM, Jonic S: StructMap: Elastic Distance Analysis of Electron Microscopy Maps for Studying Conformational Changes. Biophys J 2016, 110:1753-1765. `[Open-access] <http://www-ext.impmc.upmc.fr/~jonic/Papers/StructMap.pdf>`_
+
+[5] Harastani M, Eltsov M, Leforestier A, Jonic S: HEMNMA-3D: Cryo Electron Tomography Method Based on Normal Mode Analysis to Study Continuous Conformational Variability of Macromolecular Complexes. Front Mol Biosci 2021. `[Open-access] <https://www.frontiersin.org/articles/10.3389/fmolb.2021.663121/abstract>`_ (in press)
+
+[6] Jonic S, Sorzano CO, Thevenaz P, El-Bez C, De Carlo S, Unser M: Spline-based image-to-volume registration for three-dimensional electron microscopy. Ultramicroscopy 2005, 103:303-317. `[Author’s version] <http://www-ext.impmc.upmc.fr/~jonic/Papers/Ultramicroscopy_2005_v103_p303.pdf>`_
 
 
 # scipion-em-continuousflex
