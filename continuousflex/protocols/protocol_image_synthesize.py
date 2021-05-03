@@ -23,6 +23,8 @@
 # **************************************************************************
 
 import os
+import time
+
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
 import xmipp3
@@ -37,7 +39,6 @@ from pyworkflow.utils.path import copyFile, createLink
 import numpy as np
 from math import cos, sin, pi
 
-np.random.seed(0)
 
 NMA_ALIGNMENT_WAV = 0
 NMA_ALIGNMENT_PROJ = 1
@@ -139,6 +140,14 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                       condition='confVar==%d or refAtomic!=None' % NMA_YES,
                       label='Image size',
                       help='Image size in voxels (all volumes will be cubes)')
+        form.addParam('seedOption', params.BooleanParam, default=True,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='Random seed',
+                      help='Keeping it as True means that different runs will generate different images in terms '
+                           'of conforamtion and rigid-body parameters. If you set as False, then different runs will '
+                           'have the same conformations and angles '
+                           '(setting to False allows you to generate the same conformations and orientations with '
+                           'different noise values).')
 
         form.addSection(label='Noise and CTF')
         form.addParam('noiseCTFChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
@@ -284,6 +293,10 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
         return self.inputModes.get().getPdb()
 
     def _insertAllSteps(self):
+        if(self.seedOption.get()):
+            np.random.seed(int(time.time()))
+        else:
+            np.random.seed(0)
         if(self.confVar.get()==NMA_YES):
             self._insertFunctionStep("generate_deformations")
             self._insertFunctionStep("generate_volume_from_pdb")
