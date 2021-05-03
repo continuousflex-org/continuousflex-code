@@ -71,9 +71,9 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         form.addParam('NumOfIters', params.IntParam, default=10,
                       label='Number of iterations', help='How many times you want to iterate while performing'
                                                          ' subtomogram alignment and averaging.')
-        form.addParam('dynamoTable (Beta)', params.PathParam, allowsNull=True,
+        form.addParam('dynamoTable', params.PathParam, allowsNull=True,
                       expertLevel=params.LEVEL_ADVANCED,
-                      label='Import a Dynamo table',
+                      label='Import a Dynamo table (Beta)',
                       help='import a Dynamo table that contains the STA parameters. This option will evaluate '
                            'the average and transform the Dynamo table to Scipion metadata format')
         form.addSection(label='Missing-wedge Compensation')

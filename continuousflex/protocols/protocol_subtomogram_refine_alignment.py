@@ -180,19 +180,27 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         self._insertFunctionStep('convertInputStep')
         self._insertFunctionStep('prepareMetaData')
 
-        N = self.NumOfIters.get()
-        for i in range(1, N+1):
-            makePath(self._getExtraPath() + '/optical_flows_' + str(i))
-            if(self.FillWedge.get()):
-                self._insertFunctionStep('fillMissingWedge', i)
-            self._insertFunctionStep('applyAlignment',i)
-            self._insertFunctionStep('calculateOpticalFlows',i)
-            self._insertFunctionStep('warpByFlow',i)
-            self._insertFunctionStep('refineAlignment',i)
-            self._insertFunctionStep('combineRefinedAlignment',i)
-            self._insertFunctionStep('calculateNewAverage',i)
-        self._insertFunctionStep('createOutputStep', N)
+        N = 0
+        if (self.Alignment_refine.get()):
+            N = self.NumOfIters.get()
+            for i in range(1, N+1):
+                makePath(self._getExtraPath() + '/optical_flows_' + str(i))
+                if(self.FillWedge.get()):
+                    self._insertFunctionStep('fillMissingWedge', i)
+                self._insertFunctionStep('applyAlignment',i)
+                self._insertFunctionStep('calculateOpticalFlows',i)
+                self._insertFunctionStep('warpByFlow',i)
+                self._insertFunctionStep('refineAlignment',i)
+                self._insertFunctionStep('combineRefinedAlignment',i)
+                self._insertFunctionStep('calculateNewAverage',i)
 
+        if (self.FillWedge.get()):
+            self._insertFunctionStep('fillMissingWedge', N+1)
+        self._insertFunctionStep('applyAlignment', N+1)
+        if N:
+            self._insertFunctionStep('createOutputStep', N)
+        else:
+            self._insertFunctionStep('createOutputStep')
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
         # Write a metadata with the volumes
@@ -439,7 +447,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             if (isfile(path_flowx)):
                 continue
             else:
-                volumes_op_flowi = self.opflow_vols(path_vol0, path_vol_i, pyr_scale, levels, winsize, iterations,
+                volumes_op_flowi = self.opflow_vols(path_vol_i, path_vol0, pyr_scale, levels, winsize, iterations,
                                                     poly_n,
                                                     poly_sigma, factor1, factor2, path_flowx, path_flowy, path_flowz)
 
@@ -460,7 +468,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         for i in range(1, N + 1):
             print('Warping a copy of the reference volume by the optical flow ', i)
             flow_i = self.read_optical_flow_by_number(i, op_path=self._getExtraPath() + '/optical_flows_' + str(num) + '/')
-            warped_i = farneback3d.warp_by_flow(reference, flow_i)
+            warped_i = farneback3d.warp_by_flow(reference, np.float32(flow_i))
             warped_path_i = estVol_root + str(i).zfill(6) + '.spi'
             save_volume(warped_i, warped_path_i)
             mdWarped.setValue(md.MDL_IMAGE, warped_path_i, mdWarped.addObject())
@@ -645,8 +653,9 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         os.system("rm -f %(tempVol)s" % locals())
 
 
-    def createOutputStep(self, num):
+    def createOutputStep(self, num =1):
         # now creating the output set of aligned volumes:
+
         out_mdfn = self._getExtraPath('volumes_aligned_'+str(num)+'.xmd')
         partSet = self._createSetOfVolumes('aligned')
         xmipp3.convert.readSetOfVolumes(out_mdfn, partSet)
@@ -676,9 +685,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         vol0 = open_volume(path_vol1)
         vol1 = open_volume(path_vol0)
         # ranges are between 0 and 3.09, the values should be changed with some factor, otherwise the output is zero
-        # TODO: the normalization could be tried out with a proper scale, it is not needed if the StA average is used
-        # vol0 = self.normalize(vol0)
-        # vol1 = self.normalize(vol1)
+        # TODO: find a way to automate this normalization
         vol0 = vol0 * factor1
         vol1 = vol1 * factor2
         optflow = farneback3d.Farneback(
