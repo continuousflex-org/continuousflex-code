@@ -44,9 +44,7 @@ import xmipp3
 import os
 import numpy as np
 from pwem.utils import runProgram
-
-
-np.random.seed(0)
+import time
 
 NMA_ALIGNMENT_WAV = 0
 NMA_ALIGNMENT_PROJ = 1
@@ -153,6 +151,14 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                       condition='confVar==%d or refAtomic!=None' % NMA_YES,
                       label='Image size',
                       help='Volume size in voxels (all volumes will be cubes)')
+        form.addParam('seedOption', params.BooleanParam, default=True,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='Random seed',
+                      help='Keeping it as True means that different runs will generate different images in terms '
+                           'of conforamtion and rigid-body parameters. If you set as False, then different runs will '
+                           'have the same conformations and angles '
+                           '(setting to False allows you to generate the same conformations and orientations with '
+                           'different noise values).')
 
         form.addSection(label='Missing wedge parameters')
         form.addParam('missingWedgeChoice', params.EnumParam, default=MISSINGWEDGE_YES,
@@ -388,6 +394,10 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         return self.inputModes.get().getPdb()
 
     def _insertAllSteps(self):
+        if(self.seedOption.get()):
+            np.random.seed(int(time.time()))
+        else:
+            np.random.seed(0)
         if(self.confVar.get()==NMA_YES):
             self._insertFunctionStep("generate_deformations")
             self._insertFunctionStep("generate_volume_from_pdb")
