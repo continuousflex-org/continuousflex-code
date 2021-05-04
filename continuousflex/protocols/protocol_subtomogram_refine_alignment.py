@@ -85,7 +85,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
         form.addSection(label='Input')
         form.addParam('inputVolumes', params.PointerParam,
-                      pointerClass='SetOfVolumes,Volume',
+                      pointerClass='SetOfVolumes',
                       label="Input volumes/subtomograms", important=True,
                       help='Select volumes')
         group = form.addGroup('Reference volume: last iteration average of StA',
@@ -124,6 +124,10 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
         form.addSection(label='combined rigid-body & elastic alignment')
         group = form.addGroup('Optical flow parameters', condition='Alignment_refine')
+        group.addParam('N_GPU', params.IntParam, default=3, important=True, allowsNull=True,
+                              label = 'Parallel processes on GPU',
+                              help='This parameter indicates the number of volumes that will be processed in parallel'
+                                   ' (independently). The more powerful your GPU, the higher the number you can choose.')
         group.addParam('pyr_scale', params.FloatParam, default=0.5,
                       label='pyr_scale',
                       help='parameter specifying the image scale to build pyramids for each image (scale < 1).'

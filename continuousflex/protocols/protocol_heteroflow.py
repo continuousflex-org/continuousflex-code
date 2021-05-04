@@ -25,7 +25,7 @@ from pwem.protocols import ProtAnalysis3D
 import xmipp3.convert
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
-from pyworkflow.utils.path import makePath, copyFile
+from pyworkflow.utils.path import makePath, copyFile, createLink
 from os.path import basename
 from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
 from .utilities.spider_files3 import save_volume, open_volume
@@ -42,6 +42,8 @@ from os.path import basename, join, exists, isfile
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
 
+IMPORT_FLOWS = 0
+FIND_FLOWS = 1
 
 class FlexProtHeteroFlow(ProtAnalysis3D):
     """ Protocol for HeteroFlow. """
@@ -49,27 +51,42 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
-        form.addSection(label='Input')
-        form.addParam('inputVolumes', params.PointerParam,
-                      pointerClass='SetOfVolumes,Volume',
+        form.addSection(label='Settings')
+        group = form.addGroup('Choose what processes you want to perform:')
+        group.addParam('copy_opflows', params.EnumParam,
+                      choices=['Import optical flows from the last refinement iteration and analyze the heterogeneity',
+                               'Find optical flows for a set of ALIGNED volumes and analyze the heterogeneity'],
+                      default=IMPORT_FLOWS,
+                      label='Optical flows to analyze', display=params.EnumParam.DISPLAY_COMBO,
+                       help='You can choose to find the optical flows for a set of volumes or to import'
+                            ' precalculated optical flows from a refinement protocol previous run in the project'
+                            ' workspace')
+        group = form.addGroup('Protocol of: Missing wedge correction and combined rigid-body and elastic alignment',
+                              condition='copy_opflows==%d'% IMPORT_FLOWS)
+        group.addParam('refinementProt', params.PointerParam, pointerClass='FlexProtRefineSubtomoAlign',
+                       label='Point to the refinement protocol', allowsNull=True)
+
+        group = form.addGroup('Input', condition='copy_opflows==%d' % FIND_FLOWS)
+        group.addParam('inputVolumes', params.PointerParam,
+                      pointerClass='SetOfVolumes', allowsNull=True,
                       label="Input volume(s)", important=True,
                       help='Select volumes')
-        form.addParam('StartingReference', params.EnumParam,
+        group.addParam('StartingReference', params.EnumParam,
                       choices=['From an external volume file', 'Select a volume'],
                       default=REFERENCE_EXT,
                       label='Reference volume', display=params.EnumParam.DISPLAY_COMBO,
                       help='Either an external volume file or a subtomogram average')
-        form.addParam('ReferenceVolume', params.FileParam,
+        group.addParam('ReferenceVolume', params.FileParam,
                       pointerClass='params.FileParam', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_EXT,
                       label="Reference volume",
                       help='Choose a reference, typically from a STA previous run')
-        form.addParam('STAVolume', params.PointerParam,
+        group.addParam('STAVolume', params.PointerParam,
                       pointerClass='Volume', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_STA,
                       label="Selected volume",
                       help='Choose a reference, typically from a STA previous run')
-        form.addParam('WarpAndEstimate', params.BooleanParam,
+        group.addParam('WarpAndEstimate', params.BooleanParam,
                       expertLevel=params.LEVEL_ADVANCED,
                       default=True,
                       label='Save a warped version of the reference for each input volume?',
@@ -77,37 +94,46 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
                            'using the calculated optical flows, and calculate the cross correlation, mean square '
                            'distance and the mean absolute distance between the input volumes and estimated volumes')
         form.addSection(label='3D OpticalFLow parameters')
-        form.addParam('pyr_scale', params.FloatParam, default=0.5,
-                      label='pyr_scale',
-                      help='Multiscaling relationship')
-        form.addParam('levels', params.IntParam, default=4,
+        group = form.addGroup('Optical flows', condition='copy_opflows==%d' % FIND_FLOWS)
+        group.addParam('pyr_scale', params.FloatParam, default=0.5,
+                      label='pyr_scale', allowsNull=True,
+                       help='parameter specifying the image scale to build pyramids for each image (scale < 1).'
+                            ' A classic pyramid is of generally 0.5 scale, every new layer added, it is'
+                            ' halved to the previous one.')
+        group.addParam('levels', params.IntParam, default=4, allowsNull=True,
                       label='levels',
-                      help='Number of pyramid levels')
-        form.addParam('winsize', params.IntParam, default=10,
+                      help='evels=1 says, there are no extra layers (only the initial image).'
+                           ' It is the number of pyramid layers including the first image.')
+        group.addParam('winsize', params.IntParam, default=10, allowsNull=True,
                       label='winsize',
-                      help='window size')
-        form.addParam('iterations', params.IntParam, default=10,
+                      help='It is the average window size, larger the size, the more robust the algorithm is to noise,'
+                           ' and provide smaller conformation detection, though gives blurred motion fields.'
+                           ' You may try smaller window size for larger conformations but the method will be'
+                           ' more sensitive to noise.')
+        group.addParam('iterations', params.IntParam, default=10, allowsNull=True,
                       label='iterations',
-                      help='iterations')
-        form.addParam('poly_n', params.IntParam, default=5,
+                      help='Number of iterations to be performed at each pyramid level.')
+        group.addParam('poly_n', params.IntParam, default=5, allowsNull=True,
                       label='poly_n',
-                      help='Polynomial order for the relationship between the neighborhood pixels')
-        form.addParam('poly_sigma', params.FloatParam, default=1.2,
+                      help='It is typically 5 or 7, it is the size of the pixel neighbourhood which is used'
+                           ' to find polynomial expansion between the pixels.')
+        group.addParam('poly_sigma', params.FloatParam, default=1.2,
                       label='poly_sigma',
-                      help='polynomial constant')
-        form.addHidden('flags', params.IntParam, default=0,
+                      help='standard deviation of the gaussian that is for derivatives to be smooth as the basis of'
+                           ' the polynomial expansion. It can be 1.2 for poly= 5 and 1.5 for poly= 7.')
+        group.addHidden('flags', params.IntParam, default=0,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='flags',
                       help='flag to pass for the optical flow')
-        form.addHidden('use_gaussian_kernel', params.BooleanParam, default=True,
+        group.addHidden('use_gaussian_kernel', params.BooleanParam, default=True,
                       label='use_gaussian_kernel',
                       help='If yes, there will be a Guassian filter applied locally to '
                            'denoise and smooth the optical flow')
-        form.addHidden('factor1', params.IntParam, default=100,
+        group.addHidden('factor1', params.IntParam, default=100,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='factor1',
                       help='this factor will be multiplied by the gray levels of each subtomogram')
-        form.addHidden('factor2', params.IntParam, default=100,
+        group.addHidden('factor2', params.IntParam, default=100,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='factor2',
                       help='this factor will be multiplied by the gray levels of the reference')
@@ -116,10 +142,14 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
     def _insertAllSteps(self):
         # Define some outputs filenames
         self.imgsFn = self._getExtraPath('volumes.xmd')
-        makePath(self._getExtraPath() + '/optical_flows')
 
-        self._insertFunctionStep('convertInputStep')
-        self._insertFunctionStep('doAlignmentStep')
+        if(self.copy_opflows.get()==FIND_FLOWS):
+            makePath(self._getExtraPath() + '/optical_flows')
+            self._insertFunctionStep('convertInputStep')
+            self._insertFunctionStep('doAlignmentStep')
+        else:
+            self._insertFunctionStep('copyOpticalFlows')
+        self._insertFunctionStep('findCorrelationMatrix')
         if (self.WarpAndEstimate.get()):
             self._insertFunctionStep('warpByFlow')
         self._insertFunctionStep('createOutputStep')
@@ -127,7 +157,7 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
         # Write a metadata with the volumes
-        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self._getExtraPath('volumes.xmd'))
+        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
 
     def doAlignmentStep(self):
         tempdir = self._getTmpPath()
@@ -178,17 +208,32 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
                                                     poly_n, poly_sigma, use_gaussian_kernel, factor1, factor2,
                                                     path_flowx, path_flowy, path_flowz)
 
+    def findCorrelationMatrix(self):
+        imgFn = self.imgsFn
+        mdImgs = md.MetaData(imgFn)
+        N = 0
+        for objId in mdImgs:
+            N += 1
         metric_mat = np.zeros([N, N])
-
         for i in range(1, N + 1):
             print('finding the correlation matrix row ', i)
             flowi = self.read_optical_flow_by_number(i)
-            for j in range(1, N + 1):
+            for j in range(i, N + 1):
                 print('        column', j)
                 flowj = self.read_optical_flow_by_number(j)
-                metric_mat[i - 1, j - 1] = self.metric_opflow_vols(flowi, flowj)
+                metric_mat[i - 1, j - 1] = metric_mat[j - 1, i - 1] =  self.metric_opflow_vols(flowi, flowj)
+
         correlation_matrix = self._getExtraPath('data.csv')
         np.savetxt(correlation_matrix, metric_mat, delimiter=',')
+
+    def copyOpticalFlows(self):
+        # In this case we get from the refinment protocol the optical flows and the reference
+        self.imgsFn = self.refinementProt.get()._getExtraPath('input.xmd')
+        N = self.refinementProt.get().NumOfIters.get()
+        createLink(self.refinementProt.get()._getExtraPath() + '/optical_flows_' + str(N),
+                   self._getExtraPath() + '/optical_flows')
+        createLink(self.refinementProt.get()._getExtraPath('reference'+str(N+1)+'.spi'),
+                   self._getExtraPath('reference.spi'))
 
     def warpByFlow(self):
         makePath(self._getExtraPath() + '/estimated_volumes')
@@ -207,7 +252,7 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
         for i in range(1, N + 1):
             print('Warping a copy of the reference volume by the optical flow ', i)
             flow_i = self.read_optical_flow_by_number(i)
-            warped_i = farneback3d.warp_by_flow(reference, flow_i)
+            warped_i = farneback3d.warp_by_flow(reference, np.float32(flow_i))
             warped_path_i = estVol_root + str(i).zfill(6) + '.spi'
             save_volume(warped_i, warped_path_i)
 
@@ -241,7 +286,10 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
             # now creating the output set of volumes:
             partSet = self._createSetOfVolumes('Warped')
             xmipp3.convert.readSetOfVolumes(out_mdfn, partSet)
-            partSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
+            if (self.copy_opflows.get() == FIND_FLOWS):
+                partSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
+            else:
+                partSet.setSamplingRate(self.refinementProt.get().RefinedAverage.getSamplingRate())
             self._defineOutputs(WarpedRefByFlows=partSet)
             pass
         pass

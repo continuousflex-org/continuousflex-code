@@ -219,7 +219,10 @@ class FlexProtDimredHeteroFlow(ProtAnalysis3D):
 
     def getInputParticles(self):
         """ Get the particles of the input optical flow protocol. """
-        return self.inputOpFlow.get().inputVolumes
+        if(self.inputOpFlow.get().inputVolumes.get()):
+            return self.inputOpFlow.get().inputVolumes
+        else:
+            return self.inputOpFlow.get().refinementProt.get().inputVolumes
 
     def getOutputMatrixFile(self):
         return self._getExtraPath('output_matrix.txt')

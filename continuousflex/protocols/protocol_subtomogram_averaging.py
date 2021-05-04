@@ -333,19 +333,20 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         pass
 
     def createOutputStep(self):
+        # TODO: this is not needed any more, if no issue is reported then deleted it
         inputSet = self.inputVolumes.get()
-        partSet = self._createSetOfVolumes()
-        partSet.copyInfo(inputSet)
-        partSet.setAlignmentProj()
-        partSet.copyItems(inputSet,
-                          updateItemCallback=self._updateParticle,
-                          itemDataIterator=md.iterRows(self.imgsFn, sortByLabel=md.MDL_ITEM_ID))
+        # partSet = self._createSetOfVolumes()
+        # partSet.copyInfo(inputSet)
+        # partSet.setAlignmentProj()
+        # partSet.copyItems(inputSet,
+        #                   updateItemCallback=self._updateParticle,
+        #                   itemDataIterator=md.iterRows(self.imgsFn, sortByLabel=md.MDL_ITEM_ID))
         outvolume = Volume()
         outvolume.setSamplingRate(inputSet.getSamplingRate())
         outvolume.setFileName(self.outputVolume)
-
-        self._defineOutputs(outputParticles=partSet, outputvolume=outvolume)
-        self._defineTransformRelation(self.inputVolumes, partSet)
+        self._defineOutputs(SubtomogramAverage=outvolume)
+        # self._defineOutputs(outputParticles=partSet, outputvolume=outvolume)
+        # self._defineTransformRelation(self.inputVolumes, partSet)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
