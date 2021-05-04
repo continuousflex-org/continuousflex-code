@@ -86,64 +86,70 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         form.addSection(label='Input')
         form.addParam('inputVolumes', params.PointerParam,
                       pointerClass='SetOfVolumes,Volume',
-                      label="Input volume(s)", important=True,
+                      label="Input volumes/subtomograms", important=True,
                       help='Select volumes')
-        form.addParam('StartingReference', params.EnumParam,
-                      choices=['From an external volume file', 'Select a volume'],
-                      default=REFERENCE_EXT,
-                      label='Average volume', display=params.EnumParam.DISPLAY_COMBO,
-                      help='Either an external volume file or a subtomogram average')
-        form.addParam('ReferenceVolume', params.FileParam,
+        group = form.addGroup('Reference volume: last iteration average of StA',
+                              condition='Alignment_refine or FillWedge')
+        group.addParam('StartingReference', params.EnumParam,
+                      choices=['Browse for an external volume file', 'Select a volume from the project workspace'],
+                      default=REFERENCE_STA,
+                      label='Average volume', display=params.EnumParam.DISPLAY_COMBO)
+        group.addParam('ReferenceVolume', params.FileParam,
                       pointerClass='params.FileParam', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_EXT,
-                      label="Reference volume",
-                      help='Choose a reference, typically from a STA previous run')
-        form.addParam('STAVolume', params.PointerParam,
+                      label="Volume path",
+                      help='Choose a reference, typically from a StA previous run')
+        group.addParam('STAVolume', params.PointerParam,
                       pointerClass='Volume', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_STA,
                       label="Selected volume",
-                      help='Choose a reference, typically from a STA previous run')
-        form.addParam('AlignmentParameters', params.EnumParam,
-                      choices=['from input file', 'from STA run'],
-                      default=REFERENCE_EXT,
+                      help='Choose a reference, typically from a StA previous run')
+        group = form.addGroup('Alignment parameters: last iteration table of StA (Scipion/Xmipp metadata)')
+        group.addParam('AlignmentParameters', params.EnumParam,
+                      choices=['Browse for a file', 'Select a subtomogram averaging protocol '
+                                                    'from the project workspace'],
+                      default=REFERENCE_STA,
                       label='Alignment parameters', display=params.EnumParam.DISPLAY_COMBO,
-                      help='either an external metadata file containing alignment parameters or STA run')
-        form.addParam('MetaDataFile', params.FileParam,
+                      help='either an external metadata file containing alignment parameters or StA run')
+        group.addParam('MetaDataFile', params.FileParam,
                       pointerClass='params.FileParam', allowsNull=True,
                       condition='AlignmentParameters==%d' % REFERENCE_EXT,
-                      label="Alignment parameters MetaData",
-                      help='Alignment parameters, typically from a STA previous run')
-        form.addParam('MetaDataSTA', params.PointerParam,
+                      label="File for rigid-body alignment parameters (Xmipp/Scipion MetaData)",
+                      help='Alignment parameters, typically from a StA previous run')
+        group.addParam('MetaDataSTA', params.PointerParam,
                       pointerClass='FlexProtSubtomogramAveraging', allowsNull=True,
                       condition='AlignmentParameters==%d' % REFERENCE_STA,
-                      label="Subtomogram averaging run",
-                      help='Alignment parameters, typically from a STA previous run')
-        form.addParam('angleY', params.BooleanParam,
-                      default=True,
-                      label='Are those parameters come from Scipion/Xmipp?',
-                      help='If the original alignment was done on Dynamo or if the alignment was done '
-                           'without missing wedge compensation, switch this to no')
+                      label="Subtomogram averaging (StA)",
+                      help='A StA previous run')
 
         form.addSection(label='combined rigid-body & elastic alignment')
         group = form.addGroup('Optical flow parameters', condition='Alignment_refine')
         group.addParam('pyr_scale', params.FloatParam, default=0.5,
                       label='pyr_scale',
-                      help='Multiscaling relationship')
+                      help='parameter specifying the image scale to build pyramids for each image (scale < 1).'
+                           ' A classic pyramid is of generally 0.5 scale, every new layer added, it is'
+                           ' halved to the previous one.')
         group.addParam('levels', params.IntParam, default=4,
                       label='levels',
-                      help='Number of pyramid levels')
+                      help='evels=1 says, there are no extra layers (only the initial image).'
+                           ' It is the number of pyramid layers including the first image.')
         group.addParam('winsize', params.IntParam, default=10,
                       label='winsize',
-                      help='window size')
+                      help='It is the average window size, larger the size, the more robust the algorithm is to noise,'
+                           ' and provide smaller conformation detection, though gives blurred motion fields.'
+                           ' You may try smaller window size for larger conformations but the method will be'
+                           ' more sensitive to noise.')
         group.addParam('iterations', params.IntParam, default=10,
                       label='iterations',
-                      help='iterations')
+                      help='Number of iterations to be performed at each pyramid level.')
         group.addParam('poly_n', params.IntParam, default=5,
                       label='poly_n',
-                      help='Polynomial order for the relationship between the neighborhood pixels')
+                      help='It is typically 5 or 7, it is the size of the pixel neighbourhood which is used'
+                           ' to find polynomial expansion between the pixels.')
         group.addParam('poly_sigma', params.FloatParam, default=1.2,
                       label='poly_sigma',
-                      help='polynomial constant')
+                      help='standard deviation of the gaussian that is for derivatives to be smooth as the basis of'
+                           ' the polynomial expansion. It can be 1.2 for poly= 5 and 1.5 for poly= 7.')
         group.addHidden('flags', params.IntParam, default=0,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='flags',
@@ -320,11 +326,13 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             params = '-i ' + STAVolume + ' -o ' + tempdir + '/temp.vol '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
-            if self.angleY.get():
+            if self.getAngleY()==90:
+            # if self.angleY.get():
                 params += '--inverse'
             # print('xmipp_transform_geometry',params)
             runProgram('xmipp_transform_geometry', params)
-            if self.angleY.get():
+            if self.getAngleY() == 90:
+            # if self.angleY.get():
                 params = '-i ' + tempdir + '/temp.vol -o ' + tempdir + '/temp.vol '
                 params += '--rotate_volume euler 0 -90 0 '
                 # print('xmipp_transform_geometry',params)
@@ -380,7 +388,8 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             shiftz = str(mdImgs.getValue(md.MDL_SHIFT_Z, objId))
             # rotate 90 around y, align, then rotate -90 to get to neutral
             params = '-i ' + imgPath + ' -o ' + tempdir + '/temp.vol '
-            if(self.angleY):
+            if self.getAngleY() == 90:
+            # if(self.angleY):
                 params += '--rotate_volume euler 0 90 0 '
             else: # only to convert
                 params += '--rotate_volume euler 0 0 0 '
@@ -388,7 +397,8 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             params = '-i ' + tempdir + '/temp.vol -o ' + new_imgPath + ' '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
-            if (not(self.angleY)):
+            if self.getAngleY() == 0:
+            # if (not(self.angleY)):
                 params += ' --inverse '
 
             # print('xmipp_transform_geometry',params)
@@ -518,7 +528,11 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
     def combineRefinedAlignment(self, num):
         # 1- read both metadata (before and after refinment)
-        MD_original = md.MetaData(self.imgsFn)
+        if num == 1:
+            MD_original = md.MetaData(self.imgsFn)
+        else:
+            MD_original = md.MetaData(self._getExtraPath('combined_'+str(num-1)+'.xmd'))
+
         MD_refined = md.MetaData(self._getExtraPath('refinement_'+str(num)+'.xmd'))
         # This metadata will be populated and saved
         MD_combined = md.MetaData()
@@ -540,7 +554,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             shiftz_r = MD_refined.getValue(md.MDL_SHIFT_Z, objId)
 
             T1 = Euler_angles2matrix(rot_o, tilt_o, psi_o)
-            T_o = np.zeros([4,4], dtype=np.float64)
+            T_o = np.zeros([4,4])
             T_o[:3,:3] = T1
             T_o[0,3] = shiftx_o
             T_o[1,3] = shifty_o
@@ -548,7 +562,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             T_o[3,3] = 1
 
             T2 = Euler_angles2matrix(rot_r, tilt_r, psi_r)
-            T_r = np.zeros([4,4], dtype=np.float64)
+            T_r = np.zeros([4,4])
             T_r[:3, :3] = T2
             T_r[0,3] = shiftx_r
             T_r[1,3] = shifty_r
@@ -556,18 +570,23 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             T_r[3,3] = 1
 
             # 3- multiply the matrices
-            if(self.angleY.get()):
+            if self.getAngleY() == 90:
+            # if(self.angleY.get()):
                 # In this case the refinement matrix should be inverted
                 T_r_inv = np.linalg.inv(T_r)
                 T_shift = np.matmul(T_r_inv,T_o)
+                # T_shift = np.matmul(T_o, T_r_inv)
                 T2_inv = np.linalg.inv(T2)
                 # This is taken separately to avoid numerical errors
                 T_ang= np.matmul(T2_inv,T1)
+                # T_ang = np.matmul(T1,T2_inv)
             else:
                 # In this case the refinement matrix should be used as it is
-                T_shift = np.matmul(T_o,T_r)
+                T_shift = np.matmul(T_o, T_r)
+                # T_shift = np.matmul(T_r,T_o)
                 # This is taken separately to avoid numerical errors
                 T_ang = np.matmul(T1, T2)
+                # T_ang = np.matmul(T2, T1)
 
             # 4- Find the angles and shifts of the overall matrix
             rot_i, tilt_i, psi_i = Euler_matrix2angles(T_ang)
@@ -585,7 +604,8 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             MD_combined.setValue(md.MDL_SHIFT_X, float(x_i), objId)
             MD_combined.setValue(md.MDL_SHIFT_Y, float(y_i), objId)
             MD_combined.setValue(md.MDL_SHIFT_Z, float(z_i), objId)
-            if(self.angleY.get()):
+            if self.getAngleY() == 90:
+            # if(self.angleY.get()):
                 MD_combined.setValue(md.MDL_ANGLE_Y, 90.0, objId)
             else:
                 MD_combined.setValue(md.MDL_ANGLE_Y, 0.0, objId)
@@ -595,7 +615,8 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
 
     def calculateNewAverage(self, num):
-        flag = self.angleY.get()
+        flag = self.getAngleY() == 90
+        # flag = self.angleY.get()
 
         volumesMd = self._getExtraPath('combined_'+str(num)+'.xmd')
         mdVols = md.MetaData(volumesMd)
@@ -655,17 +676,18 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
     def createOutputStep(self, num =1):
         # now creating the output set of aligned volumes:
-
         out_mdfn = self._getExtraPath('volumes_aligned_'+str(num)+'.xmd')
         partSet = self._createSetOfVolumes('aligned')
         xmipp3.convert.readSetOfVolumes(out_mdfn, partSet)
         partSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
         # now creating the output of the final average:
-        outvolume = Volume()
-        outvolume.setSamplingRate((self.inputVolumes.get().getSamplingRate()))
-        outvolume.setFileName(self._getExtraPath('reference' + str(num+1) + '.spi'))
-        self._defineOutputs(AlignedAndMissingWedgeFilled=partSet, RefinedAverage=outvolume)
-
+        if (self.Alignment_refine.get()):
+            outvolume = Volume()
+            outvolume.setSamplingRate((self.inputVolumes.get().getSamplingRate()))
+            outvolume.setFileName(self._getExtraPath('reference' + str(num+1) + '.spi'))
+            self._defineOutputs(OutputVolumes=partSet, RefinedAverage=outvolume)
+        else:
+            self._defineOutputs(OutputVolumes=partSet)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
@@ -800,3 +822,16 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             np.ndarray.flatten(v1),
             np.zeros([np.size(np.ndarray.flatten(v1))]))
         return score
+
+    def getAngleY(self):
+        AlignmentParameters = self.AlignmentParameters.get()
+        MetaDataFile = self.MetaDataFile.get()
+        if AlignmentParameters == REFERENCE_STA:
+            MetaDataFile = self.MetaDataSTA.get()._getExtraPath('final_md.xmd')
+        try:
+            mdFile = md.MetaData(MetaDataFile)
+            angleY = mdFile.getValue(md.MDL_ANGLE_Y, 1)
+        except:
+            angleY = 0
+
+        return int(angleY)
