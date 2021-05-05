@@ -41,8 +41,9 @@ from pwem.utils import runProgram
 from pwem import Domain
 from xmippLib import Euler_matrix2angles, Euler_angles2matrix
 from pwem.objects import Volume
-
-
+from joblib import Parallel, delayed
+import continuousflex
+from subprocess import check_call
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
@@ -445,12 +446,12 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         mdImgs = md.MetaData(imgFn)
         of_root = self._getExtraPath() + '/optical_flows_' + str(num) + '/'
 
-        N = 0
-        for objId in mdImgs:
-            N += 1
+        # Parallel processing (finding multiple optical flows at the same time)
+        global segment
+        def segment(objId):
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             # getting a copy converted to spider format to solve the problem with stacks or mrc files
-            tmp = self._getTmpPath('tmp.spi')
+            tmp = self._getTmpPath('tmp_' + str(objId) + '.spi')
             runProgram('xmipp_image_convert', '-i ' + imgPath + ' -o ' + tmp + ' --type vol')
 
             print('processing optical flow for volume ', objId)
@@ -459,11 +460,19 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             path_flowz = of_root + str(objId).zfill(6) + '_opflowz.spi'
             path_vol_i = tmp
             if (isfile(path_flowx)):
-                continue
+                return
             else:
-                volumes_op_flowi = self.opflow_vols(path_vol_i, path_vol0, pyr_scale, levels, winsize, iterations,
-                                                    poly_n,
-                                                    poly_sigma, factor1, factor2, path_flowx, path_flowy, path_flowz)
+                args = " %s %s %f %d %d %d %d %f %d %d %s %s %s" % (path_vol_i, path_vol0, pyr_scale, levels, winsize,
+                                                                   iterations, poly_n, poly_sigma, factor1, factor2,
+                                                                   path_flowx, path_flowy, path_flowz)
+                script_path = continuousflex.__path__[0] + '/protocols/utilities/optflow_run.py'
+                command = "python " + script_path + args
+                check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
+                           env=None, cwd=None)
+
+        # Running the multiple processing:
+        ps = [objId for objId in mdImgs]
+        Parallel(n_jobs=self.N_GPU.get(), backend="multiprocessing")(delayed(segment)(p) for p in ps)
 
 
     def warpByFlow(self, num):
@@ -705,46 +714,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         pass
 
     # --------------------------- UTILS functions --------------------------------------------
-    def opflow_vols(self, path_vol0, path_vol1, pyr_scale, levels, winsize, iterations, poly_n, poly_sigma, factor1=100,
-                    factor2=100, path_volx='x_OF_3D.vol', path_voly='y_OF_3D.vol', path_volz='z_OF_3D.vol'):
-        # Convention here is in reverse order
-        vol0 = open_volume(path_vol1)
-        vol1 = open_volume(path_vol0)
-        # ranges are between 0 and 3.09, the values should be changed with some factor, otherwise the output is zero
-        # TODO: find a way to automate this normalization
-        vol0 = vol0 * factor1
-        vol1 = vol1 * factor2
-        optflow = farneback3d.Farneback(
-            pyr_scale=pyr_scale,  # Scaling between multi-scale pyramid levels
-            levels=levels,  # Number of multi-scale levels
-            winsize=winsize,  # Window size for Gaussian filtering of polynomial coefficients
-            num_iterations=iterations,  # Iterations on each multi-scale level
-            poly_n=poly_n,  # Size of window for weighted least-square estimation of polynomial coefficients
-            poly_sigma=poly_sigma,  # Sigma for Gaussian weighting of least-square estimation of polynomial coefficients
-        )
-        t0 = time.time()
-        # perform OF:
-        flow = optflow.calc_flow(vol0, vol1)
-        t_end = time.time()
-        print("spent on calculating 3D optical flow", np.floor((t_end - t0) / 60), "minutes and",
-              np.round(t_end - t0 - np.floor((t_end - t0) / 60) * 60), "seconds")
-
-        # Extracting the flows in x, y and z dimensions:
-        Flowx = flow[0, :, :, :]
-        Flowy = flow[1, :, :, :]
-        Flowz = flow[2, :, :, :]
-
-        # # See if flow has some values in:
-        # print("flow_X maximum:", np.amax(Flowx), "minumum", np.amax(Flowx))
-        # print("flow_Y maximum:", np.amax(Flowy), "minumum", np.amax(Flowy))
-        # print("flow_Z maximum:", np.amax(Flowz), "minumum", np.amax(Flowz))
-
-        save_volume(Flowx, path_volx)
-        save_volume(Flowy, path_voly)
-        save_volume(Flowz, path_volz)
-
-        return flow
-
     def read_optical_flow(self, path_flowx, path_flowy, path_flowz):
         x = open_volume(path_flowx)
         y = open_volume(path_flowy)
