@@ -1,6 +1,6 @@
 # **************************************************************************
 # * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
-# *
+# * IMPMC Sorbonne University
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
 # * the Free Software Foundation; either version 2 of the License, or
@@ -33,10 +33,8 @@ import numpy as np
 import farneback3d
 from .utilities.spider_files3 import *
 import time
-import PIL
 import os
-from .utilities.OF_plots import plot_quiver_3d
-from os.path import basename, join, exists, isfile
+from os.path import basename, isfile
 from pwem.utils import runProgram
 from pwem import Domain
 from xmippLib import Euler_matrix2angles, Euler_angles2matrix
@@ -155,6 +153,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                       label='poly_sigma',
                       help='standard deviation of the gaussian that is for derivatives to be smooth as the basis of'
                            ' the polynomial expansion. It can be 1.2 for poly= 5 and 1.5 for poly= 7.')
+        # This flag can be added later (when the Optical flow library is updated to include it)
         group.addHidden('flags', params.IntParam, default=0,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='flags',
@@ -169,13 +168,11 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                       help='this factor will be multiplied by the gray levels of the reference')
         group = form.addGroup('rigid-body alignment (refinement)', condition='Alignment_refine',)
         group.addParam('frm_freq', params.FloatParam, default=0.25,
-                      # expertLevel=params.LEVEL_ADVANCED,
                       label='Maximum cross correlation frequency',
                       help='The normalized frequency should be between 0 and 0.5 '
                            'The more it is, the bigger the search frequency is, the more time it demands, '
                            'keeping it as default is recommended.')
         group.addParam('frm_maxshift', params.IntParam, default=4,
-                      # expertlevel=params.LEVEL_ADVANCED,
                       label='Maximum shift for rigid body refinement (in pixels)',
                       help='The maximum shift is a number between 1 and half the size of your volume. '
                            'It represents the maximum distance searched in x,y and z directions.')
@@ -212,6 +209,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             self._insertFunctionStep('createOutputStep', N)
         else:
             self._insertFunctionStep('createOutputStep')
+
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
         # Write a metadata with the volumes
@@ -219,7 +217,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
 
     def prepareMetaData(self):
-        tempdir = self._getTmpPath()
         imgFn = self.imgsFn
         AlignmentParameters = self.AlignmentParameters.get()
         MetaDataFile = self.MetaDataFile.get()
@@ -257,7 +254,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
     def fillMissingWedge(self, num):
         tempdir = self._getTmpPath()
-
+        # If this is the first iteration, then we have to use the starting metadata and subtomogram average
         if num == 1:
             imgFn = self.imgsFn
             StartingReference = self.StartingReference.get()
@@ -270,10 +267,11 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             path_vol0 = self._getExtraPath('reference' + str(num) + '.spi')
             params = '-i ' + STAVolume + ' -o ' + path_vol0 + ' --type vol'
             runProgram('xmipp_image_convert', params)
-
+        # Otherwise, we use the last itration of the combined refined alignment and the last average reached
         else:
             imgFn = self._getExtraPath('combined_'+str(num-1)+'.xmd')
             STAVolume = self._getExtraPath('reference' + str(num) + '.spi')
+
 
         tiltLow = self.tiltLow.get()
         tiltHigh = self.tiltHigh.get()
@@ -302,6 +300,9 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         fnmask = self._getExtraPath('Mask.spi')
         save_volume(np.float32(MW_mask), fnmask)
         runProgram('xmipp_transform_geometry', '-i ' + fnmask + ' --rotate_volume euler 0 90 0')
+        # Up to here, the missing wedge is created (this can be checked on the disk
+        # to see if the missing wedge corresponds or not to the data)
+
         mdImgs = md.MetaData(imgFn)
         new_imgPath = self._getExtraPath() + '/mw_filled_' + str(num) + '/'
         makePath(new_imgPath)
@@ -332,7 +333,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
             if self.getAngleY()==90:
-            # if self.angleY.get():
                 params += '--inverse'
             # print('xmipp_transform_geometry',params)
             runProgram('xmipp_transform_geometry', params)
@@ -361,9 +361,9 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             save_volume(v_result, new_imgPath)
 
             # for debugging, save everything that was aligned in the first iteration
-            if objId == 1:
-                v_ave = open_volume(tempdir + '/temp.vol')
-                save_volume(v_ave, self._getExtraPath('aligned_average_with_first_volume.spi'))
+            # if objId == 1:
+            #     v_ave = open_volume(tempdir + '/temp.vol')
+            #     save_volume(v_ave, self._getExtraPath('aligned_average_with_first_volume.spi'))
 
         mdImgs.write(self._getExtraPath('MWFilled_' + str(num) + '.xmd'))
 
@@ -372,6 +372,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         makePath(self._getExtraPath()+'/aligned_'+str(num))
         tempdir = self._getTmpPath()
 
+        # The aligned subtomograms are either the missing wedge filled or not according to the user choice
         if (self.FillWedge.get()):
             mdImgs = md.MetaData(self._getExtraPath('MWFilled_' + str(num) + '.xmd'))
         else:
@@ -391,22 +392,22 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             shiftx = str(mdImgs.getValue(md.MDL_SHIFT_X, objId))
             shifty = str(mdImgs.getValue(md.MDL_SHIFT_Y, objId))
             shiftz = str(mdImgs.getValue(md.MDL_SHIFT_Z, objId))
-            # rotate 90 around y, align, then rotate -90 to get to neutral
+
             params = '-i ' + imgPath + ' -o ' + tempdir + '/temp.vol '
+            # When we compensate for the missing wedge our software (FRM) doesn't have the same convention as XMIPP
+            # So we have to rotate by the 90 degrees and use the software in inverse order, therefore you will find
+            # a rotation of the subtomogram by 90 degrees and toogling the flag --inverse in xmipp_transform_geometry
             if self.getAngleY() == 90:
-            # if(self.angleY):
                 params += '--rotate_volume euler 0 90 0 '
-            else: # only to convert
+            else: # only to convert to spider in case it is something else (MRC for example)
                 params += '--rotate_volume euler 0 0 0 '
             runProgram('xmipp_transform_geometry', params)
             params = '-i ' + tempdir + '/temp.vol -o ' + new_imgPath + ' '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
             if self.getAngleY() == 0:
-            # if (not(self.angleY)):
                 params += ' --inverse '
 
-            # print('xmipp_transform_geometry',params)
             runProgram('xmipp_transform_geometry', params)
         self.fnaligned = self._getExtraPath('volumes_aligned_'+str(num)+'.xmd')
         mdImgs.write(self.fnaligned)
@@ -416,6 +417,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         tempdir = self._getTmpPath()
         imgFn = self._getExtraPath('volumes_aligned_'+str(num)+'.xmd')
 
+        # in case it is the first iteration we only need the reference volume (metadata has to be for aligned volumes)
         if num == 1:
             StartingReference = self.StartingReference.get()
             ReferenceVolume = self.ReferenceVolume.get()
@@ -424,7 +426,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             else:
                 STAVolume = ReferenceVolume
 
-            # in case the reference is in MRC format:
+            # just in case the reference is in MRC format:
             path_vol0 = self._getExtraPath('reference' + str(num) + '.spi')
             params = '-i ' + STAVolume + ' -o ' + path_vol0 + ' --type vol'
             runProgram('xmipp_image_convert', params)
@@ -432,13 +434,15 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         else:
             path_vol0 = self._getExtraPath('reference' + str(num) + '.spi')
 
-
         pyr_scale = self.pyr_scale.get()
         levels = self.levels.get()
         iterations = self.iterations.get()
         winsize = self.winsize.get()
         poly_n = self.poly_n.get()
         poly_sigma = self.poly_sigma.get()
+        # TODO: the factor1 and 2 can be any value as long as we are using the subtomogram average (gray level values
+        # are similar. It is not sure if we use an external reference what this should be! This could be normalized in
+        #  future
         flags = self.flags.get()
         factor1 = self.factor1.get()
         factor2 = self.factor2.get()
@@ -446,6 +450,8 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         mdImgs = md.MetaData(imgFn)
         of_root = self._getExtraPath() + '/optical_flows_' + str(num) + '/'
 
+        # This is a spherical mask with maximum radius
+        mask_size = int(self.getVolumeDimesion()//2)
         # Parallel processing (finding multiple optical flows at the same time)
         global segment
         def segment(objId):
@@ -462,13 +468,20 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             if (isfile(path_flowx)):
                 return
             else:
-                args = " %s %s %f %d %d %d %d %f %d %d %s %s %s" % (path_vol_i, path_vol0, pyr_scale, levels, winsize,
+                args = " %s %s %f %d %d %d %d %f %d %d %s %s %s" % (path_vol0, path_vol_i, pyr_scale, levels, winsize,
                                                                    iterations, poly_n, poly_sigma, factor1, factor2,
                                                                    path_flowx, path_flowy, path_flowz)
                 script_path = continuousflex.__path__[0] + '/protocols/utilities/optflow_run.py'
                 command = "python " + script_path + args
                 check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
                            env=None, cwd=None)
+
+                arg_x = "-i %s  --mask circular -%d --substitute 0  -o %s" % (path_flowx, mask_size, path_flowx)
+                arg_y = "-i %s  --mask circular -%d --substitute 0  -o %s" % (path_flowy, mask_size, path_flowy)
+                arg_z = "-i %s  --mask circular -%d --substitute 0  -o %s" % (path_flowz, mask_size, path_flowz)
+                runProgram('xmipp_transform_mask', arg_x)
+                runProgram('xmipp_transform_mask', arg_y)
+                runProgram('xmipp_transform_mask', arg_z)
 
         # Running the multiple processing:
         ps = [objId for objId in mdImgs]
@@ -501,22 +514,12 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
 
     def refineAlignment(self, num):
-        tempdir = self._getTmpPath()
         imgFn = self._getExtraPath('warped_volumes_' + str(num) + '.xmd')
-
         frm_freq = self.frm_freq.get()
         frm_maxshift = self.frm_maxshift.get()
-
         result = self._getExtraPath('refinement_'+str(num)+'.xmd')
         reference = self._getExtraPath('reference' + str(num) + '.spi')
-
-        print('tempdir is ', tempdir)
-        print('imgFn is ', imgFn)
-        print('frm_freq is ', frm_freq)
-        print('frm_maxshift is ', frm_maxshift)
-        print('result is ', result)
-        print('reference is ', reference)
-
+        tempdir = self._getTmpPath()
         args = "-i %(imgFn)s -o %(result)s --odir %(tempdir)s --resume --ref %(reference)s" \
                " --frm_parameters %(frm_freq)f %(frm_maxshift)d "
 
@@ -525,7 +528,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
         mdImgs = md.MetaData(result)
         inputSet = md.MetaData(imgFn)
-        # setting item_id (lost due to mpi usually)
+        # setting item_id (lost due to mpi) then sorting
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             # Conside the index is the id in the input set
@@ -584,26 +587,22 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
             # 3- multiply the matrices
             if self.getAngleY() == 90:
-            # if(self.angleY.get()):
-                # In this case the refinement matrix should be inverted
+                # In this case the refinement matrix should be inverted (because the refined alignment does not have
+                # missing wedge correction)
                 T_r_inv = np.linalg.inv(T_r)
                 T_shift = np.matmul(T_r_inv,T_o)
-                # T_shift = np.matmul(T_o, T_r_inv)
-                T2_inv = np.linalg.inv(T2)
                 # This is taken separately to avoid numerical errors
+                T2_inv = np.linalg.inv(T2)
                 T_ang= np.matmul(T2_inv,T1)
-                # T_ang = np.matmul(T1,T2_inv)
             else:
-                # In this case the refinement matrix should be used as it is
+                # In this case the refinement matrix should be used as it is (as for both the previous and refined do not
+                # have missing wedge correction)
                 T_shift = np.matmul(T_o, T_r)
-                # T_shift = np.matmul(T_r,T_o)
                 # This is taken separately to avoid numerical errors
                 T_ang = np.matmul(T1, T2)
-                # T_ang = np.matmul(T2, T1)
 
             # 4- Find the angles and shifts of the overall matrix
             rot_i, tilt_i, psi_i = Euler_matrix2angles(T_ang)
-            # print(T1-T_ang)
             x_i = T_shift[0, 3]
             y_i = T_shift[1, 3]
             z_i = T_shift[2, 3]
@@ -618,7 +617,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             MD_combined.setValue(md.MDL_SHIFT_Y, float(y_i), objId)
             MD_combined.setValue(md.MDL_SHIFT_Z, float(z_i), objId)
             if self.getAngleY() == 90:
-            # if(self.angleY.get()):
                 MD_combined.setValue(md.MDL_ANGLE_Y, 90.0, objId)
             else:
                 MD_combined.setValue(md.MDL_ANGLE_Y, 0.0, objId)
@@ -628,18 +626,17 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
 
     def calculateNewAverage(self, num):
+        # The flag will be used to know which alignment (missing wedge or without missing wedge) will be followed
         flag = self.getAngleY() == 90
-        # flag = self.angleY.get()
 
         volumesMd = self._getExtraPath('combined_'+str(num)+'.xmd')
         mdVols = md.MetaData(volumesMd)
 
-        counter = 0
+        counter = 0 # this is used to find the sum/number_of_volumes
         first = True
         for objId in mdVols:
             counter = counter + 1
             imgPath = mdVols.getValue(md.MDL_IMAGE, objId)
-
             rot = mdVols.getValue(md.MDL_ANGLE_ROT, objId)
             tilt = mdVols.getValue(md.MDL_ANGLE_TILT, objId)
             psi = mdVols.getValue(md.MDL_ANGLE_PSI, objId)
@@ -647,9 +644,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             y_shift = mdVols.getValue(md.MDL_SHIFT_Y, objId)
             z_shift = mdVols.getValue(md.MDL_SHIFT_Z, objId)
 
-            # The flip one is used here to determine if we need to use the option --inverse
-            # with xmipp_transform_geometry
-            flip = mdVols.getValue(md.MDL_ANGLE_Y, objId)
             # The new reference is for the next iteration
             outputVol = self._getExtraPath('reference' + str(num+1) + '.spi')
             tempVol = self._getExtraPath('temp.vol')
@@ -667,7 +661,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                 if first:
                     print("THERE IS A COMPENSATION FOR THE MISSING WEDGE")
                     first = False
-                # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
+                # First got to rotate each volume 90 degrees about the y axis, align it, then sum it
                 params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
                 runProgram('xmipp_transform_geometry', params)
                 params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
@@ -693,7 +687,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         partSet = self._createSetOfVolumes('aligned')
         xmipp3.convert.readSetOfVolumes(out_mdfn, partSet)
         partSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
-        # now creating the output of the final average:
+        # now creating the output of the final average if there is a refinement (otherwise no need as it is unchanged):
         if (self.Alignment_refine.get()):
             outvolume = Volume()
             outvolume.setSamplingRate((self.inputVolumes.get().getSamplingRate()))
@@ -735,13 +729,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         flow = self.read_optical_flow(path_flowx, path_flowy, path_flowz)
         return flow
 
-    def metric_opflow_vols(self, flow1, flow2):
-        # print(np.shape(flow1))
-        reshaped_flow1 = np.reshape(flow1, [3, np.shape(flow1)[1] * np.shape(flow1)[2] * np.shape(flow1)[3]])
-        reshaped_flow2 = np.reshape(flow2, [3, np.shape(flow2)[1] * np.shape(flow2)[2] * np.shape(flow2)[3]])
-        metric = np.sum(np.multiply(reshaped_flow1, reshaped_flow2))
-        return metric
-
     def _printWarnings(self, *lines):
         """ Print some warning lines to 'warnings.xmd',
         the function should be called inside the working dir."""
@@ -749,52 +736,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         for l in lines:
             print >> fWarn, l
         fWarn.close()
-
-    def normalize(self, v):
-        """Normalize the data.
-        @param v: input volume.
-        @return: Normalized volume.
-        """
-        m = np.mean(v)
-        v = v - m
-        s = np.std(v)
-        v = v / s
-        return v
-
-    def ncc(self, v1, v2):
-        """Compute the Normalized Cross Correlation between the two volumes.
-        @param v1: volume 1.
-        @param v2: volume 2.
-        @return: NCC.
-        """
-        vv1 = self.normalize(v1)
-        vv2 = self.normalize(v2)
-        score = np.sum(vv1 * vv2) / vv1.size
-        return score
-
-    def vmsq(self, v1, v2):
-        """Compute the normalized mean square distance between the two volumes
-        :param v1: volume1
-        :param v2: volume2
-        :return: score for mean square diff
-        """
-        from sklearn.metrics import mean_squared_error
-        score = mean_squared_error(np.ndarray.flatten(v1), np.ndarray.flatten(v2)) / mean_squared_error(
-            np.ndarray.flatten(v1),
-            np.zeros([np.size(np.ndarray.flatten(v1))]))
-        return score
-
-    def vmab(self, v1, v2):
-        """Compute the normalized mean absolute distance between the two volumes
-        :param v1: volume1
-        :param v2: volume2
-        :return: score for mean square diff
-        """
-        from sklearn.metrics import mean_absolute_error
-        score = mean_absolute_error(np.ndarray.flatten(v1), np.ndarray.flatten(v2)) / mean_absolute_error(
-            np.ndarray.flatten(v1),
-            np.zeros([np.size(np.ndarray.flatten(v1))]))
-        return score
 
     def getAngleY(self):
         AlignmentParameters = self.AlignmentParameters.get()
@@ -808,3 +749,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             angleY = 0
 
         return int(angleY)
+
+    def getVolumeDimesion(self):
+        return self.inputVolumes.get().getDimensions()[0]

@@ -108,7 +108,6 @@ class FlexHeteroFlowViewer(EmProtocolViewer):
         volumes = self.protocol.WarpedRefByFlows
         return [ObjectView(self._project, volumes.strId(), volumes.getFileName())]
 
-
     def _viewParam(self, paramName):
         datamat_fn = self.protocol._getExtraPath('cc_msd_mad.txt')
         datamat = np.loadtxt(datamat_fn, delimiter=' ')
@@ -230,7 +229,3 @@ class FlexHeteroFlowViewer(EmProtocolViewer):
         a33 = cos(t2)
         T = np.array([[a11, a12, a13], [a21, a22, a23], [a31, a32, a33]])
         return T
-
-
-
-

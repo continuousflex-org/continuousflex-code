@@ -25,23 +25,20 @@ from pwem.protocols import ProtAnalysis3D
 import xmipp3.convert
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
-from pyworkflow.utils.path import makePath, copyFile, createLink
-from os.path import basename
+from pyworkflow.utils.path import makePath, createLink
 from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
 from .utilities.spider_files3 import save_volume, open_volume
-from pyworkflow.utils import replaceBaseExt
 import numpy as np
 import farneback3d
 from .utilities.spider_files3 import *
 import time
-import PIL
 import os
-from .utilities.OF_plots import plot_quiver_3d
-from os.path import basename, join, exists, isfile
+from os.path import isfile
 from joblib import Parallel, delayed
 import continuousflex
 from subprocess import check_call
 from pwem.utils import runProgram
+from pwem.emlib.image import ImageHandler
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
@@ -133,10 +130,6 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
                       expertLevel=params.LEVEL_ADVANCED,
                       label='flags',
                       help='flag to pass for the optical flow')
-        group.addHidden('use_gaussian_kernel', params.BooleanParam, default=True,
-                      label='use_gaussian_kernel',
-                      help='If yes, there will be a Guassian filter applied locally to '
-                           'denoise and smooth the optical flow')
         group.addHidden('factor1', params.IntParam, default=100,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='factor1',
@@ -168,7 +161,6 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
         xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
 
     def doAlignmentStep(self):
-        tempdir = self._getTmpPath()
         imgFn = self.imgsFn
         StartingReference = self.StartingReference.get()
         ReferenceVolume = self.ReferenceVolume.get()
@@ -177,7 +169,7 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
             STAVolume = self.STAVolume.get().getFileName()
         else:
             STAVolume = ReferenceVolume
-        # in case the reference is in MRC format:
+        # just in case the reference is in MRC format:
         path_vol0 = self._getExtraPath('reference.spi')
         params = '-i ' + STAVolume + ' -o ' + path_vol0 + ' --type vol'
         self.runJob('xmipp_image_convert', params)
@@ -188,10 +180,12 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
         winsize = self.winsize.get()
         poly_n = self.poly_n.get()
         poly_sigma = self.poly_sigma.get()
+        # TODO: the factor1 and 2 can be any value as long as we are using the subtomogram average (gray level values
+        # are similar. It is not sure if we use an external reference what this should be! This could be normalized in
+        #  future
         flags = self.flags.get()
         factor1 = self.factor1.get()
         factor2 = self.factor2.get()
-        use_gaussian_kernel = self.use_gaussian_kernel.get()
 
         mdImgs = md.MetaData(imgFn)
         of_root = self._getExtraPath() + '/optical_flows/'
@@ -212,13 +206,20 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
             if (isfile(path_flowx)):
                 return
             else:
-                args = " %s %s %f %d %d %d %d %f %d %d %s %s %s" % (path_vol_i, path_vol0, pyr_scale, levels, winsize,
+                args = " %s %s %f %d %d %d %d %f %d %d %s %s %s" % (path_vol0, path_vol_i, pyr_scale, levels, winsize,
                                                                    iterations, poly_n, poly_sigma, factor1, factor2,
                                                                    path_flowx, path_flowy, path_flowz)
                 script_path = continuousflex.__path__[0] + '/protocols/utilities/optflow_run.py'
                 command = "python " + script_path + args
                 check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
                            env=None, cwd=None)
+
+                arg_x = "-i %s  --mask circular -%d --substitute 0  -o %s" % (path_flowx, mask_size, path_flowx)
+                arg_y = "-i %s  --mask circular -%d --substitute 0  -o %s" % (path_flowy, mask_size, path_flowy)
+                arg_z = "-i %s  --mask circular -%d --substitute 0  -o %s" % (path_flowz, mask_size, path_flowz)
+                runProgram('xmipp_transform_mask', arg_x)
+                runProgram('xmipp_transform_mask', arg_y)
+                runProgram('xmipp_transform_mask', arg_z)
 
         # Running the multiple processing:
         ps = [objId for objId in mdImgs]
@@ -284,7 +285,9 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
             self.runJob('xmipp_image_convert', '-i ' + imgPath + ' -o ' + tmp + ' --type vol')
             vol_i = open_volume(tmp)
             warped_path_i = estVol_root + str(i + 1).zfill(6) + '.spi'
-            warped_i = open_volume(warped_path_i)
+            warped_i = ImageHandler().read(warped_path_i).getData()
+            # TODO: replace all the open_volume and save_volume by the ImageHandler() read and write
+            # warped_i = open_volume(warped_path_i)
             stat_mat[i, 0] = self.ncc(warped_i,vol_i)
             stat_mat[i, 1] = self.vmsq(warped_i,vol_i)
             stat_mat[i, 2] = self.vmab(warped_i,vol_i)
