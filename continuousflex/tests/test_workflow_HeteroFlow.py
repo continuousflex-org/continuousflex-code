@@ -25,8 +25,8 @@ from pwem.tests.workflows import TestWorkflow
 from pwem import Domain
 from pyworkflow.tests import setupTestProject, DataSet
 
-from continuousflex.protocols import (FlexProtNMA, FlexProtSynthesizeSubtomo,NMA_CUTOFF_ABS)
-from continuousflex.protocols.protocol_subtomogrmas_synthesize import MODE_RELATION_LINEAR, MODE_RELATION_3CLUSTERS,\
+from continuousflex.protocols import (FlexProtNMA, FlexProtSynthesizeSubtomo, NMA_CUTOFF_ABS)
+from continuousflex.protocols.protocol_subtomogrmas_synthesize import MODE_RELATION_LINEAR, MODE_RELATION_3CLUSTERS, \
     MODE_RELATION_MESH, MODE_RELATION_RANDOM
 from continuousflex.protocols.protocol_pdb_dimred import FlexProtDimredPdb
 from continuousflex.protocols.protocol_subtomograms_classify import FlexProtSubtomoClassify
@@ -34,40 +34,42 @@ from continuousflex.protocols.protocol_subtomogram_averaging import FlexProtSubt
 from continuousflex.protocols.protocol_missing_wedge_filling import FlexProtMissingWedgeFilling
 from continuousflex.protocols.protocol_heteroflow import FlexProtHeteroFlow
 from continuousflex.protocols.protocol_heteroflow_dimred import FlexProtDimredHeteroFlow
+from continuousflex.protocols.protocol_missing_wedge_filling import METHOD_STAFILL
+from continuousflex.protocols.protocol_heteroflow import FIND_FLOWS
 
 class TestHeteroFlow(TestWorkflow):
     """ Check subtomograms are generated propoerly """
-    
+
     @classmethod
-    def setUpClass(cls):    
+    def setUpClass(cls):
         # Create a new project
         setupTestProject(cls)
         cls.ds = DataSet.getDataSet('nma')
-    
+
     def test_synthesize_all(self):
         """ Run NMA then synthesize sybtomograms"""
-        
-        #------------------------------------------------
+
+        # ------------------------------------------------
         # Import a Pdb -> NMA
-        #------------------------------------------------
+        # ------------------------------------------------
         # Import a PDB
         protImportPdb = self.newProtocol(ProtImportPdb, inputPdbData=1,
                                          pdbFile=self.ds.getFile('pdb'))
         protImportPdb.setObjLabel('AK.pdb')
         self.launchProtocol(protImportPdb)
-        
+
         # Launch NMA for PDB imported
         protNMA = self.newProtocol(FlexProtNMA,
-                                    cutoffMode=NMA_CUTOFF_ABS)
+                                   cutoffMode=NMA_CUTOFF_ABS)
         protNMA.inputStructure.set(protImportPdb.outputPdb)
         protNMA.setObjLabel('NMA')
         self.launchProtocol(protNMA)
-        #------------------------------------------------------------------------------------
+        # ------------------------------------------------------------------------------------
         # Synthesize subtomograms with 3 clusters relationship
         protSynthesize = self.newProtocol(FlexProtSynthesizeSubtomo,
-                                         modeList='7-8',
-                                         numberOfVolumes=36,
-                                         modeRelationChoice=MODE_RELATION_3CLUSTERS)
+                                          modeList='7-8',
+                                          numberOfVolumes=3,
+                                          modeRelationChoice=MODE_RELATION_3CLUSTERS)
         protSynthesize.inputModes.set(protNMA.outputModes)
         protSynthesize.setObjLabel('subtomograms 3 clusters')
         self.launchProtocol(protSynthesize)
@@ -80,9 +82,9 @@ class TestHeteroFlow(TestWorkflow):
 
         # Post alignment classification (PCA+Kmeans)
         protKmeans = self.newProtocol(FlexProtSubtomoClassify,
-                                                     numOfClasses=3,
-                                                     classifyTechnique=1,
-                                                     reducedDim=3)
+                                      numOfClasses=3,
+                                      classifyTechnique=1,
+                                      reducedDim=3)
         protKmeans.ProtSynthesize.set(protSynthesize)
         protKmeans.setObjLabel('Kmeans')
         self.launchProtocol(protKmeans)
@@ -90,7 +92,8 @@ class TestHeteroFlow(TestWorkflow):
         # Missing wedge filling and applying alignment:
         protMissingWedgeFilling = self.newProtocol(FlexProtMissingWedgeFilling,
                                                    StartingReference=1,
-                                                   AlignmentParameters=2)
+                                                   AlignmentParameters=2,
+                                                   Method=METHOD_STAFILL)
         protMissingWedgeFilling.STAVolume.set(protKmeans.GlobalAverage)
         protMissingWedgeFilling.MetaDataSTS.set(protSynthesize)
         protMissingWedgeFilling.inputVolumes.set(protSynthesize.outputVolumes)
@@ -99,14 +102,14 @@ class TestHeteroFlow(TestWorkflow):
 
         # Perform StA
         protStA = self.newProtocol(FlexProtSubtomogramAveraging,
-                                    NumOfIters=4)
+                                   NumOfIters=4)
         protStA.inputVolumes.set(protSynthesize.outputVolumes)
         protStA.setObjLabel('StA')
         self.launchProtocol(protStA)
 
         # Post alignment classification (PCA+Kmeans)
         protclassifyKmeans = self.newProtocol(FlexProtSubtomoClassify,
-                                              SubtomoSource=1, #this is for StA
+                                              SubtomoSource=1,  # this is for StA
                                               numOfClasses=3,
                                               classifyTechnique=1,
                                               reducedDim=3)
@@ -116,9 +119,10 @@ class TestHeteroFlow(TestWorkflow):
 
         # Missing wedge filling and applying alignment:
         protMissingWedgeFilling2 = self.newProtocol(FlexProtMissingWedgeFilling,
-                                                   StartingReference=1,
-                                                   AlignmentParameters=1)
-        protMissingWedgeFilling2.STAVolume.set(protStA.outputvolume)
+                                                    StartingReference=1,
+                                                    AlignmentParameters=1,
+                                                    Method=METHOD_STAFILL)
+        protMissingWedgeFilling2.STAVolume.set(protStA.SubtomogramAverage)
         protMissingWedgeFilling2.MetaDataSTA.set(protStA)
         protMissingWedgeFilling2.inputVolumes.set(protSynthesize.outputVolumes)
         protMissingWedgeFilling2.setObjLabel('MW filling & alignment (realistic)')
@@ -126,31 +130,31 @@ class TestHeteroFlow(TestWorkflow):
 
         ProtFlow = self.newProtocol(FlexProtHeteroFlow,
                                     StartingReference=1,
-                                    winsize=5
+                                    winsize=5,
+                                    copy_opflows=FIND_FLOWS
                                     )
         ProtFlow.inputVolumes.set(protMissingWedgeFilling.MissingWedgeFilledAndAligned)
         ProtFlow.STAVolume.set(protKmeans.GlobalAverage)
         ProtFlow.setObjLabel('HeteroFlow (ideal)')
         self.launchProtocol(ProtFlow)
         ProtFlowDimred = self.newProtocol(FlexProtDimredHeteroFlow,
-                                          reducedDim = 4)
+                                          reducedDim=2)
         ProtFlowDimred.inputOpFlow.set(ProtFlow)
         ProtFlowDimred.setObjLabel('HeteroFlow Dimred (ideal)')
         self.launchProtocol(ProtFlowDimred)
 
         ProtFlow2 = self.newProtocol(FlexProtHeteroFlow,
-                                    StartingReference=1,
-                                    winsize=5
-                                    )
+                                     StartingReference=1,
+                                     winsize=5,
+                                     copy_opflows=FIND_FLOWS
+                                     )
         ProtFlow2.inputVolumes.set(protMissingWedgeFilling2.MissingWedgeFilledAndAligned)
-        ProtFlow2.STAVolume.set(protStA.outputvolume)
+        ProtFlow2.STAVolume.set(protStA.SubtomogramAverage)
         ProtFlow2.setObjLabel('HeteroFlow (realistic)')
         self.launchProtocol(ProtFlow2)
 
         ProtFlowDimred2 = self.newProtocol(FlexProtDimredHeteroFlow,
-                                          reducedDim = 4)
+                                           reducedDim=2)
         ProtFlowDimred2.inputOpFlow.set(ProtFlow2)
         ProtFlowDimred2.setObjLabel('HeteroFlow Dimred (realistic)')
         self.launchProtocol(ProtFlowDimred2)
-
-
