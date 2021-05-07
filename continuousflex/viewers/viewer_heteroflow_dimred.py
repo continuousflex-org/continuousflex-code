@@ -1,5 +1,4 @@
 # **************************************************************************
-# *
 # * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
 # *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
@@ -362,7 +361,7 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
             deformations = [X[np.argmin(np.sum((Y - p) ** 2, axis=1))] for p in trajectoryPoints]
 
         # get the original size of the input:
-        mdImgs = md.MetaData(self.protocol.inputOpFlow.get()._getExtraPath('volumes.xmd'))
+        mdImgs = md.MetaData(self.protocol.inputOpFlow.get()._getExtraPath('volumes_out.xmd'))
         N = 0
         for objId in mdImgs:
             N += 1

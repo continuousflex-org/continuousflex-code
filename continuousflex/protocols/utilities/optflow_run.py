@@ -8,8 +8,8 @@ import sys
 def opflow_vols(path_vol0, path_vol1, pyr_scale, levels, winsize, iterations, poly_n, poly_sigma, factor1=100,
                 factor2=100, path_volx='x_OF_3D.vol', path_voly='y_OF_3D.vol', path_volz='z_OF_3D.vol'):
     # Convention here is in reverse order
-    vol0 = open_volume(path_vol1)
-    vol1 = open_volume(path_vol0)
+    vol0 = open_volume(path_vol0)
+    vol1 = open_volume(path_vol1)
 
     vol0 = vol0 * factor1
     vol1 = vol1 * factor2
