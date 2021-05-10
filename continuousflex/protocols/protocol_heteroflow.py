@@ -74,7 +74,7 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
                       help='Select volumes')
         group.addParam('StartingReference', params.EnumParam,
                       choices=['From an external volume file', 'Select a volume'],
-                      default=REFERENCE_EXT,
+                      default=REFERENCE_STA,
                       label='Reference volume', display=params.EnumParam.DISPLAY_COMBO,
                       help='Either an external volume file or a subtomogram average')
         group.addParam('ReferenceVolume', params.FileParam,
@@ -190,6 +190,8 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
         mdImgs = md.MetaData(imgFn)
         of_root = self._getExtraPath() + '/optical_flows/'
 
+        # This is a spherical mask with maximum radius
+        mask_size = int(self.getVolumeDimesion()//2)
         # Parallel processing (finding multiple optical flows at the same time)
         global segment
         def segment(objId):
@@ -405,3 +407,6 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
             np.ndarray.flatten(v1),
             np.zeros([np.size(np.ndarray.flatten(v1))]))
         return score
+
+    def getVolumeDimesion(self):
+        return self.inputVolumes.get().getDimensions()[0]

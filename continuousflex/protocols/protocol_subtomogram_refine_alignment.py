@@ -337,7 +337,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             # print('xmipp_transform_geometry',params)
             runProgram('xmipp_transform_geometry', params)
             if self.getAngleY() == 90:
-            # if self.angleY.get():
                 params = '-i ' + tempdir + '/temp.vol -o ' + tempdir + '/temp.vol '
                 params += '--rotate_volume euler 0 -90 0 '
                 # print('xmipp_transform_geometry',params)
@@ -361,9 +360,9 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             save_volume(v_result, new_imgPath)
 
             # for debugging, save everything that was aligned in the first iteration
-            # if objId == 1:
-            #     v_ave = open_volume(tempdir + '/temp.vol')
-            #     save_volume(v_ave, self._getExtraPath('aligned_average_with_first_volume.spi'))
+            if objId == 1:
+                v_ave = open_volume(tempdir + '/temp.vol')
+                save_volume(v_ave, self._getExtraPath('aligned_average_with_first_volume.spi'))
 
         mdImgs.write(self._getExtraPath('MWFilled_' + str(num) + '.xmd'))
 
@@ -745,6 +744,8 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         try:
             mdFile = md.MetaData(MetaDataFile)
             angleY = mdFile.getValue(md.MDL_ANGLE_Y, 1)
+            if angleY is None:
+                angleY = 0
         except:
             angleY = 0
 

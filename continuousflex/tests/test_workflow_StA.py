@@ -31,7 +31,7 @@ from continuousflex.protocols.protocol_subtomogrmas_synthesize import MODE_RELAT
 from continuousflex.protocols.protocol_pdb_dimred import FlexProtDimredPdb
 from continuousflex.protocols.protocol_subtomograms_classify import FlexProtSubtomoClassify
 from continuousflex.protocols.protocol_subtomogram_averaging import FlexProtSubtomogramAveraging
-from continuousflex.protocols.protocol_missing_wedge_filling import FlexProtMissingWedgeFilling
+# from continuousflex.protocols.protocol_missing_wedge_filling import FlexProtMissingWedgeFilling
 
 
 class TestStA(TestWorkflow):
