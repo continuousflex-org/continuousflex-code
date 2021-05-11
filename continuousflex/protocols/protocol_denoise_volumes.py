@@ -39,6 +39,7 @@ REFERENCE_EXT = 0
 REFERENCE_STA = 1
 
 METHOD_BM4D = 0
+METHOD_LOWPASS = 1
 
 NOISE_GAUSS = 0
 NOISE_RICE = 1
@@ -61,36 +62,52 @@ class FlexProtVolumeDenoise(ProtAnalysis3D):
                       help='Select volumes')
         form.addSection('Method')
         form.addParam('Method', params.EnumParam,
-                      choices=['bm4d'],
+                      choices=['BM4D', 'Fourier lowpass filter'],
                       default=METHOD_BM4D,
                       label='Denoising Method', display=params.EnumParam.DISPLAY_COMBO,
-                      help='Denoise using bm4d')
-        form.addParam('noiseType', params.EnumParam,
+                      help='Choose a method: BM4D or Fourier lowpass filter')
+        group = form.addGroup('BM4D parameters', condition='Method==%d' % METHOD_BM4D)
+        group.addParam('noiseType', params.EnumParam,
                       choices=['Gaussian', 'Rician'],
                       default=NOISE_GAUSS,
                       label='Noise distribution', display=params.EnumParam.DISPLAY_COMBO,
                       help='Noise distribution (either Gaussian or Rician)')
-        form.addParam('sigma_choice', params.EnumParam,
+        group.addParam('sigma_choice', params.EnumParam,
                       choices=['Automatically estimate sigma', 'Set a value for sigma (recommended)'],
                       default=1,
                       label='Sigma choice', display=params.EnumParam.DISPLAY_COMBO,
                       help='Sigma is the standard deviation of data noise')
-        form.addParam('sigma', params.FloatParam, default=0.2, allowsNull=True,
+        group.addParam('sigma', params.FloatParam, default=0.2, allowsNull=True,
                       condition='sigma_choice==%d' % 1,
                       label='Sigma',
                       help='estimated standard deviation of data noise '
                            'defines the strength of the processing (high value gives smooth images)')
-        form.addParam('profile', params.EnumParam,
+        group.addParam('profile', params.EnumParam,
                       choices=['low complexity profile', 'normal profile', 'modified profile (recommended)'],
                       default=PROFILE_MP,
                       label='Noise profile', display=params.EnumParam.DISPLAY_COMBO,
                       help='lc --> low complexity profile, '
                            ' np --> normal profile,'
                            ' mp --> modified profile')
-        form.addParam('do_wiener', params.BooleanParam, allowsNull=True,
+        group.addParam('do_wiener', params.BooleanParam, allowsNull=True,
                       default=False,
                       label='Do wiener?',
                       help='Perform collaborative Wiener filtering')
+
+        # Normalized frequencies ("digital frequencies")
+        line = form.addLine('Frequency (normalized)',
+                            condition='Method==%d' % METHOD_LOWPASS)
+        line.addHidden('lowFreqDig', params.DigFreqParam, default=0.00,
+                        label='Lowest')
+        line.addParam('highFreqDig', params.DigFreqParam, default=0.35,
+                       label='Highest',
+                       help=('Amplitude decay in a [[https://en.wikipedia.org/'
+                             'wiki/Raised-cosine_filter][raised cosine]]'))
+        line.addParam('freqDecayDig', params.FloatParam, default=0.02,
+                      label='Frequency decay',
+                      help=('Amplitude decay in a [[https://en.wikipedia.org/'
+                            'wiki/Raised-cosine_filter][raised cosine]]'))
+
 
     # --------------------------- INSERT steps functions --------------------------------------------
 
