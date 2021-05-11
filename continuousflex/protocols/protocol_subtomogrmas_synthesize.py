@@ -233,17 +233,16 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                       help='The generated volumes will be low pass filtered before projection into a tilt series.'
                            ' This simulates extra distortions similar to dose accumulation.'
                            ' However, CTF will already have such an effect.')
-        form.addParam('w1', params.FloatParam, default=0.25,
+        line = form.addLine('Frequency (normalized)',
+                            condition='lowPassChoice==%d' % LOWPASS_YES,
+                            help='The cufoff frequency and raised coside width of the low pass filter.'
+                                 ' For details: see "xmipp_transform_filter --fourier low_pass"')
+        line.addParam('w1', params.FloatParam, default=0.25,
                       condition='lowPassChoice==%d' % LOWPASS_YES,
-                      label='Cutoff frequency (0 -> 0.5)',
-                      help='This is the cufoff frequency of the low pass filter.'
-                           ' For details: see "xmipp_transform_filter --fourier low_pass"')
-        form.addParam('raisedw', params.FloatParam, default=0.02,
-                      expertLevel=params.LEVEL_ADVANCED,
+                      label='Cutoff frequency (0 -> 0.5)')
+        line.addParam('raisedw', params.FloatParam, default=0.02,
                       condition='lowPassChoice==%d' % LOWPASS_YES,
-                      label='Raised cosine wedth',
-                      help='Pixels around the central frequency for the raised cosine,'
-                           ' For details: see "xmipp_transform_filter --fourier low_pass"')
+                      label='Raised cosine width')
 
         form.addSection('Reconstruction')
         form.addParam('reconstructionChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
@@ -548,7 +547,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             cutoff = self.w1.get()
             raisedw = self.raisedw.get()
             for i in range(numberOfVolumes):
-                params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_deformed.vol')
+                params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_df.vol')
                 params += " --fourier low_pass " + str(cutoff) + ' ' + str(raisedw)
                 runProgram('xmipp_transform_filter', params)
 
