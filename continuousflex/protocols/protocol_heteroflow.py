@@ -27,7 +27,7 @@ import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
 from pyworkflow.utils.path import makePath, createLink
 from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
-from .utilities.spider_files3 import save_volume, open_volume
+from .utilities.spider_files3 import save_volume #, open_volume
 import numpy as np
 import farneback3d
 from .utilities.spider_files3 import *
@@ -258,7 +258,9 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
         makePath(self._getExtraPath() + '/estimated_volumes')
         estVol_root = self._getExtraPath() + '/estimated_volumes/'
         reference_fn = self._getExtraPath('reference.spi')
-        reference = open_volume(reference_fn)
+        # reference = open_volume(reference_fn)
+        reference = ImageHandler().read(reference_fn).getData()
+
         stat_mat_fn = self._getExtraPath('cc_msd_mad.txt')
         # recount the number of volumes:
         imgFn = self.imgsFn
@@ -285,7 +287,9 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
             # getting a copy converted to spider format to solve the problem with stacks or mrc files
             tmp = self._getTmpPath('tmp.spi')
             self.runJob('xmipp_image_convert', '-i ' + imgPath + ' -o ' + tmp + ' --type vol')
-            vol_i = open_volume(tmp)
+            # vol_i = open_volume(tmp)
+            vol_i = ImageHandler().read(tmp).getData()
+
             warped_path_i = estVol_root + str(i + 1).zfill(6) + '.spi'
             warped_i = ImageHandler().read(warped_path_i).getData()
             # TODO: replace all the open_volume and save_volume by the ImageHandler() read and write
@@ -328,9 +332,13 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
 
     # --------------------------- UTILS functions --------------------------------------------
     def read_optical_flow(self, path_flowx, path_flowy, path_flowz):
-        x = open_volume(path_flowx)
-        y = open_volume(path_flowy)
-        z = open_volume(path_flowz)
+        # x = open_volume(path_flowx)
+        x = ImageHandler().read(path_flowx).getData()
+        # y = open_volume(path_flowy)
+        y = ImageHandler().read(path_flowy).getData()
+        # z = open_volume(path_flowz)
+        z = ImageHandler().read(path_flowz).getData()
+
         l = np.shape(x)
         # print(l)
         flow = np.zeros([3, l[0], l[1], l[2]])

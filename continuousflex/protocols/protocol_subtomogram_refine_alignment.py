@@ -27,7 +27,7 @@ import pyworkflow.protocol.params as params
 from pyworkflow.utils.path import makePath, copyFile
 from os.path import basename
 from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
-from .utilities.spider_files3 import save_volume, open_volume
+from .utilities.spider_files3 import save_volume #, open_volume
 from pyworkflow.utils import replaceBaseExt
 import numpy as np
 import farneback3d
@@ -42,6 +42,7 @@ from pwem.objects import Volume
 from joblib import Parallel, delayed
 import continuousflex
 from subprocess import check_call
+from pwem.emlib.image import ImageHandler
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
@@ -342,13 +343,17 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                 # print('xmipp_transform_geometry',params)
                 runProgram('xmipp_transform_geometry', params)
             # Now the STA is aligned, add the missing wedge region to the subtomogram:
-            v = open_volume(new_imgPath)
+            # v = open_volume(new_imgPath)
+            v = ImageHandler().read(new_imgPath).getData()
             I = fft(v)
             I = fftshift(I)
-            v_ave = open_volume(tempdir + '/temp.vol')
+            # v_ave = open_volume(tempdir + '/temp.vol')
+            v_ave = ImageHandler().read(tempdir + '/temp.vol').getData()
             Iave = fft(v_ave)
             Iave = fftshift((Iave))
-            Mask = open_volume(fnmask)
+            # Mask = open_volume(fnmask)
+            Mask = ImageHandler().read(fnmask).getData()
+
             Mask = np.ones(np.shape(Mask)) - Mask
             Iave = Iave * Mask
             #
@@ -361,7 +366,8 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
             # for debugging, save everything that was aligned in the first iteration
             if objId == 1:
-                v_ave = open_volume(tempdir + '/temp.vol')
+                # v_ave = open_volume(tempdir + '/temp.vol')
+                v_ave = ImageHandler().read(tempdir + '/temp.vol').getData()
                 save_volume(v_ave, self._getExtraPath('aligned_average_with_first_volume.spi'))
 
         mdImgs.write(self._getExtraPath('MWFilled_' + str(num) + '.xmd'))
@@ -490,7 +496,8 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
     def warpByFlow(self, num):
         makePath(self._getExtraPath() + '/estimated_volumes_' + str(num))
         estVol_root = self._getExtraPath() + '/estimated_volumes_' + str(num) + '/'
-        reference = open_volume(self._getExtraPath('reference' + str(num) + '.spi'))
+        # reference = open_volume(self._getExtraPath('reference' + str(num) + '.spi'))
+        reference = ImageHandler().read(self._getExtraPath('reference' + str(num) + '.spi')).getData()
         # recount the number of volumes:
         imgFn = self.imgsFn
         mdImgs = md.MetaData(imgFn)
@@ -708,9 +715,13 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
     # --------------------------- UTILS functions --------------------------------------------
     def read_optical_flow(self, path_flowx, path_flowy, path_flowz):
-        x = open_volume(path_flowx)
-        y = open_volume(path_flowy)
-        z = open_volume(path_flowz)
+        # x = open_volume(path_flowx)
+        x = ImageHandler().read(path_flowx).getData()
+        # y = open_volume(path_flowy)
+        y = ImageHandler().read(path_flowy).getData()
+        # z = open_volume(path_flowz)
+        z = ImageHandler().read(path_flowz).getData()
+
         l = np.shape(x)
         # print(l)
         flow = np.zeros([3, l[0], l[1], l[2]])
