@@ -73,9 +73,15 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                                                          ' subtomogram alignment and averaging.')
         form.addParam('dynamoTable', params.PathParam, allowsNull=True,
                       expertLevel=params.LEVEL_ADVANCED,
-                      label='Import a Dynamo table (Beta)',
+                      label='Import a Dynamo table [Beta]',
                       help='import a Dynamo table that contains the STA parameters. This option will evaluate '
                            'the average and transform the Dynamo table to Scipion metadata format')
+        form.addParam('tomBoxTable', params.PathParam, allowsNull=True,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='Import a TOM-toolbox table (motive list) [Beta]',
+                      help='import a TOM-toolbox table that contains the STA parameters. This option will evaluate '
+                           'the average and transform the table to Scipion metadata format and will allow more processing'
+                           ' such as refinement and classification')
         form.addSection(label='Missing-wedge Compensation')
         form.addParam('WedgeMode', params.EnumParam,
                       choices=['Do not compensate', 'Compensate'],
@@ -117,10 +123,12 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         self.outputMD = self._getExtraPath('final_md.xmd')
 
         self._insertFunctionStep('convertInputStep')
-        if self.dynamoTable.empty():
+        if self.dynamoTable.empty() and self.tomBoxTable.empty():
             self._insertFunctionStep('doAlignmentStep')
-        else:
+        elif not(self.dynamoTable.empty):
             self._insertFunctionStep('adaptDynamoStep', self.dynamoTable.get())
+        else:
+            self._insertFunctionStep('adaptTomboxStep', self.tomBoxTable.get())
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
@@ -330,6 +338,51 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         os.system("rm -f %(tempVol)s" % locals())
          # Averaging is done
 
+        pass
+
+    def adaptTomboxStep(self, Table):
+        volumes_in = self.imgsFn
+        volume_out = self.outputVolume
+        md_out = self.outputMD
+        from continuousflex.protocols.utilities.tombox import motivelist2metadata
+        motivelist2metadata(Table, volumes_in, md_out)
+
+        # Averaging based on the metadata:
+        mdImgs = md.MetaData(md_out)
+        counter = 0
+
+        for objId in mdImgs:
+            counter = counter + 1
+
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+            tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+            psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+
+            x_shift = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+            y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+            z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+
+            flip = mdImgs.getValue(md.MDL_ANGLE_Y, objId)
+            tempVol = self._getExtraPath('temp.mrc')
+            extra = self._getExtraPath()
+
+            params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                     ' --shift %(x_shift)s %(y_shift)s %(z_shift)s' % locals()
+
+            runProgram('xmipp_transform_geometry', params)
+
+            if counter == 1:
+                os.system("cp %(tempVol)s %(volume_out)s" % locals())
+
+            else:
+                params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
+                runProgram('xmipp_image_operate', params)
+
+        params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
+        runProgram('xmipp_image_operate', params)
+        os.system("rm -f %(tempVol)s" % locals())
+         # Averaging is done
         pass
 
     def createOutputStep(self):
