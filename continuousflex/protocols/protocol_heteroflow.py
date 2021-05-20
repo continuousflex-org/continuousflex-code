@@ -247,8 +247,8 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
 
     def copyOpticalFlows(self):
         # In this case we get from the refinment protocol the optical flows and the reference
-        self.imgsFn = self.refinementProt.get()._getExtraPath('input.xmd')
         N = self.refinementProt.get().NumOfIters.get()
+        self.imgsFn = self.refinementProt.get()._getExtraPath('volumes_aligned_'+str(N+1)+'.xmd')
         createLink(self.refinementProt.get()._getExtraPath() + '/optical_flows_' + str(N),
                    self._getExtraPath() + '/optical_flows')
         createLink(self.refinementProt.get()._getExtraPath('reference'+str(N+1)+'.spi'),

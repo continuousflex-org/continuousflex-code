@@ -24,7 +24,7 @@ from pwem.protocols import ProtAnalysis3D
 import xmipp3.convert
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
-from pyworkflow.utils.path import makePath, copyFile
+from pyworkflow.utils.path import makePath, copyFile, cleanPath
 from os.path import basename
 from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
 from .utilities.spider_files3 import save_volume #, open_volume
@@ -76,6 +76,14 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                        condition='Alignment_refine',
                        label='Refinment iterations', help='How many times you want to iterate to perform'
                                                          ' subtomogram alignment refinement.')
+        group.addParam('KeepFiles', params.BooleanParam, default=False,
+                       expertLevel=params.LEVEL_ADVANCED,
+                       label='Keep the intermediate files on the disk (CAREFUL!)?',
+                       condition='Alignment_refine',
+                       help='This will keep all the itermediate files on the disk (useful for debugging). Be very careful'
+                            ' that it requires 6 times the size of the input subtomograms per iteration.'
+                            ' For example, if you are using 1GB size input subtomogams, and you are refining for 4 iterations,'
+                            ' then this requires 24GB on the disk; where setting this to no, we require 6GB.')
         group.addParam('ApplyAlignment', params.EnumParam,
                        label='Apply volume/subtomogam alignment?',
                        choices=['Yes'],
@@ -88,7 +96,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                       pointerClass='SetOfVolumes',
                       label="Input volumes/subtomograms", important=True,
                       help='Select volumes')
-        group = form.addGroup('Reference volume: last iteration average of StA',
+        group = form.addGroup('Reference volume (last iteration average of StA) and a Mask',
                               condition='Alignment_refine or FillWedge')
         group.addParam('StartingReference', params.EnumParam,
                       choices=['Browse for an external volume file', 'Select a volume from the project workspace'],
@@ -104,6 +112,14 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                       condition='StartingReference==%d' % REFERENCE_STA,
                       label="Selected volume",
                       help='Choose a reference, typically from a StA previous run')
+        group.addParam('applyMask', params.BooleanParam, label='Use a mask?', default=True,
+                       help='A mask that can be applied on the reference without cropping it. The same mask will be'
+                            ' applied on the aligned subtomograms at each iteration (do not apply this mask in advance)'
+                       )
+        group.addParam('Mask', params.PointerParam,
+                       condition='applyMask',
+                       pointerClass='Volume', allowsNull=True,
+                       label="Select mask")
         group = form.addGroup('Alignment parameters: last iteration table of StA (Scipion/Xmipp metadata)')
         group.addParam('AlignmentParameters', params.EnumParam,
                       choices=['Browse for a file', 'Select a subtomogram averaging protocol '
@@ -206,7 +222,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         if (self.FillWedge.get()):
             self._insertFunctionStep('fillMissingWedge', N+1)
         self._insertFunctionStep('applyAlignment', N+1)
-        if N:
+        if self.Alignment_refine.get():
             self._insertFunctionStep('createOutputStep', N)
         else:
             self._insertFunctionStep('createOutputStep')
@@ -268,10 +284,21 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             path_vol0 = self._getExtraPath('reference' + str(num) + '.spi')
             params = '-i ' + STAVolume + ' -o ' + path_vol0 + ' --type vol'
             runProgram('xmipp_image_convert', params)
+
+            # if there is a mask, then apply it:
+            if (self.applyMask.get()):
+                maskfn = self.Mask.get().getFileName()
+                params = '-i ' + path_vol0 + ' -o ' + path_vol0 + ' --mult ' + maskfn
+                runProgram('xmipp_image_operate', params)
+
         # Otherwise, we use the last itration of the combined refined alignment and the last average reached
         else:
             imgFn = self._getExtraPath('combined_'+str(num-1)+'.xmd')
             STAVolume = self._getExtraPath('reference' + str(num) + '.spi')
+            # If this is not the first itration, remove the missing wedge filled data
+            print('keep files options is ',self.KeepFiles.get())
+            if(not(self.KeepFiles.get())):
+                cleanPath(self._getExtraPath() + '/mw_filled_' + str(num-1))
 
 
         tiltLow = self.tiltLow.get()
@@ -386,6 +413,11 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             else:
                 mdImgs = md.MetaData(self._getExtraPath('combined_' + str(num - 1) + '.xmd'))
 
+        if(num != 1):
+            # If this is not the first itration, remove the previously aligned data
+            if (not (self.KeepFiles.get())):
+                cleanPath(self._getExtraPath() + '/aligned_' + str(num - 1))
+
 
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
@@ -414,6 +446,13 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                 params += ' --inverse '
 
             runProgram('xmipp_transform_geometry', params)
+
+            # if there is a mask, then apply it:
+            if(self.applyMask.get()):
+                maskfn = self.Mask.get().getFileName()
+                params = '-i ' + new_imgPath + ' -o ' + new_imgPath + ' --mult ' + maskfn
+                runProgram('xmipp_image_operate', params)
+
         self.fnaligned = self._getExtraPath('volumes_aligned_'+str(num)+'.xmd')
         mdImgs.write(self.fnaligned)
 
@@ -436,8 +475,17 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             params = '-i ' + STAVolume + ' -o ' + path_vol0 + ' --type vol'
             runProgram('xmipp_image_convert', params)
 
+            # if there is a mask, then apply it:
+            if (self.applyMask.get()):
+                maskfn = self.Mask.get().getFileName()
+                params = '-i ' + path_vol0 + ' -o ' + path_vol0 + ' --mult ' + maskfn
+                runProgram('xmipp_image_operate', params)
+
         else:
             path_vol0 = self._getExtraPath('reference' + str(num) + '.spi')
+            # If this is not the first itration, remove the previous optical flows
+            if(not(self.KeepFiles.get())):
+                cleanPath(self._getExtraPath() + '/optical_flows_' + str(num - 1))
 
         pyr_scale = self.pyr_scale.get()
         levels = self.levels.get()
@@ -495,6 +543,9 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
     def warpByFlow(self, num):
         makePath(self._getExtraPath() + '/estimated_volumes_' + str(num))
+        if num != 1:
+            if(not(self.KeepFiles.get())):
+                cleanPath(self._getExtraPath() + '/estimated_volumes_' + str(num-1))
         estVol_root = self._getExtraPath() + '/estimated_volumes_' + str(num) + '/'
         # reference = open_volume(self._getExtraPath('reference' + str(num) + '.spi'))
         reference = ImageHandler().read(self._getExtraPath('reference' + str(num) + '.spi')).getData()
@@ -656,17 +707,10 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             extra = self._getExtraPath()
 
             if flag == 0 :
-                if first:
-                    print("THERE IS NO COMPENSATION FOR THE MISSING WEDGE")
-                    first = False
-
                 params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
                          ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
 
             else:
-                if first:
-                    print("THERE IS A COMPENSATION FOR THE MISSING WEDGE")
-                    first = False
                 # First got to rotate each volume 90 degrees about the y axis, align it, then sum it
                 params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
                 runProgram('xmipp_transform_geometry', params)
@@ -684,12 +728,22 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
         params = '-i %(outputVol)s --divide %(counter)s -o %(outputVol)s ' % locals()
         runProgram('xmipp_image_operate', params)
+
+        # if there is a mask, then apply it:
+        if (self.applyMask.get()):
+            maskfn = self.Mask.get().getFileName()
+            params = '-i ' + outputVol + ' -o ' + outputVol + ' --mult ' + maskfn
+            runProgram('xmipp_image_operate', params)
+
         os.system("rm -f %(tempVol)s" % locals())
 
 
     def createOutputStep(self, num =1):
         # now creating the output set of aligned volumes:
-        out_mdfn = self._getExtraPath('volumes_aligned_'+str(num)+'.xmd')
+        if num==1:
+            out_mdfn = self._getExtraPath('volumes_aligned_'+str(num)+'.xmd')
+        else:
+            out_mdfn = self._getExtraPath('volumes_aligned_' + str(num+1) + '.xmd')
         partSet = self._createSetOfVolumes('aligned')
         xmipp3.convert.readSetOfVolumes(out_mdfn, partSet)
         partSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
