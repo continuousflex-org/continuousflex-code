@@ -39,7 +39,10 @@ def motivelist2metadata(mtlist, mdfi, mdfo):
         psi = float(line[17])
         theta = float(line[18])
         # Conversion of angles:
-        rot, tilt, psi = Euler_matrix2angles(TomboxRotationMatrix(phi, psi, theta))
+        a, b, c = Euler_matrix2angles(TomboxRotationMatrix(phi, psi, theta))
+        rot = -c
+        tilt = -b
+        psi = -a
         # Writing the results:
         # md_motlist.setValue(md.MDL_IMAGE, name, md_motlist.addObject())
         md_motlist.setValue(md.MDL_MAXCC, cc, counter)

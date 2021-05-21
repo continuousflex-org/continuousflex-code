@@ -112,7 +112,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                       condition='StartingReference==%d' % REFERENCE_STA,
                       label="Selected volume",
                       help='Choose a reference, typically from a StA previous run')
-        group.addParam('applyMask', params.BooleanParam, label='Use a mask?', default=True,
+        group.addParam('applyMask', params.BooleanParam, label='Use a mask?', default=False,
                        help='A mask that can be applied on the reference without cropping it. The same mask will be'
                             ' applied on the aligned subtomograms at each iteration (do not apply this mask in advance)'
                        )
