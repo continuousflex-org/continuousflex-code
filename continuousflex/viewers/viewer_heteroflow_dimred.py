@@ -48,6 +48,7 @@ from joblib import load, dump
 from continuousflex.protocols.utilities.spider_files3 import open_volume, save_volume
 import farneback3d
 import matplotlib.pyplot as plt
+from pwem.emlib.image import ImageHandler
 
 from pyworkflow.protocol import params
 
@@ -436,9 +437,13 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         return errors
 
     def read_optical_flow(self, path_flowx, path_flowy, path_flowz):
-        x = open_volume(path_flowx)
-        y = open_volume(path_flowy)
-        z = open_volume(path_flowz)
+        # x = open_volume(path_flowx)
+        x = ImageHandler().read(path_flowx).getData()
+        # y = open_volume(path_flowy)
+        y = ImageHandler().read(path_flowy).getData()
+        # z = open_volume(path_flowz)
+        z = ImageHandler().read(path_flowz).getData()
+
         l = np.shape(x)
         flow = np.zeros([3, l[0], l[1], l[2]])
         flow[0, :, :, :] = x
