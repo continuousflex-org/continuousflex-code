@@ -37,12 +37,12 @@ import os
 from os.path import basename, isfile
 from pwem.utils import runProgram
 from pwem import Domain
-from xmippLib import Euler_matrix2angles, Euler_angles2matrix
 from pwem.objects import Volume
 from joblib import Parallel, delayed
 import continuousflex
 from subprocess import check_call
 from pwem.emlib.image import ImageHandler
+import math
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
@@ -626,43 +626,21 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             shifty_r = MD_refined.getValue(md.MDL_SHIFT_Y, objId)
             shiftz_r = MD_refined.getValue(md.MDL_SHIFT_Z, objId)
 
-            T1 = Euler_angles2matrix(rot_o, tilt_o, psi_o)
-            T_o = np.zeros([4,4])
-            T_o[:3,:3] = T1
-            T_o[0,3] = shiftx_o
-            T_o[1,3] = shifty_o
-            T_o[2,3] = shiftz_o
-            T_o[3,3] = 1
-
-            T2 = Euler_angles2matrix(rot_r, tilt_r, psi_r)
-            T_r = np.zeros([4,4])
-            T_r[:3, :3] = T2
-            T_r[0,3] = shiftx_r
-            T_r[1,3] = shifty_r
-            T_r[2,3] = shiftz_r
-            T_r[3,3] = 1
+            T_o = self.eulerAngles2matrix(rot_o, tilt_o, psi_o, shiftx_o, shifty_o, shiftz_o)
+            T_r = self.eulerAngles2matrix(rot_r, tilt_r, psi_r, shiftx_r, shifty_r, shiftz_r)
 
             # 3- multiply the matrices
             if self.getAngleY() == 90:
                 # In this case the refinement matrix should be inverted (because the refined alignment does not have
                 # missing wedge correction)
                 T_r_inv = np.linalg.inv(T_r)
-                T_shift = np.matmul(T_r_inv,T_o)
-                # This is taken separately to avoid numerical errors
-                T2_inv = np.linalg.inv(T2)
-                T_ang= np.matmul(T2_inv,T1)
+                T = np.matmul(T_r_inv,T_o)
             else:
                 # In this case the refinement matrix should be used as it is (as for both the previous and refined do not
                 # have missing wedge correction)
-                T_shift = np.matmul(T_o, T_r)
-                # This is taken separately to avoid numerical errors
-                T_ang = np.matmul(T1, T2)
+                T = np.matmul(T_o, T_r)
 
-            # 4- Find the angles and shifts of the overall matrix
-            rot_i, tilt_i, psi_i = Euler_matrix2angles(T_ang)
-            x_i = T_shift[0, 3]
-            y_i = T_shift[1, 3]
-            z_i = T_shift[2, 3]
+            rot_i, tilt_i, psi_i, x_i, y_i, z_i = self.matrix2eulerAngles(T)
 
             # Populate the metadata
             name_i = MD_original.getValue(md.MDL_IMAGE, objId)
@@ -738,12 +716,8 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         os.system("rm -f %(tempVol)s" % locals())
 
 
-    def createOutputStep(self, num =1):
-        # now creating the output set of aligned volumes:
-        if num==1:
-            out_mdfn = self._getExtraPath('volumes_aligned_'+str(num)+'.xmd')
-        else:
-            out_mdfn = self._getExtraPath('volumes_aligned_' + str(num+1) + '.xmd')
+    def createOutputStep(self, num =0):
+        out_mdfn = self._getExtraPath('volumes_aligned_' + str(num + 1) + '.xmd')
         partSet = self._createSetOfVolumes('aligned')
         xmipp3.convert.readSetOfVolumes(out_mdfn, partSet)
         partSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
@@ -818,3 +792,63 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
     def getVolumeDimesion(self):
         return self.inputVolumes.get().getDimensions()[0]
+
+    def matrix2eulerAngles(self, A):
+        abs_sb = np.sqrt(A[0, 2] * A[0, 2] + A[1, 2] * A[1, 2])
+        if (abs_sb > 16 * np.exp(-5)):
+            gamma = math.atan2(A[1, 2], -A[0, 2])
+            alpha = math.atan2(A[2, 1], A[2, 0])
+            if (abs(np.sin(gamma)) < np.exp(-5)):
+                sign_sb = np.sign(-A[0, 2] / np.cos(gamma))
+            else:
+                if np.sin(gamma) > 0:
+                    sign_sb = np.sign(A[1, 2])
+                else:
+                    sign_sb = -np.sign(A[1, 2])
+            beta = math.atan2(sign_sb * abs_sb, A[2, 2])
+        else:
+            if (np.sign(A[2, 2]) > 0):
+                alpha = 0
+                beta = 0
+                gamma = math.atan2(-A[1, 0], A[0, 0])
+            else:
+                alpha = 0
+                beta = np.pi
+                gamma = math.atan2(A[1, 0], -A[0, 0])
+        gamma = np.rad2deg(gamma)
+        beta = np.rad2deg(beta)
+        alpha = np.rad2deg(alpha)
+        return alpha, beta, gamma, A[0, 3], A[1, 3], A[2, 3]
+
+
+    def eulerAngles2matrix(self, alpha, beta, gamma, shiftx, shifty, shiftz):
+        A = np.empty([4, 4])
+        A.fill(2)
+        A[3, 3] = 1
+        A[3, 0:3] = 0
+        A[0, 3] = float(shiftx)
+        A[1, 3] = float(shifty)
+        A[2, 3] = float(shiftz)
+        alpha = float(alpha)
+        beta = float(beta)
+        gamma = float(gamma)
+        sa = np.sin(np.deg2rad(alpha))
+        ca = np.cos(np.deg2rad(alpha))
+        sb = np.sin(np.deg2rad(beta))
+        cb = np.cos(np.deg2rad(beta))
+        sg = np.sin(np.deg2rad(gamma))
+        cg = np.cos(np.deg2rad(gamma))
+        cc = cb * ca
+        cs = cb * sa
+        sc = sb * ca
+        ss = sb * sa
+        A[0, 0] = cg * cc - sg * sa
+        A[0, 1] = cg * cs + sg * ca
+        A[0, 2] = -cg * sb
+        A[1, 0] = -sg * cc - cg * sa
+        A[1, 1] = -sg * cs + cg * ca
+        A[1, 2] = sg * sb
+        A[2, 0] = sc
+        A[2, 1] = ss
+        A[2, 2] = cb
+        return A

@@ -130,13 +130,13 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
                       expertLevel=params.LEVEL_ADVANCED,
                       label='flags',
                       help='flag to pass for the optical flow')
-        group.addHidden('factor1', params.IntParam, default=100,
+        group.addParam('factor1', params.IntParam, default=100,
                       expertLevel=params.LEVEL_ADVANCED,
-                      label='factor1',
+                      label='gray scale factor1',
                       help='this factor will be multiplied by the gray levels of each subtomogram')
-        group.addHidden('factor2', params.IntParam, default=100,
+        group.addParam('factor2', params.IntParam, default=100,
                       expertLevel=params.LEVEL_ADVANCED,
-                      label='factor2',
+                      label='gray scale factor2',
                       help='this factor will be multiplied by the gray levels of the reference')
 
     # --------------------------- INSERT steps functions --------------------------------------------
