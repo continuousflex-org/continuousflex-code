@@ -115,6 +115,14 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                       condition='StartingReference==%d' % REFERENCE_IMPORTED,
                       label="selected starting reference",
                       help='Choose an imported volume as a starting reference')
+        group.addParam('applyMask', params.BooleanParam, label='Use a mask?', default=False,
+                       help='A mask that can be applied on the reference without cropping it. The same mask will be'
+                            ' applied on the aligned subtomograms at each iteration (do not apply this mask in advance)'
+                       )
+        group.addParam('Mask', params.PointerParam,
+                       condition='applyMask',
+                       pointerClass='Volume', allowsNull=True,
+                       label="Select mask")
         group.addParam('NumOfIters', params.IntParam, default=10,
                       label='Number of iterations', help='How many times you want to iterate while performing'
                                                          ' subtomogram alignment and averaging.')
@@ -225,8 +233,9 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                 # args += " %(tilt0)d %(tiltF)d "
                 args += "--tilt_values %(tilt0)d %(tiltF)d "
 
-            # This command does not allow mpi processing
-            # runProgram("xmipp_volumeset_align", args % locals())
+            if self.applyMask.get():
+                args += "--mask " + self.Mask.get().getFileName()
+
             self.runJob("xmipp_volumeset_align", args % locals(),
                         env = Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
 
