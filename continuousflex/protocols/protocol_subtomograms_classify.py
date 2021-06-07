@@ -373,7 +373,7 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
         if self.SubtomoSource.get() == 0:
             return self.ProtSynthesize.get().volumeSize.get()
         if self.SubtomoSource.get() == 1:
-            return self.StA.get().outputvolume.getDim()[0]
+            return self.StA.get().SubtomogramAverage.getDim()[0]
 
 
     def getOutputMatrixFile(self):
