@@ -78,6 +78,14 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
                       choices=['Scikit-Learn PCA'],
                       label='Dimensionality reduction method',
                       help='This method will be used to reduce the dimensions of the covariance matrix')
+        form.addParam('applyMask', params.BooleanParam, label='Use a mask?', default=False,
+                       help='This mask will be applied on the aligned particles before finding the cross correlation'
+                            ', a proper mask is a mask derived from the subtomogram average (tight), that can be '
+                            'applied on it without cropping any part.')
+        form.addParam('Mask', params.PointerParam,
+                       condition='applyMask',
+                       pointerClass='Volume', allowsNull=True,
+                       label="Select mask")
         form.addParam('reducedDim', IntParam, default=2,
                       condition='classifyTechnique == 1',
                       label='Reduced dimension')
@@ -147,32 +155,45 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
             shifty = str(subtomogramMD.getValue(md.MDL_SHIFT_Y, i))
             shiftz = str(subtomogramMD.getValue(md.MDL_SHIFT_Z, i))
             # align the subtomogram
-            if self.SubtomoSource.get() == 1:
+
+            if self.getAngleY() == 90:
                 args = '-i ' + fnsubtomo + ' -o ' + fnalignedsubtomo + ' --rotate_volume euler 0 90 0'
                 runProgram('xmipp_transform_geometry', args)
                 params = '-i ' + fnalignedsubtomo + ' -o ' + fnalignedsubtomo + ' '
+
             else:
                 params = '-i ' + fnsubtomo + ' -o ' + fnalignedsubtomo + ' '
+                params += ' --inverse '
+
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
-            if self.SubtomoSource.get() == 0:
-                params += ' --inverse '
+
             runProgram('xmipp_transform_geometry', params)
+
             # align the mask (no shift should be applied only angles)
-            if self.SubtomoSource.get() == 1:
+            if self.getAngleY() == 90:
                 args = '-i ' + fnmask + ' -o ' + fnalignedmask + ' --rotate_volume euler 0 90 0'
                 runProgram('xmipp_transform_geometry', args)
                 params = '-i ' + fnalignedmask + ' -o ' + fnalignedmask + ' '
             else:
                 params = '-i ' + fnmask + ' -o ' + fnalignedmask + ' '
-            params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
-            if self.SubtomoSource.get() == 0:
                 params += ' --inverse '
+
+            params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
+
             runProgram('xmipp_transform_geometry', params)
+
+            if (self.applyMask):
+                maskfn = self.Mask.get().getFileName()
+                params = '-i ' + fnalignedsubtomo + ' -o ' + fnalignedsubtomo + ' --mult ' + maskfn
+                runProgram('xmipp_image_operate', params)
+
             subtomogaligneMD.setValue(md.MDL_IMAGE, fnalignedsubtomo, subtomogaligneMD.addObject())
             mwalignedMD.setValue(md.MDL_IMAGE, fnalignedmask, mwalignedMD.addObject())
         subtomogaligneMD.write(self._getExtraPath('aligned_subtomograms.xmd'))
         mwalignedMD.write(self._getExtraPath('aligned_masks.xmd'))
+
+
 
 
     def find_covariance_matrix(self):
@@ -363,6 +384,14 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
             return [self.ProtSynthesize.get().tiltLow.get(), self.ProtSynthesize.get().tiltHigh.get()]
         if self.SubtomoSource.get()==1:
             return [self.StA.get().tiltLow.get(), self.StA.get().tiltHigh.get()]
+
+    def getAngleY(self):
+        if self.SubtomoSource.get() == 0:
+            return 0
+        if self.SubtomoSource.get() == 1:
+            temp = md.MetaData(self.StA.get()._getExtraPath('final_md.xmd'))
+            return temp.getValue(md.MDL_ANGLE_Y, 1)
+
 
     def getSamplingRate(self):
         if self.SubtomoSource.get()==0:
