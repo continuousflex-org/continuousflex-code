@@ -261,7 +261,8 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         # Write the particles
         prot = self.protocol
         project = prot.getProject()
-        inputSet = prot.getInputParticles().get()
+        # inputSet = prot.getInputParticles().get()
+        inputSet = prot.getInputParticles()
         makePath(prot._getTmpPath())
         fnSqlite = prot._getTmpPath('cluster_particles.sqlite')
         cleanPath(fnSqlite)
@@ -422,7 +423,8 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         """ Iterate over the images and their deformations
         to create a Data object with theirs Points.
         """
-        particles = self.protocol.getInputParticles().get()
+        # particles = self.protocol.getInputParticles().get()
+        particles = self.protocol.getInputParticles()
         mat = np.loadtxt(self.protocol._getExtraPath('output_matrix.txt'))
         data = Data()
         for i, particle in enumerate(particles):

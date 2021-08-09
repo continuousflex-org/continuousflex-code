@@ -33,6 +33,7 @@ import numpy as np
 import glob
 from sklearn import decomposition
 from joblib import dump
+import xmipp3
 
 DIMRED_PCA = 0
 DIMRED_LTSA = 1
@@ -220,9 +221,18 @@ class FlexProtDimredHeteroFlow(ProtAnalysis3D):
     def getInputParticles(self):
         """ Get the particles of the input optical flow protocol. """
         if(self.inputOpFlow.get().inputVolumes.get()):
-            return self.inputOpFlow.get().inputVolumes
+            return self.inputOpFlow.get().inputVolumes.get()
         else:
-            return self.inputOpFlow.get().refinementProt.get().inputVolumes
+            # number of refinement iterations
+            num = self.inputOpFlow.get().refinementProt.get().NumOfIters.get()+1
+            fn = 'volumes_aligned_'+str(num)+'.xmd'
+            mdfn = self.inputOpFlow.get().refinementProt.get()._getExtraPath(fn)
+            print(mdfn)
+            partSet = self._createSetOfVolumes('to_average')
+            print(self.inputOpFlow.get().refinementProt.get().inputVolumes)
+            xmipp3.convert.readSetOfVolumes(mdfn, partSet)
+            partSet.setSamplingRate(self.inputOpFlow.get().refinementProt.get().inputVolumes.get().getSamplingRate())
+            return partSet
 
     def getOutputMatrixFile(self):
         return self._getExtraPath('output_matrix.txt')

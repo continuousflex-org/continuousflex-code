@@ -54,7 +54,8 @@ class FlexBatchProtHeteroFlowCluster(BatchProtocol):
     def convertInputStep(self, volumesMd):
         # It is unusual to create the output in the convertInputStep,
         # but just to avoid reading twice the sqlite with particles
-        inputSet = self.inputHeteroFlowDimred.get().getInputParticles().get()
+        # inputSet = self.inputHeteroFlowDimred.get().getInputParticles().get()
+        inputSet = self.inputHeteroFlowDimred.get().getInputParticles()
         partSet = self._createSetOfVolumes()
         # partSet = SetOfVolumes()
         partSet.copyInfo(inputSet)
@@ -64,7 +65,7 @@ class FlexBatchProtHeteroFlowCluster(BatchProtocol):
         partSet.setAlignmentProj()
 
         self._defineOutputs(OutputVolumes=partSet)
-        self._defineTransformRelation(inputSet, partSet)
+        # self._defineTransformRelation(inputSet, partSet)
         writeSetOfVolumes(partSet, volumesMd)
 
 
