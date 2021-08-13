@@ -130,7 +130,8 @@ class FlexProtDimredHeteroFlow(ProtAnalysis3D):
         # Take deforamtions text file and the number of images and modes
         inputSet = self.getInputParticles().get()
         print(inputSet)
-        rows = inputSet.getSize()
+        # TODO: fix the problem with inputset (related to pointers)
+        rows = inputSet.get().getSize()
         reducedDim = self.reducedDim.get()
         method = self.dimredMethod.get()
         extraParams = self.extraParams.get('')
