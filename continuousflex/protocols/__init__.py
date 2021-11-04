@@ -43,3 +43,4 @@ from .pdb import *
 from .protocol_pdb_dimred import FlexProtDimredPdb
 from .protocol_subtomograms_classify import FlexProtSubtomoClassify
 from .protocol_image_synthesize import FlexProtSynthesizeImages
+from .protocol_genesis import ProtGenesis

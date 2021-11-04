@@ -1,7 +1,7 @@
 # **************************************************************************
+# * Authors: Rémi Vuillemot             (remi.vuillemot@upmc.fr)
 # *
-# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
-# *              Slavica Jonic  (slavica.jonic@upmc.fr)
+# * IMPMC, UPMC Sorbonne University
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -20,17 +20,22 @@
 # *
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
-# *
 # **************************************************************************
-from .viewer_nma import FlexNMAViewer
-from .viewer_nma_alignment import FlexAlignmentNMAViewer
-from .viewer_nma_dimred import FlexDimredNMAViewer
-from .viewer_structure_mapping import FlexProtStructureMappingViewer
-from .viewer_subtomograms_synthesize import FlexProtSynthesizeSubtomoViewer
-from .viewer_pdb_dimred import FlexProtPdbDimredViewer
-from .viewer_subtomograms_classify import FlexProtSubtomoClassifyViewer
-from .viewer_nma_alignment_vol import FlexAlignmentNMAVolViewer
-from .viewer_nma_dimred_vol import FlexDimredNMAVolViewer
-from .viewer_image_synthesize import FlexProtSynthesizeImageViewer
-from .viewer_genesis import GenesisViewer
 
+
+from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
+import pyworkflow.protocol.params as params
+from continuousflex.protocols.protocol_genesis import ProtGenesis
+
+class GenesisViewer(ProtocolViewer):
+    """ Visualization of results from the GENESIS protocol
+    """
+    _label = 'viewer genesis'
+    _targets = [ProtGenesis]
+    _environments = [DESKTOP_TKINTER, WEB_DJANGO]
+
+    def _defineParams(self, form):
+        form.addSection(label='Visualization')
+        form.addParam('test', params.FloatParam, default=None,
+                      label='Hello',
+                      help='TODO')
