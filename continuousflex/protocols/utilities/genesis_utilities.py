@@ -345,7 +345,7 @@ def generatePSF(inputPDB, inputTopo, outputPrefix, nucleicChoice):
     os.system("rm -f " + fnPSFgen)
 
 
-def generateGROTOP(inputPDB, outputPrefix, forcefield, smog_dir):
+def generateGROTOP(inputPDB, outputPrefix, forcefield, smog_dir, nucleicChoice):
     mol = PDBMol(inputPDB)
     mol.remove_alter_atom()
     mol.remove_hydrogens()

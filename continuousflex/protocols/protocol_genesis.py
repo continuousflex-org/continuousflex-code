@@ -261,7 +261,8 @@ class ProtGenesis(EMProtocol):
                     generatePSF(inputPDB=self.inputPDBfn[i], inputTopo=self.inputRTF.get(),
                                 outputPrefix=inputPrefix, nucleicChoice=self.nucleicChoice.get())
                     generateGROTOP(inputPDB=self.inputPDBfn[i], outputPrefix=inputPrefix,
-                                   forcefield=self.forcefield.get(), smog_dir=self.smog_dir.get())
+                                   forcefield=self.forcefield.get(), smog_dir=self.smog_dir.get(),
+					nucleicChoice=self.nucleicChoice.get())
                     self.inputTOPfn.append(inputPrefix+".top")
 
         else:
