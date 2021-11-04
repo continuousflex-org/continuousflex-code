@@ -31,6 +31,7 @@ from pwem.objects import SetOfParticles, Volume
 
 from xmipp3.convert import writeSetOfParticles
 from pwem.utils import runProgram
+import pwem.emlib.metadata as md
 
 
 class FlexBatchProtNMACluster(BatchProtocol):
@@ -71,6 +72,22 @@ class FlexBatchProtNMACluster(BatchProtocol):
         self._defineTransformRelation(inputSet, partSet)
         
         writeSetOfParticles(partSet, imagesMd)
+
+        # Add the NMA displacement to clusters XMD files
+        md_file_nma = md.MetaData(self.inputNmaDimred.get().getParticlesMD())
+        md_file_org = md.MetaData(imagesMd)
+        for objID in md_file_org:
+            # if image name is the same, we add the nma displacement from nma to org
+            id_org = md_file_org.getValue(md.MDL_ITEM_ID, objID)
+            for j in md_file_nma:
+                id_nma = md_file_nma.getValue(md.MDL_ITEM_ID, j)
+                print(id_nma)
+                if id_org == id_nma:
+                    displacements = md_file_nma.getValue(md.MDL_NMA, j)
+                    md_file_org.setValue(md.MDL_NMA, displacements, objID)
+                    break
+        md_file_org.write(imagesMd)
+
 
     def reconstructStep(self, params):
         runProgram('xmipp_reconstruct_fourier_accel', params)
