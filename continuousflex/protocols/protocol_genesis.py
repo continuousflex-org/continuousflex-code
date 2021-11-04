@@ -170,7 +170,7 @@ class ProtGenesis(EMProtocol):
         form.addParam('image_size', params.IntParam, default=64, label='Image Size',
                       help="TODO", condition="EMfitChoice==2")
         form.addParam('estimateRB', params.BooleanParam, label="Estimate rigid body ?",
-                      default=False, help="TODO")
+                      default=False,  condition="EMfitChoice==2", help="TODO")
         form.addParam('n_iter', params.IntParam, default=10, label='Number of iterations for rigid body fitting',
                       help="TODO", condition="EMfitChoice==2 and estimateRB")
         form.addParam('imageRB', params.FileParam, label="Rigid body parameters (.xmd)",
@@ -261,7 +261,7 @@ class ProtGenesis(EMProtocol):
                     generatePSF(inputPDB=self.inputPDBfn[i], inputTopo=self.inputRTF.get(),
                                 outputPrefix=inputPrefix, nucleicChoice=self.nucleicChoice.get())
                     generateGROTOP(inputPDB=self.inputPDBfn[i], outputPrefix=inputPrefix,
-                                   forcefield=self.forcefield.get())
+                                   forcefield=self.forcefield.get(), smog_dir=self.smog_dir.get())
                     self.inputTOPfn.append(inputPrefix+".top")
 
         else:

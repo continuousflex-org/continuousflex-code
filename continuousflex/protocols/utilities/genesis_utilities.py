@@ -345,7 +345,7 @@ def generatePSF(inputPDB, inputTopo, outputPrefix, nucleicChoice):
     os.system("rm -f " + fnPSFgen)
 
 
-def generateGROTOP(self, inputPDB, outputPrefix, forcefield):
+def generateGROTOP(inputPDB, outputPrefix, forcefield, smog_dir):
     mol = PDBMol(inputPDB)
     mol.remove_alter_atom()
     mol.remove_hydrogens()
@@ -354,13 +354,13 @@ def generateGROTOP(self, inputPDB, outputPrefix, forcefield):
     mol.alias_atom("OT2", "OXT")
     mol.alias_res("HSE", "HIS")
 
-    if self.nucleicChoice.get() == NUCLEIC_RNA:
+    if nucleicChoice == NUCLEIC_RNA:
         mol.alias_res("CYT", "C")
         mol.alias_res("GUA", "G")
         mol.alias_res("ADE", "A")
         mol.alias_res("URA", "U")
 
-    elif self.nucleicChoice.get() == NUCLEIC_DNA:
+    elif nucleicChoice == NUCLEIC_DNA:
         mol.alias_res("CYT", "DC")
         mol.alias_res("GUA", "DG")
         mol.alias_res("ADE", "DA")
@@ -382,7 +382,7 @@ def generateGROTOP(self, inputPDB, outputPrefix, forcefield):
     mol.save(inputPDB)
 
     # Run Smog2
-    os.system("%s/bin/smog2" % self.smog_dir.get()+\
+    os.system("%s/bin/smog2" % smog_dir+\
                "-i %s -dname %s -%s -limitbondlength -limitcontactlength" %
                (inputPDB, outputPrefix,
                 "CA" if forcefield == FORCEFIELD_CAGO else "AA"))
