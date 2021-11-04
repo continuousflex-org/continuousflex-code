@@ -72,6 +72,22 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
         self._defineTransformRelation(inputSet, partSet)
         writeSetOfVolumes(partSet, volumesMd)
 
+        # Add the NMA displacement to clusters XMD files
+        md_file_nma = md.MetaData(self.inputNmaDimred.get().getParticlesMD())
+        md_file_org = md.MetaData(volumesMd)
+        for objID in md_file_org:
+            # if image name is the same, we add the nma displacement from nma to org
+            id_org = md_file_org.getValue(md.MDL_ITEM_ID, objID)
+            for j in md_file_nma:
+                id_nma = md_file_nma.getValue(md.MDL_ITEM_ID, j)
+                print(id_nma)
+                if id_org == id_nma:
+                    displacements = md_file_nma.getValue(md.MDL_NMA, j)
+                    md_file_org.setValue(md.MDL_NMA, displacements, objID)
+                    break
+        md_file_org.write(volumesMd)
+
+
 
     def averagingStep(self):
         flag = self.angleYflag.get()

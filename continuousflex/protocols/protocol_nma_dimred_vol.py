@@ -268,6 +268,10 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
         """ Get the output particles of the input NMA protocol. """
         return self.inputNMA.get().outputParticles
 
+    def getParticlesMD(self):
+        "Get the metadata files that contain the NMA displacement"
+        return self.inputNMA.get()._getExtraPath('volumes.xmd')
+
     def getInputPdb(self):
         return self.inputNMA.get().getInputPdb()
 
