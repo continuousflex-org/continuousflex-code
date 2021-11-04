@@ -383,7 +383,7 @@ def generateGROTOP(inputPDB, outputPrefix, forcefield, smog_dir, nucleicChoice):
 
     # Run Smog2
     os.system("%s/bin/smog2" % smog_dir+\
-               "-i %s -dname %s -%s -limitbondlength -limitcontactlength" %
+               " -i %s -dname %s -%s -limitbondlength -limitcontactlength" %
                (inputPDB, outputPrefix,
                 "CA" if forcefield == FORCEFIELD_CAGO else "AA"))
 
