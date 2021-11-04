@@ -44,6 +44,9 @@ class FlexNmaVolPlotter(FlexPlotter):
         self._ylimhigh = kwargs.get('ylim_high')
         self._zlimlow = kwargs.get('zlim_low')
         self._zlimhigh = kwargs.get('zlim_high')
+        # Alpha and S are the transparancy and the size of the points, respectively
+        self._alpha = kwargs.get('alpha')
+        self._s = kwargs.get('s')
         FlexPlotter.__init__(self, **kwargs)
         self.useLastPlot = False
 
@@ -74,7 +77,16 @@ class FlexNmaVolPlotter(FlexPlotter):
             ax.set_xlim([self._xlimlow.get(), self._xlimhigh.get()])
         if lowy:
             ax.set_ylim([self._ylimlow.get(), self._ylimhigh.get()])
-        plotArray2D(ax, self._data, self._limitlow, self._limitup)
+        s = alpha = None
+        try:
+            s = self._s.get()
+            alpha = self._alpha.get()
+        except:
+            pass
+        if s and alpha:
+            plotArray2D(ax, self._data, self._limitlow, self._limitup, s, alpha)
+        else:
+            plotArray2D(ax, self._data, self._limitlow, self._limitup)
         return ax
 
     def plotArray2D_xy(self, title, xlabel, ylabel):
@@ -92,7 +104,17 @@ class FlexNmaVolPlotter(FlexPlotter):
         if lowy:
             ax.set_ylim([self._ylimlow.get(), self._ylimhigh.get()])
 
-        plotArray2D_xy(ax, self._data, self._limitlow, self._limitup)
+        s = alpha = None
+        try:
+            s = self._s.get()
+            alpha = self._alpha.get()
+        except:
+            pass
+        if s and alpha:
+            plotArray2D_xy(ax, self._data, self._limitlow, self._limitup, s, alpha)
+        else:
+            plotArray2D_xy(ax, self._data, self._limitlow, self._limitup)
+
         return ax
 
     def plotArray3D(self, title, xlabel, ylabel, zlabel):
@@ -197,28 +219,28 @@ class FlexNmaVolPlotter(FlexPlotter):
 
 # ---------- Utility functions -----------------
 
-def plotArray2D(ax, data, vvmin=None, vvmax=None):
+def plotArray2D(ax, data, vvmin=None, vvmax=None, s = None, alpha = None):
     xdata = data.getXData()
     ydata = data.getYData()
     weights = data.getWeights()
-    if vvmin:
-        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights, vmin=vvmin.get(), vmax=vvmax.get())
+    if vvmin and vvmax:
+        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights, vmin=vvmin.get(), vmax=vvmax.get(), s=s, alpha=alpha)
         #plot_kwds = {'alpha': 0.25, 's': 150, 'linewidths': 0}
         #cax = ax.scatter(xdata, ydata, c='b',**plot_kwds)
     else:
-        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights)
+        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights, s=s, alpha=alpha)
     cb = ax.figure.colorbar(cax)
     cb.set_label('1- Cross Correlation')
 
 
-def plotArray2D_xy(ax, data, vvmin=None, vvmax=None):
+def plotArray2D_xy(ax, data, vvmin=None, vvmax=None, s = None, alpha = None):
     xdata = data.getXData()
     ydata = data.getYData()
     weights = data.getWeights()
-    if vvmin:
-        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights, vmin=vvmin.get(), vmax=vvmax.get())
+    if vvmin and vvmax:
+        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights, vmin=vvmin.get(), vmax=vvmax.get(), s=s, alpha=alpha)
         #plot_kwds = {'alpha': 0.25, 's': 150, 'linewidths': 0}
         #cax = ax.scatter(xdata, ydata, c='b',**plot_kwds)
     else:
-        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights)
+        cax = ax.scatter(xdata, ydata, c=np.ones(len(weights)) - weights, s=s, alpha=alpha)
 

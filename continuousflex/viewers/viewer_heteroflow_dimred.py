@@ -61,6 +61,8 @@ Y_LIMITS_NONE = 0
 Y_LIMITS = 1
 Z_LIMITS_NONE = 0
 Z_LIMITS = 1
+POINT_LIMITS_NONE = 0
+POINT_LIMITS = 1
 
 
 class FlexDimredHeteroFlowViewer(ProtocolViewer):
@@ -150,6 +152,22 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         form.addParam('zlim_high', params.FloatParam, default=None,
                       condition='zlimits_mode==%d' % Z_LIMITS,
                       label='Upper z-axis limit')
+        # Scatter points size and transparancy
+        form.addParam('points_shades', params.EnumParam,
+                      choices=['Automatic (Recommended)', 'Set manually point radius and transparancy'],
+                      default=POINT_LIMITS_NONE,
+                      label='Scatter points radius and transparancy', display=params.EnumParam.DISPLAY_COMBO,
+                      help='This allows you to use change the points radius and transparancy in the scatter plot'
+                           '. By trying different values, it may help you discover the densest regions in the space.')
+        line = form.addLine('Radius and transparancy',
+                            condition='points_shades==%d' % POINT_LIMITS,
+                            help='Values for points rarius have can be any positive real number.'
+                                 ' Values for transparancy are between 0 and 1.')
+        line.addParam('s', params.FloatParam, default=None, allowsNull=True,
+                      label='Radius')
+        line.addParam('alpha', params.FloatParam, default=None, allowsNull=True,
+                        label='Transparancy')
+
 
     def _getVisualizeDict(self):
         return {'displayRawDeformation': self._viewRawDeformation,
@@ -182,13 +200,15 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
                 plotter = FlexNmaVolPlotter(data=self.getData(),
                                             xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                             ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                            zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                            zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                            s=self.s, alpha = self.alpha)
             else:
                 plotter = FlexNmaVolPlotter(data=self.getData(),
                                             LimitL=self.LimitLow, LimitH=self.LimitHigh,
                                             xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                             ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                            zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                            zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                            s=self.s, alpha = self.alpha)
 
 
             baseList = [basename(n) for n in modeNameList]
