@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import copy
 
 class PDBMol:
     def __init__(self, pdb_file):
@@ -127,6 +128,9 @@ class PDBMol:
     def select_chain(self, chainName):
         self.select_atoms(self.get_chain(chainName))
 
+    def copy(self):
+        return copy.deepcopy(self)
+
     def remove_alter_atom(self):
         idx = []
         for i in range(self.n_atoms):
@@ -201,8 +205,8 @@ class PDBMol:
         else:
             print("End of chain %s %s %i" % (past_chainID, self.resName[i], self.resNum[i]))
 
-    def atom_res_reorder(self):
-        # Check res order :
+
+    def check_res_order(self):
         chains = list(set(self.chainID))
         chains.sort()
         new_idx = []
@@ -214,6 +218,10 @@ class PDBMol:
                 idx = np.where(self.resNum[chain_idx] == resNumlist[i])[0]
                 new_idx += list(chain_idx[idx])
         self.select_atoms(np.array(new_idx))
+
+    def atom_res_reorder(self):
+        chains = list(set(self.chainID))
+        chains.sort()
 
         # reorder atoms and res
         for c in chains:
@@ -238,10 +246,11 @@ def matchPDBatoms(mols, ca_only=False):
     print("> Matching PDBs atoms ...")
     n_mols = len(mols)
 
-    if mols[0].chainName[0] in mols[1].chainName:
-        chaintype = 0
-    elif mols[0].chainID[0] in mols[1].chainID:
+
+    if mols[0].chainID[0] in mols[1].chainID:
         chaintype = 1
+    elif mols[0].chainName[0] in mols[1].chainName:
+        chaintype = 0
     else:
         raise RuntimeError("\t Warning : No matching chains")
 
@@ -251,11 +260,11 @@ def matchPDBatoms(mols, ca_only=False):
         id_tmp=[]
         id_idx_tmp=[]
         for i in range(m.n_atoms):
-            if (not ca_only) or m.atomName[i] == "CA":
+            if (not ca_only) or m.atomName[i] == "CA" or m.atomName[i] == "P":
                 if chaintype == 0 :
-                    id_tmp.append(m.chainName[i] + str(m.resNum[i]) + m.atomName[i])
+                    id_tmp.append("%s_%i_%s_%s"%(m.chainName[i], m.resNum[i], m.resName[i] , m.atomName[i]))
                 else:
-                    id_tmp.append(m.chainID[i] + str(m.resNum[i]) + m.atomName[i])
+                    id_tmp.append("%s_%i_%s_%s"%(m.chainID[i], m.resNum[i], m.resName[i] , m.atomName[i]))
                 id_idx_tmp.append(i)
         ids.append(np.array(id_tmp))
         ids_idx.append(np.array(id_idx_tmp))
@@ -267,11 +276,14 @@ def matchPDBatoms(mols, ca_only=False):
             idx_tmp = np.where(ids[0][i] == ids[m])[0]
             if len(idx_tmp) == 1:
                 idx_line.append(ids_idx[m][idx_tmp[0]])
+            elif len(idx_tmp) > 1:
+                print("\t Warning : One atom in mol#0 is matching several atoms in mol#%i : "%m)
+
         if len(idx_line) == n_mols :
             idx.append(idx_line)
 
     if len(idx)==0:
-        print("\t Warning : No matching atoms")
+        print("\t Warning : No matching coordinates")
     print("\t Done")
 
     return np.array(idx)
@@ -309,29 +321,28 @@ def generatePSF(inputPDB, inputTopo, outputPrefix, nucleicChoice):
             psfgen.write("set nucleic [atomselect top nucleic]\n")
             psfgen.write("set chains [lsort -unique [$nucleic get chain]] ;\n")
             psfgen.write("foreach chain $chains {\n")
-            psfgen.write("    set seg ${chain}DNA\n")
             psfgen.write("    set sel [atomselect top \"nucleic and chain $chain\"]\n")
-            psfgen.write("    $sel set segid $seg\n")
-            psfgen.write("    $sel writepdb tmp.pdb\n")
-            psfgen.write("    segment $seg { pdb tmp.pdb }\n")
-            psfgen.write("    coordpdb tmp.pdb\n")
+            psfgen.write("    $sel writepdb %s_tmp.pdb\n" % outputPrefix)
+            psfgen.write("    segment N${chain} { pdb %s_tmp.pdb }\n" % outputPrefix)
+            psfgen.write("    coordpdb %s_tmp.pdb N${chain}\n" % outputPrefix)
             if nucleicChoice == NUCLEIC_DNA:
                 psfgen.write("    set resids [lsort -unique [$sel get resid]]\n")
                 psfgen.write("    foreach r $resids {\n")
-                psfgen.write("        patch DEOX ${chain}DNA:$r\n")
+                psfgen.write("        patch DEOX N${chain}:$r\n")
                 psfgen.write("    }\n")
             psfgen.write("}\n")
-            psfgen.write("regenerate angles dihedrals\n")
+            if nucleicChoice == NUCLEIC_DNA:
+                psfgen.write("regenerate angles dihedrals\n")
             psfgen.write("\n")
         psfgen.write("set protein [atomselect top protein]\n")
         psfgen.write("set chains [lsort -unique [$protein get pfrag]]\n")
         psfgen.write("foreach chain $chains {\n")
         psfgen.write("    set sel [atomselect top \"pfrag $chain\"]\n")
-        psfgen.write("    $sel writepdb tmp.pdb\n")
-        psfgen.write("    segment U${chain} {pdb tmp.pdb}\n")
-        psfgen.write("    coordpdb tmp.pdb U${chain}\n")
+        psfgen.write("    $sel writepdb %s_tmp.pdb\n" % outputPrefix)
+        psfgen.write("    segment P${chain} {pdb %s_tmp.pdb}\n" % outputPrefix)
+        psfgen.write("    coordpdb %s_tmp.pdb P${chain}\n" % outputPrefix)
         psfgen.write("}\n")
-        psfgen.write("rm -f tmp.pdb\n")
+        psfgen.write("rm -f %s_tmp.pdb\n" % outputPrefix)
         psfgen.write("\n")
         psfgen.write("guesscoord\n")
         psfgen.write("writepdb %s.pdb\n" % outputPrefix)
@@ -347,45 +358,54 @@ def generatePSF(inputPDB, inputTopo, outputPrefix, nucleicChoice):
 
 def generateGROTOP(inputPDB, outputPrefix, forcefield, smog_dir, nucleicChoice):
     mol = PDBMol(inputPDB)
-    mol.remove_alter_atom()
+    # mol.remove_alter_atom()
     mol.remove_hydrogens()
-    mol.alias_atom("CD", "CD1", "ILE")
-    mol.alias_atom("OT1", "O")
-    mol.alias_atom("OT2", "OXT")
-    mol.alias_res("HSE", "HIS")
+    mol.check_res_order()
+
+    moltmp = mol.copy()
+
+    moltmp.alias_atom("CD", "CD1", "ILE")
+    moltmp.alias_atom("OT1", "O")
+    moltmp.alias_atom("OT2", "OXT")
+    moltmp.alias_res("HSE", "HIS")
 
     if nucleicChoice == NUCLEIC_RNA:
-        mol.alias_res("CYT", "C")
-        mol.alias_res("GUA", "G")
-        mol.alias_res("ADE", "A")
-        mol.alias_res("URA", "U")
+        moltmp.alias_res("CYT", "C")
+        moltmp.alias_res("GUA", "G")
+        moltmp.alias_res("ADE", "A")
+        moltmp.alias_res("URA", "U")
 
     elif nucleicChoice == NUCLEIC_DNA:
-        mol.alias_res("CYT", "DC")
-        mol.alias_res("GUA", "DG")
-        mol.alias_res("ADE", "DA")
-        mol.alias_res("THY", "DT")
+        moltmp.alias_res("CYT", "DC")
+        moltmp.alias_res("GUA", "DG")
+        moltmp.alias_res("ADE", "DA")
+        moltmp.alias_res("THY", "DT")
 
-    mol.alias_atom("O1'", "O1*")
-    mol.alias_atom("O2'", "O2*")
-    mol.alias_atom("O3'", "O3*")
-    mol.alias_atom("O4'", "O4*")
-    mol.alias_atom("O5'", "O5*")
-    mol.alias_atom("C1'", "C1*")
-    mol.alias_atom("C2'", "C2*")
-    mol.alias_atom("C3'", "C3*")
-    mol.alias_atom("C4'", "C4*")
-    mol.alias_atom("C5'", "C5*")
-    mol.alias_atom("C5M", "C7")
-    mol.add_terminal_res()
-    mol.atom_res_reorder()
-    mol.save(inputPDB)
+    moltmp.alias_atom("O1'", "O1*")
+    moltmp.alias_atom("O2'", "O2*")
+    moltmp.alias_atom("O3'", "O3*")
+    moltmp.alias_atom("O4'", "O4*")
+    moltmp.alias_atom("O5'", "O5*")
+    moltmp.alias_atom("C1'", "C1*")
+    moltmp.alias_atom("C2'", "C2*")
+    moltmp.alias_atom("C3'", "C3*")
+    moltmp.alias_atom("C4'", "C4*")
+    moltmp.alias_atom("C5'", "C5*")
+    moltmp.alias_atom("C5M", "C7")
+    moltmp.add_terminal_res()
+    moltmp.atom_res_reorder()
+    moltmp.save(inputPDB)
 
     # Run Smog2
     os.system("%s/bin/smog2" % smog_dir+\
                " -i %s -dname %s -%s -limitbondlength -limitcontactlength" %
                (inputPDB, outputPrefix,
                 "CA" if forcefield == FORCEFIELD_CAGO else "AA"))
+
+
+    if forcefield == FORCEFIELD_CAGO:
+        mol.allatoms2ca()
+    mol.save(inputPDB)
 
     # ADD CHARGE TO TOP FILE
     grotopFile = outputPrefix + ".top"
@@ -413,8 +433,4 @@ def generateGROTOP(inputPDB, outputPrefix, forcefield, smog_dir, nucleicChoice):
     os.system("cp %s.tmp %s" % (grotopFile, grotopFile))
     os.system("rm -f %s.tmp" % grotopFile)
 
-    # SELECT CA ATOMS IF CAGO MODEL
-    if forcefield == FORCEFIELD_CAGO:
-        initPDB = PDBMol(inputPDB)
-        initPDB.allatoms2ca()
-        initPDB.save(inputPDB)
+
