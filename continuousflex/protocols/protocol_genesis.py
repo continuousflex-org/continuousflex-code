@@ -176,6 +176,8 @@ class ProtGenesis(EMProtocol):
         form.addParam('imageRB', params.FileParam, label="Rigid body parameters (.xmd)",
                       condition="EMfitChoice==2 and not estimateRB",
                       help='TODO')
+        form.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
+                      help="TODO", condition="EMfitChoice==2")
 
         # NMMD =================================================================================================
         form.addSection(label='NMMD')
@@ -663,6 +665,7 @@ class ProtGenesis(EMProtocol):
             elif self.EMfitChoice.get()==EMFIT_IMAGES :
                 s += "emfit_exp_image = %s \n" % self.inputVolumefn[indexFit]
                 s += "emfit_image_size =  %i\n" %self.image_size.get()
+                s += "emfit_pixel_size =  %i\n" % self.pixel_size.get()
                 if not self.estimateRB.get():
                     s += "emfit_roll_angle = %f\n" %self.rb_params[indexFit][0]
                     s += "emfit_tilt_angle = %f\n" %self.rb_params[indexFit][1]
