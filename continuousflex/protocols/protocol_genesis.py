@@ -330,9 +330,9 @@ class ProtGenesis(EMProtocol):
                 volPrefix = self._getExtraPath("%s_inputVol" % str(i + 1).zfill(5))
                 self.inputVolumefn[i]  = self.convertVol(fnInput=self.inputVolumefn[i],
                                    volPrefix = volPrefix, fnPDB=self.inputPDBfn[i])
-        elif self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateRB.get():
+        elif self.EMfitChoice.get() == EMFIT_IMAGES and not self.estimateRB.get():
             self.rb_params=[]
-            mdImgs = md.MetaData(self.inputRB.get())
+            mdImgs = md.MetaData(self.imageRB.get())
             for objId in mdImgs:
                 rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
                 tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
@@ -663,7 +663,7 @@ class ProtGenesis(EMProtocol):
             elif self.EMfitChoice.get()==EMFIT_IMAGES :
                 s += "emfit_exp_image = %s \n" % self.inputVolumefn[indexFit]
                 s += "emfit_image_size =  %i\n" %self.image_size.get()
-                if self.estimateRB.get():
+                if not self.estimateRB.get():
                     s += "emfit_roll_angle = %f\n" %self.rb_params[indexFit][0]
                     s += "emfit_tilt_angle = %f\n" %self.rb_params[indexFit][1]
                     s += "emfit_yaw_angle =  %f\n" %self.rb_params[indexFit][2]
@@ -773,8 +773,8 @@ class ProtGenesis(EMProtocol):
 
                     # comp RMSD
                     if self.rmsdChoice.get():
-                        inputPDB = self.inputPDBfn[i] if self.EMfitChoice.get() == EMFIT_IMAGES and \
-                                                   self.estimateRB.get() \
+                        inputPDB = self.inputPDBfn[i] if not(self.EMfitChoice.get() == EMFIT_IMAGES and \
+                                                   self.estimateRB.get()) \
                             else self._getExtraPath("%s_iter%i.pdb" % (str(i + 1).zfill(5), k))
                         rmsd = self.rmsdFromDCD(outputPrefix, inputPDB)
                         np.savetxt(outputPrefix + "_rmsd.txt", rmsd)
