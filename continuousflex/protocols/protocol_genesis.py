@@ -811,8 +811,10 @@ class ProtGenesis(EMProtocol):
         idx = matchPDBatoms([initPDB, targetPDB], ca_only=True)
         rmsd.append(RMSD(initPDB.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
         for i in range(N):
-            mol = PDBMol(outputPrefix + "tmp" + str(i + 1) + ".pdb")
-            rmsd.append(RMSD(mol.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
+            f = outputPrefix + "tmp" + str(i + 1) + ".pdb"
+            if os.path.exists(f):
+                mol = PDBMol(f)
+                rmsd.append(RMSD(mol.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
 
         # CLEAN TMP FILES AND SAVE
         runProgram("rm","-f %stmp*" % (outputPrefix))
