@@ -551,7 +551,9 @@ class ProtGenesis(EMProtocol):
             exitcode = p.wait()
             print("Process done %s" %str(exitcode))
             if exitcode != 0:
-                raise RuntimeError("Process failed, check .log file ")
+                # raise RuntimeError("GENESIS exit with errors, check .log file ")
+                print("Warning : GENESIS exit with errors, check .log file ")
+
 
     def getGenesisCmd(self, prefix,n_mpi):
         cmd=""
