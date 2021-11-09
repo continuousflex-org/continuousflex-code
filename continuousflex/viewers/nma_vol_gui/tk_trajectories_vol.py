@@ -251,7 +251,8 @@ class TrajectoriesWindowVol(gui.Window):
                                                     *baseList)
                     self.ps = PointPathVol(ax, self.data, self.pathData,
                                            callback=self._checkNumberOfPoints,
-                                           LimitL = self.LimitLow, LimitH = self.LimitHigh)
+                                           LimitL = self.LimitLow, LimitH = self.LimitHigh,
+                                           s = self.s.get(), alpha = self.alpha.get())
                 elif dim == 3:
                     # del self.ps # Remove PointSelector
                     self.setDataIndex('ZIND', modeList[2])
