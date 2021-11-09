@@ -90,7 +90,7 @@ class TestTomoFlow(TestWorkflow):
         protMask = self.newProtocol(XmippProtCreateMask3D,
                                     source=0, # 0 is SOURCE_VOLUME
                                     inputVolume=protStA.SubtomogramAverage,
-                                    threshold = 0.05,
+                                    threshold = 0.1,
                                     doBig = True,
                                     doMorphological = True,
                                     elementSize = 3,
@@ -157,7 +157,7 @@ class TestTomoFlow(TestWorkflow):
         protMask = self.newProtocol(XmippProtCreateMask3D,
                                     source=0, # 0 is SOURCE_VOLUME
                                     inputVolume=protStA.SubtomogramAverage,
-                                    threshold = 0.05,
+                                    threshold = 0.1,
                                     doBig = True,
                                     doMorphological = True,
                                     elementSize = 3,
