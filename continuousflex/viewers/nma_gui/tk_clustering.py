@@ -66,6 +66,9 @@ class ClusteringWindow(gui.Window):
         self.ylim_high = kwargs.get('ylim_high')
         self.zlim_low = kwargs.get('zlim_low')
         self.zlim_high = kwargs.get('zlim_high')
+        # Alpha and S are the transparancy and the size of the points, respectively
+        self._alpha = kwargs.get('alpha')
+        self._s = kwargs.get('s')
 
         content = tk.Frame(self.root)
         self._createContent(content)
@@ -194,13 +197,15 @@ class ClusteringWindow(gui.Window):
                     self.plotter = FlexNmaPlotter(data=self.data,
                                                 xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                 ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                                s=self._s, alpha=self._alpha)
                 else:
                     self.plotter = FlexNmaPlotter(data=self.data,
                                                 LimitL=self.LimitLow, LimitH=self.LimitHigh,
                                                 xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                 ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                                s=self._s, alpha=self._alpha)
 
                 doShow = True
             else:
@@ -225,7 +230,7 @@ class ClusteringWindow(gui.Window):
                     ax = self.plotter.plotArray2D("Click and drag to add points to the Cluster",
                                                   *baseList)
                     self.ps = PointSelector(ax, self.data, callback=self._updateSelectionLabel,
-                                            LimitL=self.LimitLow, LimitH=self.LimitHigh)
+                                            LimitL=self.LimitLow, LimitH=self.LimitHigh, alpha=self._alpha, s=self._s)
                 elif dim == 3:
                     del self.ps  # Remove PointSelector
                     self.data.ZIND = modeList[2]

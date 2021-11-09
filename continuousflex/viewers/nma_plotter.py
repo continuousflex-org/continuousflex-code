@@ -43,6 +43,9 @@ class FlexNmaPlotter(FlexPlotter):
         self._ylimhigh = kwargs.get('ylim_high')
         self._zlimlow = kwargs.get('zlim_low')
         self._zlimhigh = kwargs.get('zlim_high')
+        # Alpha and S are the transparancy and the size of the points, respectively
+        self._alpha = kwargs.get('alpha')
+        self._s = kwargs.get('s')
         FlexPlotter.__init__(self, **kwargs)
         self.useLastPlot = False
         
@@ -73,7 +76,16 @@ class FlexNmaPlotter(FlexPlotter):
             ax.set_xlim([self._xlimlow.get(), self._xlimhigh.get()])
         if lowy:
             ax.set_ylim([self._ylimlow.get(), self._ylimhigh.get()])
-        plotArray2D(ax, self._data, self._limitlow, self._limitup)
+        s = alpha = None
+        try:
+            s = self._s.get()
+            alpha = self._alpha.get()
+        except:
+            pass
+        if s and alpha:
+            plotArray2D(ax, self._data, self._limitlow, self._limitup, s, alpha)
+        else:
+            plotArray2D(ax, self._data, self._limitlow, self._limitup)
         return ax
 
     def plotArray3D(self, title, xlabel, ylabel, zlabel):
@@ -110,11 +122,22 @@ class FlexNmaPlotter(FlexPlotter):
         except:
             pass
 
+        alpha = 0.4
+        s = 20
+        try:
+            alpha = self._alpha.get()
+            s = self._s.get()
+        except:
+            pass
+        if alpha is None or s is None:
+            alpha = 0.4
+            s = 20
+
         if color_low is None or color_high is None:
-            cax = ax.scatter3D(xdata, ydata, zdata, c= weights)
+            cax = ax.scatter3D(xdata, ydata, zdata, c= weights, alpha=alpha, s=s)
         else:
             cax = ax.scatter3D(xdata, ydata, zdata, c= weights, vmin=color_low,
-                               vmax=color_high)
+                               vmax=color_high, alpha=alpha, s=s)
 
         x2, y2, z2 = [], [], []
         for point in self._data:
@@ -131,23 +154,23 @@ class FlexNmaPlotter(FlexPlotter):
 
 #---------- Utility functions -----------------
 
-def plotArray2D(ax, data, vvmin=None, vvmax=None):
+def plotArray2D(ax, data, vvmin=None, vvmax=None, s = None, alpha = None):
     xdata = data.getXData()
     ydata = data.getYData()
     weights = data.getWeights()
     if vvmin:
-        cax = ax.scatter(xdata, ydata, c=weights, vmin=vvmin.get(), vmax=vvmax.get())
+        cax = ax.scatter(xdata, ydata, c=weights, vmin=vvmin.get(), vmax=vvmax.get(), s=s, alpha=alpha)
     else:
         # cax = ax.scatter(xdata, ydata, weights)
-        cax = ax.scatter(xdata, ydata, c=weights)
+        cax = ax.scatter(xdata, ydata, c=weights, s=s, alpha=alpha)
     cb = ax.figure.colorbar(cax)
     cb.set_label('Error')
 
-def plotArray2D_xy(ax, data, vvmin=None, vvmax=None):
+def plotArray2D_xy(ax, data, vvmin=None, vvmax=None, s = None, alpha = None):
     xdata = data.getXData()
     ydata = data.getYData()
     weights = data.getWeights()
     if vvmin:
-        cax = ax.scatter(xdata, ydata, c=weights, vmin=vvmin.get(), vmax=vvmax.get())
+        cax = ax.scatter(xdata, ydata, c=weights, vmin=vvmin.get(), vmax=vvmax.get(), s=s, alpha=alpha)
     else:
-        cax = ax.scatter(xdata, ydata, c=weights)
+        cax = ax.scatter(xdata, ydata, c=weights, s=s, alpha=alpha)
