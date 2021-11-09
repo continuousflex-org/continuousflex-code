@@ -249,7 +249,8 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
                                            ylim_high=self.ylim_high,
                                            zlim_low=self.zlim_low,
                                            zlim_high=self.zlim_high,
-                                           )
+                                           s=self.s,
+                                           alpha=self.alpha)
         return [self.clusterWindow]
 
     def _displayTrajectories(self, paramName):
@@ -269,7 +270,8 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
                                                 ylim_high=self.ylim_high,
                                                 zlim_low=self.zlim_low,
                                                 zlim_high=self.zlim_high,
-                                                )
+                                                s=self.s,
+                                                alpha=self.alpha)
 
         return [self.trajectoriesWindow]
 

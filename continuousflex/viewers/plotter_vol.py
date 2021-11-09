@@ -103,7 +103,6 @@ class FlexNmaVolPlotter(FlexPlotter):
             ax.set_xlim([self._xlimlow.get(), self._xlimhigh.get()])
         if lowy:
             ax.set_ylim([self._ylimlow.get(), self._ylimhigh.get()])
-
         s = alpha = None
         try:
             s = self._s.get()
@@ -151,11 +150,22 @@ class FlexNmaVolPlotter(FlexPlotter):
         except:
             pass
 
+        alpha = 0.4
+        s = 20
+        try:
+            alpha = self._alpha.get()
+            s = self._s.get()
+        except:
+            pass
+        if alpha is None or s is None:
+            alpha = 0.4
+            s = 20
+
         if color_low is None or color_high is None:
-            cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights)
+            cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights, alpha=alpha, s=s)
         else:
             cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights, vmin=color_low,
-                               vmax=color_high)
+                               vmax=color_high, alpha=alpha, s=s)
 
 
         x2, y2, z2 = [], [], []
@@ -198,18 +208,29 @@ class FlexNmaVolPlotter(FlexPlotter):
         if lowz:
             ax.set_zlim([self._zlimlow.get(), self._zlimhigh.get()])
 
+        alpha = 0.4
+        s = 20
+        try:
+            alpha = self._alpha.get()
+            s = self._s.get()
+        except:
+            pass
+        if alpha is None or s is None:
+            alpha = 0.4
+            s = 20
+
         if self._limitlow == None or self._limitup == None:
-            cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights)
+            cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights, alpha=alpha, s=s)
         else:
             cax = ax.scatter3D(xdata, ydata, zdata, c= np.ones(len(weights))-weights, vmin=self._limitlow.get(),
-                               vmax=self._limitup.get())
+                               vmax=self._limitup.get(), alpha=alpha, s=s)
         x2, y2, z2 = [], [], []
         for point in self._data:
             if point.getState() == 1:
                 x2.append(point.getX())
                 y2.append(point.getY())
                 z2.append(point.getZ())
-        ax.scatter(x2, y2, z2, color='yellow', alpha=0.4, s=8)
+        # ax.scatter(x2, y2, z2, color='yellow', alpha=0.4, s=8)
         # cb = ax.figure.colorbar(cax)
         # cb.set_label('1- Cross Correlation')
         # Disable tight_layout that is not available for 3D

@@ -25,7 +25,7 @@
 
 from continuousflex.viewers.plotter_vol import plotArray2D
 from continuousflex.viewers.plotter_vol import plotArray2D_xy
-
+from math import sqrt
 
 class PointSelectorVol():
     """ Graphical manager based on Matplotlib to handle mouse
@@ -33,14 +33,18 @@ class PointSelectorVol():
     from input Data as 'selected'.
     """
 
-    def __init__(self, ax, data, callback=None, LimitL=None, LimitH=None):
+    def __init__(self, ax, data, callback=None, LimitL=None, LimitH=None, alpha=None, s=None):
         self.ax = ax
         self.data = data
         self.LimitL = LimitL
         self.LimitH = LimitH
+        # Point size and transparancy:
+        self.alpha = alpha.get()
+        self.s = s.get()
         self.createPlots(ax)
         self.press = None
         self.callback = callback
+
         # connect to all the events we need
         self.cidpress = self.rectangle_selection.figure.canvas.mpl_connect(
             'button_press_event', self.onPress)
@@ -53,9 +57,9 @@ class PointSelectorVol():
         # plotArray2D(ax, self.data)
         # To avoid plotting the sidebar twice
         if(self.LimitL):
-            plotArray2D_xy(ax, self.data, vvmin=self.LimitL, vvmax=self.LimitH)
+            plotArray2D_xy(ax, self.data, vvmin=self.LimitL, vvmax=self.LimitH, alpha=self.alpha, s=self.s)
         else:
-            plotArray2D_xy(ax, self.data)
+            plotArray2D_xy(ax, self.data, alpha=self.alpha, s=self.s)
         self.createSelectionPlot(ax)
 
     def getSelectedData(self):
@@ -68,7 +72,10 @@ class PointSelectorVol():
 
     def createSelectionPlot(self, ax):
         xs, ys = self.getSelectedData()
-        self.plot_selected, = ax.plot(xs, ys, 'o', ms=8, alpha=0.4,
+        markersize = None
+        if self.s:
+            markersize = sqrt(self.s)
+        self.plot_selected, = ax.plot(xs, ys, 'o', ms=markersize, alpha=0.4,
                                       color='yellow')
 
         self.rectangle_selection, = ax.plot([0], [0], ':')  # empty line

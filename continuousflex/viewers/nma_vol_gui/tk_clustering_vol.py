@@ -65,6 +65,9 @@ class ClusteringWindowVol(gui.Window):
         self.ylim_high = kwargs.get('ylim_high')
         self.zlim_low = kwargs.get('zlim_low')
         self.zlim_high = kwargs.get('zlim_high')
+        # Alpha and S are the transparancy and the size of the points, respectively
+        self._alpha = kwargs.get('alpha')
+        self._s = kwargs.get('s')
 
         content = tk.Frame(self.root)
         self._createContent(content)
@@ -194,13 +197,15 @@ class ClusteringWindowVol(gui.Window):
                     self.plotter = FlexNmaVolPlotter(data=self.data,
                                                      xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                      ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                                     zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                                     zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                                     s=self._s, alpha=self._alpha)
                 else:
                     self.plotter = FlexNmaVolPlotter(data=self.data,
                                                      LimitL=self.LimitLow, LimitH=self.LimitHigh,
                                                      xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                      ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                                     zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                                     zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                                     s=self._s, alpha=self._alpha)
                 doShow = True
             else:
                 self.plotter.clear()
@@ -281,13 +286,15 @@ class ClusteringWindowVolHeteroFlow(ClusteringWindowVol):
                     self.plotter = FlexNmaVolPlotter(data=self.data,
                                                      xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                      ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                                     zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                                     zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                                     s=self._s, alpha=self._alpha)
                 else:
                     self.plotter = FlexNmaVolPlotter(data=self.data,
                                                      LimitL=self.LimitLow, LimitH=self.LimitHigh,
                                                      xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                      ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                                     zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                                     zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                                     s=self._s, alpha=self._alpha)
                 doShow = True
             else:
                 self.plotter.clear()
@@ -311,7 +318,7 @@ class ClusteringWindowVolHeteroFlow(ClusteringWindowVol):
 
                     ax = self.plotter.plotArray2D_xy("Click and drag to add some points to the Cluster",
                                                      *baseList)
-                    self.ps = PointSelectorVol(ax, self.data, callback=self._updateSelectionLabel)
+                    self.ps = PointSelectorVol(ax, self.data, callback=self._updateSelectionLabel, alpha=self._alpha, s=self._s)
                     # self.ps = PointSelectorVol(ax, self.data, callback=None)
                 elif dim == 3:
                     # del self.ps  # Remove PointSelector

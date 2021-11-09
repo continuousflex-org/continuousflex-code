@@ -63,7 +63,8 @@ class TrajectoriesWindowVol(gui.Window):
         self.ylim_high = kwargs.get('ylim_high')
         self.zlim_low = kwargs.get('zlim_low')
         self.zlim_high = kwargs.get('zlim_high')
-
+        self.s = kwargs.get('s')
+        self.alpha = kwargs.get('alpha')
         self.plotter = None
 
         content = tk.Frame(self.root)
@@ -215,13 +216,15 @@ class TrajectoriesWindowVol(gui.Window):
                     self.plotter = FlexNmaVolPlotter(data=self.data,
                                                 xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                 ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                                alpha=self.alpha, s = self.s)
                 else:
                     self.plotter = FlexNmaVolPlotter(data=self.data,
                                                 LimitL=self.LimitLow, LimitH=self.LimitHigh,
                                                 xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                 ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                                alpha=self.alpha, s=self.s)
                 doShow = True
                 # self.plotter.useLastPlot = True
             else:
@@ -303,17 +306,20 @@ class TrajectoriesWindowVolHeteroFlow(TrajectoriesWindowVol):
             if self.plotter is None or self.plotter.isClosed():
                 # self.plotter = FlexNmaVolPlotter(data=self.data)
                 # Actually plot
+
                 if self.limits_modes == FIGURE_LIMIT_NONE:
                     self.plotter = FlexNmaVolPlotter(data=self.data,
                                                 xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                 ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                                alpha=self.alpha, s=self.s)
                 else:
                     self.plotter = FlexNmaVolPlotter(data=self.data,
                                                 LimitL=self.LimitLow, LimitH=self.LimitHigh,
                                                 xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                 ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                                alpha = self.alpha, s = self.s)
                 doShow = True
                 # self.plotter.useLastPlot = True
             else:
@@ -339,7 +345,7 @@ class TrajectoriesWindowVolHeteroFlow(TrajectoriesWindowVol):
                     ax = self.plotter.plotArray2D_xy("Click and drag to add points to the Cluster",
                                                     *baseList)
                     self.ps = PointPathVol(ax, self.data, self.pathData,
-                                           callback=self._checkNumberOfPoints)
+                                           callback=self._checkNumberOfPoints, s=self.s.get(), alpha=self.alpha.get())
                 elif dim == 3:
                     # del self.ps # Remove PointSelector
                     self.setDataIndex('ZIND', modeList[2])
