@@ -48,7 +48,7 @@ FIND_FLOWS = 1
 
 class FlexProtHeteroFlow(ProtAnalysis3D):
     """ Protocol for HeteroFlow. """
-    _label = 'heteroflow protocol'
+    _label = 'tomoflow protocol'
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):

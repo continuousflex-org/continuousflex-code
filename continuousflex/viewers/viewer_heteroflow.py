@@ -170,7 +170,7 @@ class FlexHeteroFlowViewer(EmProtocolViewer):
             rot, tilt, psi = list(map(float, self.RotTiltPsi.get().split()))
             title = 'Projected optical flow of input volume number %d \n using Euler angles' \
                     ' (%.1f, %.1f, %.1f)' % (self.FlowNumber, rot, tilt, psi)
-            print(rot, tilt, psi)
+            #print(rot, tilt, psi)
         command_x = '-i ' + path_flowx + ' -o ' + proj_x + ' --angles ' + str(rot) + ' ' + str(tilt) + ' ' + str(psi)
         command_y = '-i ' + path_flowy + ' -o ' + proj_y + ' --angles ' + str(rot) + ' ' + str(tilt) + ' ' + str(psi)
         command_z = '-i ' + path_flowz + ' -o ' + proj_z + ' --angles ' + str(rot) + ' ' + str(tilt) + ' ' + str(psi)

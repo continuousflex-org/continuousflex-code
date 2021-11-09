@@ -80,7 +80,7 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
             id_org = md_file_org.getValue(md.MDL_ITEM_ID, objID)
             for j in md_file_nma:
                 id_nma = md_file_nma.getValue(md.MDL_ITEM_ID, j)
-                print(id_nma)
+                #print(id_nma)
                 if id_org == id_nma:
                     displacements = md_file_nma.getValue(md.MDL_NMA, j)
                     md_file_org.setValue(md.MDL_NMA, displacements, objID)

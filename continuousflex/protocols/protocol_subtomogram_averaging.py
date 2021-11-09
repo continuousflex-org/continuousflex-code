@@ -168,8 +168,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         elif self.StA_choice.get() == COPY_STA and self.import_choice.get() == IMPORT_TOMBOX_MTV:
             self._insertFunctionStep('adaptTomboxStep', self.tomBoxTable.get())
         else:
-            # TODO: add the import of scipion metadata
-            pass
+            self._insertFunctionStep('adaptXmippStep', self.xmippMD.get())
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
@@ -411,6 +410,58 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
 
             params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
                      ' --shift %(x_shift)s %(y_shift)s %(z_shift)s' % locals()
+
+            runProgram('xmipp_transform_geometry', params)
+
+            if counter == 1:
+                os.system("cp %(tempVol)s %(volume_out)s" % locals())
+
+            else:
+                params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
+                runProgram('xmipp_image_operate', params)
+
+        params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
+        runProgram('xmipp_image_operate', params)
+        os.system("rm -f %(tempVol)s" % locals())
+         # Averaging is done
+        pass
+
+    def adaptXmippStep(self, Table):
+        volumes_in = self.imgsFn
+        volume_out = self.outputVolume
+        md_out = Table
+
+        # Averaging based on the metadata:
+        mdImgs = md.MetaData(md_out)
+        mdImgs.write(self._getExtraPath('final_md.xmd'))
+        counter = 0
+
+        for objId in mdImgs:
+            counter = counter + 1
+
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+            tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+            psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+
+            x_shift = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+            y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+            z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+
+            flip = mdImgs.getValue(md.MDL_ANGLE_Y, objId)
+            tempVol = self._getExtraPath('temp.mrc')
+            extra = self._getExtraPath()
+
+            if flip == 0 or flip is None:
+                params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                     ' --shift %(x_shift)s %(y_shift)s %(z_shift)s' % locals()
+            else:
+                # First got to rotate each volume 90 degrees about the y axis, align it, then sum it
+                params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
+                runProgram('xmipp_transform_geometry', params)
+                params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
+
 
             runProgram('xmipp_transform_geometry', params)
 

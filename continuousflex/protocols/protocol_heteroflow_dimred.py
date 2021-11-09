@@ -62,7 +62,7 @@ class FlexProtDimredHeteroFlow(ProtAnalysis3D):
     """ This protocol will take volumes with optical flows, it will operate on the correlation mat
     and will project it onto a reduced space
     """
-    _label = 'heteroflow dimred'
+    _label = 'tomoflow dimred'
 
     def __init__(self, **kwargs):
         ProtAnalysis3D.__init__(self, **kwargs)
@@ -128,10 +128,9 @@ class FlexProtDimredHeteroFlow(ProtAnalysis3D):
 
     def _insertAllSteps(self):
         # Take deforamtions text file and the number of images and modes
-        inputSet = self.getInputParticles().get()
-        print(inputSet)
-        # TODO: fix the problem with inputset (related to pointers)
-        rows = inputSet.get().getSize()
+        inputSet = self.getInputParticles()
+        rows = inputSet.getSize()
+        # rows = inputSet.get().getSize()
         reducedDim = self.reducedDim.get()
         method = self.dimredMethod.get()
         extraParams = self.extraParams.get('')
@@ -228,9 +227,7 @@ class FlexProtDimredHeteroFlow(ProtAnalysis3D):
             num = self.inputOpFlow.get().refinementProt.get().NumOfIters.get()+1
             fn = 'volumes_aligned_'+str(num)+'.xmd'
             mdfn = self.inputOpFlow.get().refinementProt.get()._getExtraPath(fn)
-            print(mdfn)
             partSet = self._createSetOfVolumes('to_average')
-            print(self.inputOpFlow.get().refinementProt.get().inputVolumes)
             xmipp3.convert.readSetOfVolumes(mdfn, partSet)
             partSet.setSamplingRate(self.inputOpFlow.get().refinementProt.get().inputVolumes.get().getSamplingRate())
             return partSet

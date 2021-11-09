@@ -33,7 +33,7 @@ class FlexBatchProtHeteroFlowCluster(BatchProtocol):
     """ Protocol executed when a cluster is created
     from HeteroFlow dimred.
     """
-    _label = 'heteroflow vol cluster'
+    _label = 'tomoflow vol cluster'
 
     def _defineParams(self, form):
         form.addHidden('inputHeteroFlowDimred', PointerParam, pointerClass='EMObject')
