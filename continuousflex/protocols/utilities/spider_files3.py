@@ -67,6 +67,7 @@ def open_volume(filename, endianness='ieee-le'):
     fields = unpack('%s13f' % e, bytes(f.read(4 * 13), encoding="latin-1"))
     nz, ny, nx, labrec = [int(fields[i]) for i in [0, 1, 11, 12]]
     f.seek(4 * nx * labrec)  # go to end of header
+    # print(np.fromfile(f, dtype='%sf4' % e).size)
     return np.fromfile(f, dtype='%sf4' % e).reshape((nx, ny, nz))
 
 

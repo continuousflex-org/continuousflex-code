@@ -34,10 +34,12 @@ import numpy as np
 from continuousflex.protocols.utilities.bm4d import bm4d
 from pwem.utils import runProgram
 
+
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
 
 METHOD_BM4D = 0
+METHOD_LOWPASS = 1
 
 NOISE_GAUSS = 0
 NOISE_RICE = 1
@@ -60,36 +62,50 @@ class FlexProtVolumeDenoise(ProtAnalysis3D):
                       help='Select volumes')
         form.addSection('Method')
         form.addParam('Method', params.EnumParam,
-                      choices=['bm4d'],
+                      choices=['BM4D', 'Fourier lowpass filter'],
                       default=METHOD_BM4D,
                       label='Denoising Method', display=params.EnumParam.DISPLAY_COMBO,
-                      help='Denoise using bm4d')
-        form.addParam('noiseType', params.EnumParam,
+                      help='Choose a method: BM4D or Fourier lowpass filter')
+        group = form.addGroup('BM4D parameters', condition='Method==%d' % METHOD_BM4D)
+        group.addParam('noiseType', params.EnumParam,
                       choices=['Gaussian', 'Rician'],
                       default=NOISE_GAUSS,
                       label='Noise distribution', display=params.EnumParam.DISPLAY_COMBO,
                       help='Noise distribution (either Gaussian or Rician)')
-        form.addParam('sigma_choice', params.EnumParam,
-                      choices=['Automatically estimate sigma', 'Set a value for sigma'],
-                      default=0,
+        group.addParam('sigma_choice', params.EnumParam,
+                      choices=['Automatically estimate sigma', 'Set a value for sigma (recommended)'],
+                      default=1,
                       label='Sigma choice', display=params.EnumParam.DISPLAY_COMBO,
                       help='Sigma is the standard deviation of data noise')
-        form.addParam('sigma', params.FloatParam, default=0, allowsNull=True,
+        group.addParam('sigma', params.FloatParam, default=0.2, allowsNull=True,
                       condition='sigma_choice==%d' % 1,
                       label='Sigma',
                       help='estimated standard deviation of data noise '
                            'defines the strength of the processing (high value gives smooth images)')
-        form.addParam('profile', params.EnumParam,
-                      choices=['lc', 'np', 'mp'],
+        group.addParam('profile', params.EnumParam,
+                      choices=['low complexity profile', 'normal profile', 'modified profile (recommended)'],
                       default=PROFILE_MP,
                       label='Noise profile', display=params.EnumParam.DISPLAY_COMBO,
                       help='lc --> low complexity profile, '
-                           ' np --> normal profile'
+                           ' np --> normal profile,'
                            ' mp --> modified profile')
-        form.addParam('do_wiener', params.BooleanParam, allowsNull=True,
+        group.addParam('do_wiener', params.BooleanParam, allowsNull=True,
                       default=False,
                       label='Do wiener?',
                       help='Perform collaborative Wiener filtering')
+
+        # Normalized frequencies ("digital frequencies")
+        line = form.addLine('Frequency (normalized)',
+                            condition='Method==%d' % METHOD_LOWPASS,
+                            help='The cufoff frequency and raised coside width of the low pass filter.'
+                                 ' For details: see "xmipp_transform_filter --fourier low_pass"')
+        line.addHidden('lowFreqDig', params.DigFreqParam, default=0.00, allowsNull=True,
+                        label='Lowest')
+        line.addParam('highFreqDig', params.DigFreqParam, default=0.25, allowsNull=True,
+                      label='Cutoff frequency (0 -> 0.5)')
+        line.addParam('freqDecayDig', params.FloatParam, default=0.02, allowsNull=True,
+                      label='Raised cosine width')
+
 
     # --------------------------- INSERT steps functions --------------------------------------------
 
@@ -98,15 +114,23 @@ class FlexProtVolumeDenoise(ProtAnalysis3D):
         self.imgsFn = self._getExtraPath('volumes.xmd')
         makePath(self._getExtraPath() + '/filtered')
         self._insertFunctionStep('convertInputStep')
-        self._insertFunctionStep('denoise_b4md')
+        if(self.Method.get()==METHOD_BM4D):
+            self._insertFunctionStep('denoise_b4md')
+        else:
+            self._insertFunctionStep('filter_lowpass')
         self._insertFunctionStep('createOutputStep')
         pass
 
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
         # Write a metadata with the volumes
-        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
-
+        try:
+            xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
+        except:
+            mdF = md.MetaData()
+            mdF.setValue(md.MDL_IMAGE, self.inputVolumes.get().getFileName(), mdF.addObject())
+            mdF.write(self.imgsFn)
+            pass
 
     def denoise_b4md(self):
         distribution = ''
@@ -146,6 +170,7 @@ class FlexProtVolumeDenoise(ProtAnalysis3D):
             # params = '-i ' + imgPath + ' -o ' + new_imgPath + ' --type vol'
             params = '-i ' + imgPath + ' -o ' + temp_path + ' --type vol'
             runProgram('xmipp_image_convert', params)
+
             # perform the mwr:
             # in case the file exists (continuing or injecting)
             if (isfile(new_imgPath)):
@@ -156,6 +181,39 @@ class FlexProtVolumeDenoise(ProtAnalysis3D):
             mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
         mdImgs.write(self.imgsFn)
 
+
+    def filter_lowpass(self):
+        cutoff = self.highFreqDig.get()
+        raisedw = self.freqDecayDig.get()
+
+        imgFn = self.imgsFn
+        # looping on all images and performing mwr
+        mdImgs = md.MetaData(imgFn)
+        for objId in mdImgs:
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            index, fname = xmipp3.convert.xmippToLocation(imgPath)
+            new_imgPath = self._getExtraPath() + '/filtered/'
+            if index:  # case of stack
+                new_imgPath += str(index).zfill(6) + '.spi'
+            else:
+                new_imgPath += basename(replaceBaseExt(basename(imgPath), 'spi'))
+            # Get a copy of the volume converted to spider format
+            temp_path = self._getTmpPath('temp.spi')
+            # params = '-i ' + imgPath + ' -o ' + new_imgPath + ' --type vol'
+            params = '-i ' + imgPath + ' -o ' + temp_path + ' --type vol'
+            runProgram('xmipp_image_convert', params)
+
+            # perform the mwr:
+            # in case the file exists (continuing or injecting)
+            if (isfile(new_imgPath)):
+                continue
+            else:
+                params = " -i " + temp_path + " -o " + new_imgPath
+                params += " --fourier low_pass " + str(cutoff) + ' ' + str(raisedw)
+                runProgram('xmipp_transform_filter', params)
+            # update the name in the metadata file
+            mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
+        mdImgs.write(self.imgsFn)
 
     def createOutputStep(self):
         partSet = self._createSetOfVolumes('filtered')

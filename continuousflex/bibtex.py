@@ -103,5 +103,16 @@ keywords = ""
   doi= {https://doi.org/10.1002/pro.3772}
 }
 
+
+@article{moebel2020monte,
+  title={A Monte Carlo framework for missing wedge restoration and noise removal in cryo-electron tomography},
+  author={Moebel, Emmanuel and Kervrann, Charles},
+  journal={Journal of Structural Biology: X},
+  volume={4},
+  pages={100013},
+  year={2020},
+  publisher={Elsevier}
+}
+
 """
 
