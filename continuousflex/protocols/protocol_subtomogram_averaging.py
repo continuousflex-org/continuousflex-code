@@ -62,7 +62,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                       help='Select volumes')
         group.addParam('StA_choice', params.EnumParam,
                       choices=['Perform StA using Fast Rotational Matching (FRM)',
-                               'Import a previously performed StA parameters'],
+                               'Import parameters of a previously performed StA'],
                       default=PERFORM_STA,
                       label='Choose what processes you want to perform:', display=params.EnumParam.DISPLAY_COMBO,
                        help='If you choose to "Perform StA" using FRM you have to set the parameters in the last tab.'

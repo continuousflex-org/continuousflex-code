@@ -145,27 +145,25 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                               help='This parameter indicates the number of volumes that will be processed in parallel'
                                    ' (independently). The more powerful your GPU, the higher the number you can choose.')
         group.addParam('pyr_scale', params.FloatParam, default=0.5,
-                      label='pyr_scale',
-                      help='parameter specifying the image scale to build pyramids for each image (scale < 1).'
-                           ' A classic pyramid is of generally 0.5 scale, every new layer added, it is'
-                           ' halved to the previous one.')
-        group.addParam('levels', params.IntParam, default=4,
+                      label='pyr_scale', allowsNull=True,
+                       help='parameter specifying the image scale to build pyramids for each image (scale < 1). '
+                            'A classic pyramid is of generally 0.5 scale, every new layer added, it is halved to the previous one.')
+        group.addParam('levels', params.IntParam, default=4, allowsNull=True,
                       label='levels',
-                      help='evels=1 says, there are no extra layers (only the initial image).'
-                           ' It is the number of pyramid layers including the first image.')
-        group.addParam('winsize', params.IntParam, default=10,
+                      help='levels=1 says, there are no extra layers (only the initial image).'
+                           ' It is the number of pyramid layers including the first image.'
+                           ' The coarsest possible pyramid level is 32x32x32 voxels')
+        group.addParam('winsize', params.IntParam, default=10, allowsNull=True,
                       label='winsize',
-                      help='It is the average window size, larger the size, the more robust the algorithm is to noise,'
-                           ' and provide smaller conformation detection, though gives blurred motion fields.'
-                           ' You may try smaller window size for larger conformations but the method will be'
-                           ' more sensitive to noise.')
-        group.addParam('iterations', params.IntParam, default=10,
+                      help='It is the average window size, larger the size, the more robust the algorithm is to noise, '
+                           'and provide fast motion detection, though gives blurred motion fields.')
+        group.addParam('iterations', params.IntParam, default=10, allowsNull=True,
                       label='iterations',
                       help='Number of iterations to be performed at each pyramid level.')
-        group.addParam('poly_n', params.IntParam, default=5,
+        group.addParam('poly_n', params.IntParam, default=5, allowsNull=True,
                       label='poly_n',
-                      help='It is typically 5 or 7, it is the size of the pixel neighbourhood which is used'
-                           ' to find polynomial expansion between the pixels.')
+                      help='It is typically 5 or 7, it is the degree of'
+                           ' polynomial expansion in Farneback optical flow method.')
         group.addParam('poly_sigma', params.FloatParam, default=1.2,
                       label='poly_sigma',
                       help='standard deviation of the gaussian that is for derivatives to be smooth as the basis of'
