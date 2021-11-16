@@ -169,12 +169,12 @@ class ProtGenesis(EMProtocol):
                       condition="EMfitChoice==2")
         form.addParam('image_size', params.IntParam, default=64, label='Image Size',
                       help="TODO", condition="EMfitChoice==2")
-        form.addParam('estimateRB', params.BooleanParam, label="Estimate rigid body ?",
+        form.addParam('estimateAngleShift', params.BooleanParam, label="Estimate rigid body ?",
                       default=False,  condition="EMfitChoice==2", help="TODO")
         form.addParam('n_iter', params.IntParam, default=10, label='Number of iterations for rigid body fitting',
-                      help="TODO", condition="EMfitChoice==2 and estimateRB")
-        form.addParam('imageRB', params.FileParam, label="Rigid body parameters (.xmd)",
-                      condition="EMfitChoice==2 and not estimateRB",
+                      help="TODO", condition="EMfitChoice==2 and estimateAngleShift")
+        form.addParam('imageAngleShift', params.FileParam, label="Rigid body parameters (.xmd)",
+                      condition="EMfitChoice==2 and not estimateAngleShift",
                       help='TODO')
         form.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
                       help="TODO", condition="EMfitChoice==2")
@@ -332,16 +332,18 @@ class ProtGenesis(EMProtocol):
                 volPrefix = self._getExtraPath("%s_inputVol" % str(i + 1).zfill(5))
                 self.inputVolumefn[i]  = self.convertVol(fnInput=self.inputVolumefn[i],
                                    volPrefix = volPrefix, fnPDB=self.inputPDBfn[i])
-        elif self.EMfitChoice.get() == EMFIT_IMAGES and not self.estimateRB.get():
-            self.rb_params=[]
-            mdImgs = md.MetaData(self.imageRB.get())
-            for objId in mdImgs:
-                rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
-                tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
-                psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
-                shiftx = mdImgs.getValue(md.MDL_SHIFT_X, objId)
-                shifty = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
-                self.rb_params.append([rot, tilt, psi, shiftx, shifty])
+
+        # Initialize rigid body fitting parameters
+        elif self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get():
+            for i in range(self.numberOfInputVol):
+                currentAngles = md.MetaData()
+                currentAngles.setValue(md.MDL_IMAGE, self.inputVolumefn[i], currentAngles.addObject())
+                currentAngles.setValue(md.MDL_ANGLE_ROT, 0.0, 1)
+                currentAngles.setValue(md.MDL_ANGLE_TILT, 0.0, 1)
+                currentAngles.setValue(md.MDL_ANGLE_PSI, 0.0, 1)
+                currentAngles.setValue(md.MDL_SHIFT_X, 0.0, 1)
+                currentAngles.setValue(md.MDL_SHIFT_Y, 0.0, 1)
+                currentAngles.write(self._getExtraPath("%s_current_angles.xmd" % str(i + 1).zfill(5)))
 
     def convertVol(self,fnInput,volPrefix, fnPDB):
 
@@ -445,7 +447,7 @@ class ProtGenesis(EMProtocol):
             lastIter = self.numberOfFitting % self.numberOfMpi.get()
 
         # RUN PARALLEL FITTING
-        if not(self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateRB.get()):
+        if not(self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get()):
             for i1 in range(numberOfLinearFit+1):
                 cmds= []
                 n_parallel = numberOfParallelFit if i1<numberOfLinearFit else lastIter
@@ -471,38 +473,45 @@ class ProtGenesis(EMProtocol):
                 # Loop rigidbody align / GENESIS fitting
                 for iterFit in range(self.n_iter.get()):
 
-                    # Align PDB
+                # ------   ALIGN PDBs---------
+                    # Transform PDBs to volume
                     cmds_pdb2vol = []
-                    cmds_projectVol = []
-                    cmds_projectMatch = []
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numberOfParallelFit
-                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        prefix = self._getExtraPath("%s_iter%i" % (str(indexFit + 1).zfill(5), iterFit))
                         inputPDB = self.inputPDBfn[indexFit]
-                        inputImage = self.inputVolumefn[indexFit]
-
-                        # get commands
+                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
                         cmds_pdb2vol.append(self.pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix))
-                        cmds_projectVol.append(self.projectVol(inputImage=inputImage, inputVol=tmpPrefix, outputProj=tmpPrefix))
-                        cmds_projectMatch.append(self.projectMatch(inputImage= inputImage, inputProj=tmpPrefix, outputMeta=prefix))
-
-                    # run parallel jobs
                     self.runParallelJobs(cmds_pdb2vol)
-                    self.runParallelJobs(cmds_projectVol)
-                    self.runParallelJobs(cmds_projectMatch)
 
-                    # Apply alignement
+                    # Loop 4 times to refine the angles
+                    sampling_rate = [10.0, 5.0, 3.0, 2.0]
+                    angular_distance = [-1, 10, 20, 5]
+                    for i_align in range(4):
+                        cmds_projectVol = []
+                        cmds_projectMatch = []
+                        for i2 in range(n_parallel):
+                            indexFit = i2 + i1 * numberOfParallelFit
+                            tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                            inputImage = self.inputVolumefn[indexFit]
+                            currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
+
+                            # get commands
+                            cmds_projectVol.append(self.projectVol(inputVol=tmpPrefix, outputProj=tmpPrefix, expImage=currentAngles,
+                                                sampling_rate=sampling_rate[i_align], angular_distance=angular_distance[i_align]))
+                            cmds_projectMatch.append(self.projectMatch(inputImage= inputImage, inputProj=tmpPrefix, outputMeta=currentAngles))
+
+                        # run parallel jobs
+                        self.runParallelJobs(cmds_projectVol)
+                        self.runParallelJobs(cmds_projectMatch)
+
+                    # Cleaning volumes and projections
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numberOfParallelFit
                         tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        prefix = self._getExtraPath("%s_iter%i" % (str(indexFit + 1).zfill(5), iterFit))
+                        os.system("rm -f %s*"%tmpPrefix)
 
-                        self.applyTransform2PDB(inputPDB=self.inputPDBfn[indexFit],
-                            outputPDB="%s.pdb" % prefix, tmpPrefix=tmpPrefix, inputMeta=prefix)
-                        self.inputPDBfn[indexFit] = "%s.pdb" % prefix
 
-                    # run GENESIS
+                # ------   Run Genesis ---------
                     cmds = []
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numberOfParallelFit
@@ -668,14 +677,12 @@ class ProtGenesis(EMProtocol):
                 s += "emfit_exp_image = %s \n" % self.inputVolumefn[indexFit]
                 s += "emfit_image_size =  %i\n" %self.image_size.get()
                 s += "emfit_pixel_size =  %i\n" % self.pixel_size.get()
-                if not self.estimateRB.get():
-                    s += "emfit_roll_angle = %f\n" %self.rb_params[indexFit][0]
-                    s += "emfit_tilt_angle = %f\n" %self.rb_params[indexFit][1]
-                    s += "emfit_yaw_angle =  %f\n" %self.rb_params[indexFit][2]
-                else:
-                    s += "emfit_roll_angle = 0.0\n"
-                    s += "emfit_tilt_angle = 0.0\n"
-                    s += "emfit_yaw_angle =  0.0\n"
+                rigid_body_params = self.getRigidBodyParams()
+                s += "emfit_roll_angle = %f\n" % rigid_body_params[indexFit][0]
+                s += "emfit_tilt_angle = %f\n" % rigid_body_params[indexFit][1]
+                s += "emfit_yaw_angle =  %f\n" % rigid_body_params[indexFit][2]
+                s += "emfit_shift_x = %f\n" % rigid_body_params[indexFit][3]
+                s += "emfit_shift_y =  %f\n" % rigid_body_params[indexFit][4]
 
             if self.replica_exchange.get():
                 s += "\n[REMD] \n"
@@ -696,45 +703,72 @@ class ProtGenesis(EMProtocol):
                 self.image_size.get(),self.image_size.get(),self.image_size.get())
         return cmd+ " "+ args
 
-    def projectVol(self, inputImage, inputVol, outputProj):
+    def projectVol(self, inputVol, outputProj, expImage, sampling_rate=5.0, angular_distance=-1):
         cmd = "xmipp_angular_project_library"
-        args = "-i %s.vol -o %s.stk --sampling_rate 5.0 " % (inputVol, outputProj)
-        args +="--sym c1 --compute_neighbors --angular_distance -1 --method real_space "
-        args += "--experimental_images %s"%inputImage
+        args = "-i %s.vol -o %s.stk --sampling_rate %f " % (inputVol, outputProj, sampling_rate)
+        args +="--sym c1 --compute_neighbors --angular_distance %f --method real_space " % angular_distance
+        args += "--experimental_images %s "%expImage
+        if angular_distance != -1 :
+            args += "--near_exp_data"
         return cmd+ " "+ args
 
-    def projectMatch(self, inputImage, inputProj, outputMeta):
+    def projectMatch(self, inputImage, inputProj, outputMeta, max_shift = 1000.0):
         cmd = "xmipp_angular_projection_matching "
-        args= "-i %s -o %s.xmd --ref %s.stk "%(inputImage, outputMeta, inputProj)
-        args +="--max_shift 1000.0 --search5d_shift 5.0 --search5d_step 2.0"
+        args= "-i %s -o %s --ref %s.stk "%(inputImage, outputMeta, inputProj)
+        args +="--max_shift %f --search5d_shift 5.0 --search5d_step 2.0" %max_shift
         return cmd + " "+ args
 
-    def applyTransform2PDB(self, inputPDB, outputPDB, inputMeta, tmpPrefix):
+    def getRigidBodyParams(self):
+        params = []
+        if not self.estimateAngleShift.get():
+            mdImgs = md.MetaData(self.imageAngleShift.get())
+            for objId in mdImgs:
+                params.append([
+                    mdImgs.getValue(md.MDL_ANGLE_ROT, objId),
+                    mdImgs.getValue(md.MDL_ANGLE_TILT, objId),
+                    mdImgs.getValue(md.MDL_ANGLE_PSI, objId),
+                    mdImgs.getValue(md.MDL_SHIFT_X, objId),
+                    mdImgs.getValue(md.MDL_SHIFT_Y, objId),
+                ])
+        else:
+            for i in range(self.numberOfFitting):
+                mdImg = md.MetaData(self._getExtraPath("%s_current_angles.xmd" % str(i + 1).zfill(5)))
+                params.append([
+                    mdImg.getValue(md.MDL_ANGLE_ROT, 1),
+                    mdImg.getValue(md.MDL_ANGLE_TILT, 1),
+                    mdImg.getValue(md.MDL_ANGLE_PSI, 1),
+                    mdImg.getValue(md.MDL_SHIFT_X, 1),
+                    mdImg.getValue(md.MDL_SHIFT_Y, 1),
+                ])
 
-        mdImgs = md.MetaData("%s.xmd"%inputMeta)
-        Ts = self.voxel_size.get()
-        for objId in mdImgs:
-            rot = str(mdImgs.getValue(md.MDL_ANGLE_ROT, objId))
-            tilt = str(mdImgs.getValue(md.MDL_ANGLE_TILT, objId))
-            psi = str(mdImgs.getValue(md.MDL_ANGLE_PSI, objId))
+        return params
 
-            shiftx = str(-mdImgs.getValue(md.MDL_SHIFT_X, objId)*Ts)
-            shifty = str(-mdImgs.getValue(md.MDL_SHIFT_Y, objId)*Ts)
 
-            cmd = "xmipp_phantom_transform "
-            args = "-i %s -o %s.pdb --operation rotate_euler %s %s %s" % \
-                   (inputPDB, tmpPrefix, rot, tilt,psi)
-            runProgram(cmd, args)
 
-            cmd = "xmipp_phantom_transform "
-            args = "-i %s.pdb -o %s --operation shift %s %s 0.0" % \
-                   (tmpPrefix, outputPDB, shiftx, shifty)
-            runProgram(cmd, args)
+    # def applyTransform2PDB(self, inputPDB, outputPDB, inputMeta, tmpPrefix):
+    #
+    #     mdImgs = md.MetaData("%s.xmd"%inputMeta)
+    #     Ts = self.voxel_size.get()
+    #     for objId in mdImgs:
+    #         rot = str(mdImgs.getValue(md.MDL_ANGLE_ROT, objId))
+    #         tilt = str(mdImgs.getValue(md.MDL_ANGLE_TILT, objId))
+    #         psi = str(mdImgs.getValue(md.MDL_ANGLE_PSI, objId))
+    #
+    #         shiftx = str(-mdImgs.getValue(md.MDL_SHIFT_X, objId)*Ts)
+    #         shifty = str(-mdImgs.getValue(md.MDL_SHIFT_Y, objId)*Ts)
+    #
+    #         cmd = "xmipp_phantom_transform "
+    #         args = "-i %s -o %s.pdb --operation rotate_euler %s %s %s" % \
+    #                (inputPDB, tmpPrefix, rot, tilt,psi)
+    #         runProgram(cmd, args)
+    #
+    #         cmd = "xmipp_phantom_transform "
+    #         args = "-i %s.pdb -o %s --operation shift %s %s 0.0" % \
+    #                (tmpPrefix, outputPDB, shiftx, shifty)
+    #         runProgram(cmd, args)
 
     ################################################################################
-    ##////////////////////////////////////////////////////////////////////////////##
     ##                 CREATE OUTPUT STEP
-    ##\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\##
     ################################################################################
 
     def createOutputStep(self):
@@ -764,10 +798,10 @@ class ProtGenesis(EMProtocol):
             numberOfReplicas = self.nreplica.get() \
                 if self.replica_exchange.get() else 1
             numberOfIterImg = self.n_iter.get() if self.EMfitChoice.get() == EMFIT_IMAGES and \
-                                                   self.estimateRB.get() else 1
+                                                   self.estimateAngleShift.get() else 1
             for j in range(numberOfReplicas):
                 for k in range(numberOfIterImg):
-                    if self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateRB.get():
+                    if self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get():
                         outputPrefix = self._getExtraPath("%s_iter%i_output" % (str(i + 1).zfill(5), k))
                     if self.replica_exchange.get() :
                         outputPrefix += "_remd%i" % (j+1)
@@ -779,7 +813,7 @@ class ProtGenesis(EMProtocol):
                     # comp RMSD
                     if self.rmsdChoice.get():
                         inputPDB = self.inputPDBfn[i] if not(self.EMfitChoice.get() == EMFIT_IMAGES and \
-                                                   self.estimateRB.get()) \
+                                                   self.estimateAngleShift.get()) \
                             else self._getExtraPath("%s_iter%i.pdb" % (str(i + 1).zfill(5), k))
                         rmsd = self.rmsdFromDCD(outputPrefix, inputPDB)
                         np.savetxt(outputPrefix + "_rmsd.txt", rmsd)
