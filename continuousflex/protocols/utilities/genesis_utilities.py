@@ -81,7 +81,7 @@ class PDBMol:
                     atomNum = "99999"  # aomnum#5d
                 else:
                     atomNum = str(self.atomNum[i]).rjust(5)  # aomnum#5d
-                atomName = self.atomName[i].ljust(3)  # atomname$#4s
+                atomName = self.atomName[i].ljust(4)  # atomname$#4s
                 resAlter = self.resAlter[i].ljust(1)  # resAlter#1
                 resName = self.resName[i].ljust(4)  # resname#1s
                 chainName = self.chainName[i].rjust(1)  # Astring
@@ -93,7 +93,7 @@ class PDBMol:
                 temp = str('%6.2f' % self.temp[i]).rjust(6)  # temp
                 chainID = str(self.chainID[i]).ljust(4)  # elname
                 elemName = str(self.elemName[i]).rjust(2)  # elname
-                file.write("%s%s  %s%s%s%s%s    %s%s%s%s%s      %s%s\n" % (
+                file.write("%s%s %s%s%s%s%s    %s%s%s%s%s      %s%s\n" % (
                 atom, atomNum, atomName, resAlter, resName, chainName, resNum,
                 coordx, coordy, coordz, occ, temp, chainID, elemName))
             file.write("END\n")
