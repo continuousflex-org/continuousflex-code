@@ -36,7 +36,7 @@ from pwem.utils import runProgram
 from subprocess import Popen
 from xmippLib import Euler_angles2matrix
 
-from .utilities.genesis_utilities import PDBMol, matchPDBatoms,generatePSF, generateGROTOP
+from .utilities.genesis_utilities import PDBMol,generatePSF, generateGROTOP
 
 EMFIT_NONE = 0
 EMFIT_VOLUMES = 1
@@ -200,21 +200,14 @@ class ProtGenesis(EMProtocol):
                       help="TODO", condition="replica_exchange")
         form.addParam('constantKREMD', params.StringParam, label='K values ',
                       help="TODO", condition="replica_exchange")
-        # Outputs =================================================================================================
-        form.addSection(label='Outputs')
-        form.addParam('rmsdChoice', params.BooleanParam, label="RMSD to target PDB",
-                      default=False, important=False,
-                      help="TODO")
-        form.addParam('target_pdb', params.PointerParam,
-                      pointerClass='AtomStruct', label="Target PDB", help='TODO', condition="rmsdChoice")
 
-        form.addParallelSection(threads=1, mpi=8)
+        form.addParallelSection(threads=1, mpi=1)
         # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
         self._insertFunctionStep("convertInputPDBStep")
         if self.EMfitChoice.get() == EMFIT_VOLUMES or self.EMfitChoice.get() == EMFIT_IMAGES:
-            self._insertFunctionStep("convertInputVolStep")
+            self._insertFunctionStep("convertInputEMStep")
         self._insertFunctionStep("fittingStep")
         self._insertFunctionStep("createOutputStep")
 
@@ -223,129 +216,77 @@ class ProtGenesis(EMProtocol):
     ################################################################################
 
     def convertInputPDBStep(self):
-        # SETUP INPUT PDBs
-        initFn = []
-        if isinstance(self.inputPDB.get(), SetOfAtomStructs) or \
-                isinstance(self.inputPDB.get(), SetOfPDBs):
-            self.numberOfInputPDB = self.inputPDB.get().getSize()
-            for i in range(self.inputPDB.get().getSize()):
-                initFn.append(self.inputPDB.get()[i+1].getFileName())
 
-        else:
-            self.numberOfInputPDB =1
-            initFn.append(self.inputPDB.get().getFileName())
+        inputPDBfn = self.getInputPDBfn()
+        n_pdb = self.getNumberOfInputPDB()
 
-        # COPY INIT PDBs
-        self.inputPDBfn = []
-        for i in range(self.numberOfInputPDB):
-            newPDB = self._getExtraPath("%s_inputPDB.pdb" % str(i + 1).zfill(5))
-            self.inputPDBfn.append(newPDB)
-            runProgram("cp","%s %s"%(initFn[i], newPDB))
-        self.numberOfFitting = self.numberOfInputPDB
+        # Copy PDBs :
+        for i in range(n_pdb):
+            os.system("cp %s %s.pdb"%(inputPDBfn[i],self.getInputPDBprefix(i)))
 
         # GENERATE TOPOLOGY FILES
         if self.generateTop.get():
             #CHARMM
             if self.forcefield.get() == FORCEFIELD_CHARMM:
-                self.inputPSFfn = []
-                for i in range(self.numberOfInputPDB):
-                    inputPrefix = self._getExtraPath("%s_inputPDB"%str(i+1).zfill(5))
-                    generatePSF(inputPDB=self.inputPDBfn[i],inputTopo=self.inputRTF.get(),
-                        outputPrefix=inputPrefix, nucleicChoice=self.nucleicChoice.get())
-                    self.inputPSFfn.append(inputPrefix+".psf")
+                for i in range(n_pdb):
+                    prefix = self.getInputPDBprefix(i)
+                    generatePSF(inputPDB=prefix+".pdb",inputTopo=self.inputRTF.get(),
+                        outputPrefix=prefix, nucleicChoice=self.nucleicChoice.get())
 
             # GROMACS
             elif self.forcefield.get() == FORCEFIELD_AAGO\
                     or self.forcefield.get() == FORCEFIELD_CAGO:
                 self.inputTOPfn = []
-                for i in range(self.numberOfInputPDB):
-                    inputPrefix = self._getExtraPath("%s_inputPDB" % str(i + 1).zfill(5))
-                    generatePSF(inputPDB=self.inputPDBfn[i], inputTopo=self.inputRTF.get(),
-                                outputPrefix=inputPrefix, nucleicChoice=self.nucleicChoice.get())
-                    generateGROTOP(inputPDB=self.inputPDBfn[i], outputPrefix=inputPrefix,
+                for i in range(n_pdb):
+                    prefix = self.getInputPDBprefix(i)
+                    generatePSF(inputPDB=prefix+".pdb", inputTopo=self.inputRTF.get(),
+                                outputPrefix=prefix, nucleicChoice=self.nucleicChoice.get())
+                    generateGROTOP(inputPDB=prefix+".pdb", outputPrefix=prefix,
                                    forcefield=self.forcefield.get(), smog_dir=self.smog_dir.get(),
 					nucleicChoice=self.nucleicChoice.get())
-                    self.inputTOPfn.append(inputPrefix+".top")
 
         else:
             # CHARMM
             if self.forcefield.get() == FORCEFIELD_CHARMM:
-                self.inputPSFfn = [self.inputPSF.get() for i in range(self.numberOfInputPDB)]
+                for i in range(n_pdb):
+                    os.system("cp %s %s.psf" % (self.inputPSF.get(), self.getInputPDBprefix(i)))
 
             # GROMACS
             elif self.forcefield.get() == FORCEFIELD_AAGO\
                     or self.forcefield.get() == FORCEFIELD_CAGO:
-                self.inputTOPfn = [self.inputTOP.get() for i in range(self.numberOfInputPDB)]
-
+                os.system("cp %s %s.top" % (self.inputTOP.get(), self.getInputPDBprefix(i)))
 
     ################################################################################
     ##                 CONVERT INPUT VOLUME/IMAGE
     ################################################################################
 
-    def convertInputVolStep(self):
+    def convertInputEMStep(self):
         # SETUP INPUT VOLUMES / IMAGES
-        self.inputVolumefn = []
 
-        # Get volumes number and file names
-        if self.EMfitChoice.get() == EMFIT_VOLUMES:
-            if isinstance(self.inputVolume.get(), SetOfVolumes) :
-                self.numberOfInputVol = self.inputVolume.get().getSize()
-                for i in self.inputVolume.get():
-                    self.inputVolumefn.append(i.getFileName())
-            else:
-                self.numberOfInputVol =1
-                self.inputVolumefn.append(self.inputVolume.get().getFileName())
-
-        # Get images number and file names
-        elif self.EMfitChoice.get() == EMFIT_IMAGES:
-            if isinstance(self.inputImage.get(), SetOfParticles) :
-                self.numberOfInputVol = self.inputImage.get().getSize()
-                for i in self.inputImage.get():
-                    self.inputVolumefn.append(i.getFileName())
-            else:
-                self.numberOfInputVol =1
-                self.inputVolumefn.append(self.inputImage.get().getFileName())
-
-        # Check input volumes/images correspond to input PDBs
-        if self.numberOfInputPDB != self.numberOfInputVol and \
-                self.numberOfInputVol != 1 and self.numberOfInputPDB != 1:
-            raise RuntimeError("Number of input volumes and PDBs must be the same.")
-
-        ##############################################################################
-        # If number of Volume is > to number of PDBs, change the inputPDB files to
-        #   correspond to volumes
-        if self.numberOfFitting <self.numberOfInputVol :
-            self.numberOfFitting = self.numberOfInputVol
-            self.inputPDBfn = [self.inputPDBfn[0] for i in range(self.numberOfFitting)]
-            if self.forcefield.get() == FORCEFIELD_CHARMM:
-                self.inputPSFfn = [self.inputPSFfn[0] for i in range(self.numberOfFitting)]
-
-            # GROMACS
-            elif self.forcefield.get() == FORCEFIELD_AAGO\
-                    or self.forcefield.get() == FORCEFIELD_CAGO:
-                self.inputTOPfn = [self.inputTOPfn[0] for i in range(self.numberOfFitting)]
-        ##########################################################################
+        inputEMfn = self.getInputEMfn()
+        n_em = self.getNumberOfInputEM()
 
         # CONVERT VOLUMES
         if self.EMfitChoice.get() == EMFIT_VOLUMES:
-            for i in range(self.numberOfInputVol):
-                volPrefix = self._getExtraPath("%s_inputVol" % str(i + 1).zfill(5))
-                self.inputVolumefn[i]  = self.convertVol(fnInput=self.inputVolumefn[i],
-                                   volPrefix = volPrefix, fnPDB=self.inputPDBfn[i])
+            for i in range(n_em):
+                self.convertVolum2Situs(fnInput=inputEMfn[i],
+                                   volPrefix = self.getInputEMprefix(i), fnPDB=self.getInputPDBprefix(i))
 
         # Initialize rigid body fitting parameters
-        elif self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get():
-            for i in range(self.numberOfInputVol):
-                currentAngles = md.MetaData()
-                currentAngles.setValue(md.MDL_IMAGE, self.inputVolumefn[i], currentAngles.addObject())
-                currentAngles.setValue(md.MDL_ANGLE_ROT, 0.0, 1)
-                currentAngles.setValue(md.MDL_ANGLE_TILT, 0.0, 1)
-                currentAngles.setValue(md.MDL_ANGLE_PSI, 0.0, 1)
-                currentAngles.setValue(md.MDL_SHIFT_X, 0.0, 1)
-                currentAngles.setValue(md.MDL_SHIFT_Y, 0.0, 1)
-                currentAngles.write(self._getExtraPath("%s_current_angles.xmd" % str(i + 1).zfill(5)))
+        elif self.EMfitChoice.get() == EMFIT_IMAGES:
+            for i in range(n_em):
+                os.system("cp %s %s.spi"%(inputEMfn[i], self.getInputEMprefix(i)))
+                if self.estimateAngleShift.get():
+                    currentAngles = md.MetaData()
+                    currentAngles.setValue(md.MDL_IMAGE, self.getInputEMprefix(i), currentAngles.addObject())
+                    currentAngles.setValue(md.MDL_ANGLE_ROT, 0.0, 1)
+                    currentAngles.setValue(md.MDL_ANGLE_TILT, 0.0, 1)
+                    currentAngles.setValue(md.MDL_ANGLE_PSI, 0.0, 1)
+                    currentAngles.setValue(md.MDL_SHIFT_X, 0.0, 1)
+                    currentAngles.setValue(md.MDL_SHIFT_Y, 0.0, 1)
+                    currentAngles.write(self._getExtraPath("%s_current_angles.xmd" % str(i + 1).zfill(5)))
 
-    def convertVol(self,fnInput,volPrefix, fnPDB):
+    def convertVolum2Situs(self,fnInput,volPrefix, fnPDB):
 
         # CONVERT TO MRC
         pre, ext = os.path.splitext(os.path.basename(fnInput))
@@ -426,40 +367,29 @@ class ProtGenesis(EMProtocol):
         runProgram("rm","-f %sConv.mrc"%volPrefix)
         runProgram("rm","-f %s.mrc" % volPrefix)
 
-        return "%s.sit"%volPrefix
-
 
     ################################################################################
     ##                 FITTING STEP
     ################################################################################
 
     def fittingStep(self):
-        # SETUP parallel computation
-        if self.numberOfFitting <= self.numberOfMpi.get():
-            numberOfMpiPerFit =self.numberOfMpi.get()//self.numberOfFitting
-            numberOfLinearFit = 1
-            numberOfParallelFit = self.numberOfFitting
-            lastIter=0
-        else:
-            numberOfMpiPerFit = 1
-            numberOfLinearFit = self.numberOfFitting//self.numberOfMpi.get()
-            numberOfParallelFit = self.numberOfMpi.get()
-            lastIter = self.numberOfFitting % self.numberOfMpi.get()
+        # SETUP MPI parameters
+        numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
 
         # RUN PARALLEL FITTING
         if not(self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get()):
-            for i1 in range(numberOfLinearFit+1):
+            for i1 in range(numLinearFit+1):
                 cmds= []
-                n_parallel = numberOfParallelFit if i1<numberOfLinearFit else lastIter
+                n_parallel = numParallelFit if i1<numLinearFit else numLastIter
                 for i2 in range(n_parallel):
-                    indexFit = i2 + i1*numberOfParallelFit
+                    indexFit = i2 + i1*numParallelFit
                     prefix = self._getExtraPath(str(indexFit + 1).zfill(5))
 
                     # Create INP file
                     self.createINP(prefix=prefix, indexFit=indexFit)
 
                     # Create Genesis command
-                    cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numberOfMpiPerFit))
+                    cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
 
                 # Run Genesis
                 self.runParallelJobs(cmds)
@@ -467,8 +397,8 @@ class ProtGenesis(EMProtocol):
 
         # RUN PARALLEL FITTING FOR IMAGES
         else:
-            for i1 in range(numberOfLinearFit + 1):
-                n_parallel = numberOfParallelFit if i1 < numberOfLinearFit else lastIter
+            for i1 in range(numLinearFit + 1):
+                n_parallel = numParallelFit if i1 < numLinearFit else numLastIter
 
                 # Loop rigidbody align / GENESIS fitting
                 for iterFit in range(self.n_iter.get()):
@@ -477,8 +407,10 @@ class ProtGenesis(EMProtocol):
                     # Transform PDBs to volume
                     cmds_pdb2vol = []
                     for i2 in range(n_parallel):
-                        indexFit = i2 + i1 * numberOfParallelFit
-                        inputPDB = self.inputPDBfn[indexFit]
+                        indexFit = i2 + i1 * numParallelFit
+                        inputPDB = self.getInputPDBprefix(indexFit)+".pdb" if iterFit ==0 \
+                            else  self._getExtraPath("%s_iter%i_output.pdb" % (str(indexFit + 1).zfill(5), iterFit-1))
+
                         tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
                         cmds_pdb2vol.append(self.pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix))
                     self.runParallelJobs(cmds_pdb2vol)
@@ -490,9 +422,9 @@ class ProtGenesis(EMProtocol):
                         cmds_projectVol = []
                         cmds_projectMatch = []
                         for i2 in range(n_parallel):
-                            indexFit = i2 + i1 * numberOfParallelFit
+                            indexFit = i2 + i1 * numParallelFit
                             tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            inputImage = self.inputVolumefn[indexFit]
+                            inputImage = self.getInputEMprefix(indexFit)+".spi"
                             currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
 
                             # get commands
@@ -506,7 +438,7 @@ class ProtGenesis(EMProtocol):
 
                     # Cleaning volumes and projections
                     for i2 in range(n_parallel):
-                        indexFit = i2 + i1 * numberOfParallelFit
+                        indexFit = i2 + i1 * numParallelFit
                         tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
                         os.system("rm -f %s*"%tmpPrefix)
 
@@ -514,34 +446,23 @@ class ProtGenesis(EMProtocol):
                 # ------   Run Genesis ---------
                     cmds = []
                     for i2 in range(n_parallel):
-                        indexFit = i2 + i1 * numberOfParallelFit
+                        indexFit = i2 + i1 * numParallelFit
                         prefix = self._getExtraPath("%s_iter%i" % (str(indexFit + 1).zfill(5), iterFit))
 
                         # Create INP file
                         self.createINP(prefix=prefix, indexFit=indexFit)
 
                         # run GENESIS
-                        cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numberOfMpiPerFit))
-                        self.inputPDBfn[indexFit] = "%s_output.pdb" % prefix
-
+                        cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
                     self.runParallelJobs(cmds)
 
-                # Apply rigid body inverse to output PDBs
                 for i2 in range(n_parallel):
-                    indexFit = i2 + i1 * numberOfParallelFit
-                    mol = PDBMol(self.inputPDBfn[indexFit])
-                    for iterFit in range(self.n_iter.get()):
-                        mdImg = md.MetaData(self._getExtraPath("%s_iter%i.xmd" % (str(indexFit + 1).zfill(5), iterFit)))
-                        for objId in mdImg:
-                            rot = mdImg.getValue(md.MDL_ANGLE_ROT, objId)
-                            tilt = mdImg.getValue(md.MDL_ANGLE_TILT, objId)
-                            psi = mdImg.getValue(md.MDL_ANGLE_PSI, objId)
-                            shiftx = -mdImg.getValue(md.MDL_SHIFT_X, objId)
-                            shifty = -mdImg.getValue(md.MDL_SHIFT_Y, objId)
-                        mol.coords -= np.array([shiftx, shifty, 0.0])
-                        inv_m = np.linalg.inv(Euler_angles2matrix(rot, tilt, psi))
-                        mol.coords = np.dot(inv_m, mol.coords.T).T
-                    mol.save(self._getExtraPath("%s_output.pdb" % str(indexFit + 1).zfill(5)))
+                    idx = str(i2 + i1 * numParallelFit+ 1).zfill(5)
+                    os.system("cp %s %s" % (self._getExtraPath("%s_iter%i_output.pdb" % (idx, self.n_iter.get()-1)),
+                                            self._getExtraPath("%s_output.pdb" % idx)))
+
+
+
 
     def runParallelJobs(self, cmds):
 
@@ -560,8 +481,8 @@ class ProtGenesis(EMProtocol):
             exitcode = p.wait()
             print("Process done %s" %str(exitcode))
             if exitcode != 0:
-                # raise RuntimeError("GENESIS exit with errors, check .log file ")
-                print("Warning : GENESIS exit with errors, check .log file ")
+                raise RuntimeError("GENESIS exit with errors, check .log file ")
+                # print("Warning : GENESIS exit with errors, check .log file ")
 
 
     def getGenesisCmd(self, prefix,n_mpi):
@@ -578,19 +499,22 @@ class ProtGenesis(EMProtocol):
     def createINP(self,prefix, indexFit):
         # CREATE INPUT FILE FOR GENESIS
         outputPrefix = "%s_output"%prefix
-        s = "\n[INPUT] \n"
-        s += "pdbfile = %s\n" % self.inputPDBfn[indexFit]
+        inputPDBprefix = self.getInputPDBprefix(indexFit)
+        inputEMprefix = self.getInputEMprefix(indexFit)
+
+        s = "\n[INPUT] \n" #-----------------------------------------------------------
+        s += "pdbfile = %s.pdb\n" % inputPDBprefix
         if self.forcefield.get() == FORCEFIELD_CHARMM:
             s += "topfile = %s\n" % self.inputRTF.get()
             s += "parfile = %s\n" % self.inputPRM.get()
-            s += "psffile = %s\n" % self.inputPSFfn[indexFit]
+            s += "psffile = %s.psf\n" % inputPDBprefix
         elif self.forcefield.get() == FORCEFIELD_AAGO\
                 or self.forcefield.get() == FORCEFIELD_CAGO:
-            s += "grotopfile = %s\n" % self.inputTOPfn[indexFit]
+            s += "grotopfile = %s.top\n" % inputPDBprefix
         if self.restartchoice.get():
             s += "rstfile = %s\n" % self.inputRST.get()
 
-        s += "\n[OUTPUT] \n"
+        s += "\n[OUTPUT] \n" #-----------------------------------------------------------
         if self.replica_exchange.get():
             outputPrefix += "_remd{}"
             s += "remfile = %s.rem\n" %outputPrefix
@@ -599,7 +523,7 @@ class ProtGenesis(EMProtocol):
         s += "rstfile = %s.rst\n" %outputPrefix
         s += "pdbfile = %s.pdb\n" %outputPrefix
 
-        s += "\n[ENERGY] \n"
+        s += "\n[ENERGY] \n" #-----------------------------------------------------------
         if self.forcefield.get() == FORCEFIELD_CHARMM:
             s += "forcefield = CHARMM \n"
         elif self.forcefield.get() == FORCEFIELD_AAGO:
@@ -621,10 +545,10 @@ class ProtGenesis(EMProtocol):
             s += "implicit_solvent = NONE  \n"
 
         if self.simulationType.get() == SIMULATION_MIN:
-            s += "\n[MINIMIZE]\n"
+            s += "\n[MINIMIZE]\n" #-----------------------------------------------------------
             s += "method = SD\n"
         else:
-            s += "\n[DYNAMICS] \n"
+            s += "\n[DYNAMICS] \n" #-----------------------------------------------------------
             if self.integrator.get() == INTEGRATOR_VVERLET:
                 s += "integrator = VVER  \n"
             else:
@@ -636,10 +560,10 @@ class ProtGenesis(EMProtocol):
         s += "rstout_period = %i \n" % self.n_steps.get()
         s += "nbupdate_period = %i \n" % self.nbupdate_period.get()
 
-        s += "\n[CONSTRAINTS] \n"
+        s += "\n[CONSTRAINTS] \n" #-----------------------------------------------------------
         s += "rigid_bond = NO \n"
 
-        s += "\n[ENSEMBLE] \n"
+        s += "\n[ENSEMBLE] \n" #-----------------------------------------------------------
         s += "ensemble = NVT \n"
         if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
             s += "tpcontrol = LANGEVIN  \n"
@@ -649,15 +573,15 @@ class ProtGenesis(EMProtocol):
             s += "tpcontrol = NO  \n"
         s += "temperature = %.2f \n" % self.temperature.get()
 
-        s += "\n[BOUNDARY] \n"
+        s += "\n[BOUNDARY] \n" #-----------------------------------------------------------
         s += "type = NOBC  \n"
 
         if (self.EMfitChoice.get()==EMFIT_VOLUMES or self.EMfitChoice.get()==EMFIT_IMAGES)\
                 and self.simulationType.get() == SIMULATION_MD:
-            s += "\n[SELECTION] \n"
+            s += "\n[SELECTION] \n" #-----------------------------------------------------------
             s += "group1 = all and not hydrogen\n"
 
-            s += "\n[RESTRAINTS] \n"
+            s += "\n[RESTRAINTS] \n" #-----------------------------------------------------------
             s += "nfunctions = 1 \n"
             s += "function1 = EM \n"
             if self.replica_exchange.get():
@@ -666,26 +590,26 @@ class ProtGenesis(EMProtocol):
                 s += "constant1 = %.2f \n" % self.constantK.get()
             s += "select_index1 = 1 \n"
 
-            s += "\n[EXPERIMENTS] \n"
+            s += "\n[EXPERIMENTS] \n" #-----------------------------------------------------------
             s += "emfit = YES  \n"
             s += "emfit_sigma = %.4f \n" % self.emfit_sigma.get()
             s += "emfit_tolerance = %.6f \n" % self.emfit_tolerance.get()
             s += "emfit_period = 1  \n"
             if self.EMfitChoice.get() == EMFIT_VOLUMES:
-                s += "emfit_target = %s \n" % self.inputVolumefn[indexFit]
+                s += "emfit_target = %s.sit \n" % inputEMprefix
             elif self.EMfitChoice.get()==EMFIT_IMAGES :
-                s += "emfit_exp_image = %s \n" % self.inputVolumefn[indexFit]
+                s += "emfit_exp_image = %s.spi \n" % inputEMprefix
                 s += "emfit_image_size =  %i\n" %self.image_size.get()
                 s += "emfit_pixel_size =  %i\n" % self.pixel_size.get()
-                rigid_body_params = self.getRigidBodyParams()
-                s += "emfit_roll_angle = %f\n" % rigid_body_params[indexFit][0]
-                s += "emfit_tilt_angle = %f\n" % rigid_body_params[indexFit][1]
-                s += "emfit_yaw_angle =  %f\n" % rigid_body_params[indexFit][2]
-                s += "emfit_shift_x = %f\n" % rigid_body_params[indexFit][3]
-                s += "emfit_shift_y =  %f\n" % rigid_body_params[indexFit][4]
+                rigid_body_params = self.getRigidBodyParams(indexFit)
+                s += "emfit_roll_angle = %f\n" % rigid_body_params[0]
+                s += "emfit_tilt_angle = %f\n" % rigid_body_params[1]
+                s += "emfit_yaw_angle =  %f\n" % rigid_body_params[2]
+                s += "emfit_shift_x = %f\n" % rigid_body_params[3]
+                s += "emfit_shift_y =  %f\n" % rigid_body_params[4]
 
             if self.replica_exchange.get():
-                s += "\n[REMD] \n"
+                s += "\n[REMD] \n" #-----------------------------------------------------------
                 s += "dimension = 1 \n"
                 s += "exchange_period = %i \n" % self.exchange_period.get()
                 s += "type1 = RESTRAINT \n"
@@ -699,7 +623,7 @@ class ProtGenesis(EMProtocol):
     def pdb2vol(self, inputPDB, outputVol):
         cmd = "xmipp_volume_from_pdb"
         args = "-i %s  -o %s --sampling %f --size %i %i %i"%\
-               (inputPDB, outputVol,self.voxel_size.get(),
+               (inputPDB, outputVol,self.pixel_size.get(),
                 self.image_size.get(),self.image_size.get(),self.image_size.get())
         return cmd+ " "+ args
 
@@ -715,33 +639,8 @@ class ProtGenesis(EMProtocol):
     def projectMatch(self, inputImage, inputProj, outputMeta, max_shift = 1000.0):
         cmd = "xmipp_angular_projection_matching "
         args= "-i %s -o %s --ref %s.stk "%(inputImage, outputMeta, inputProj)
-        args +="--max_shift %f --search5d_shift 5.0 --search5d_step 2.0" %max_shift
+        args +="--max_shift %f --search5d_shift 10.0 --search5d_step 2.0" %max_shift
         return cmd + " "+ args
-
-    def getRigidBodyParams(self):
-        params = []
-        if not self.estimateAngleShift.get():
-            mdImgs = md.MetaData(self.imageAngleShift.get())
-            for objId in mdImgs:
-                params.append([
-                    mdImgs.getValue(md.MDL_ANGLE_ROT, objId),
-                    mdImgs.getValue(md.MDL_ANGLE_TILT, objId),
-                    mdImgs.getValue(md.MDL_ANGLE_PSI, objId),
-                    mdImgs.getValue(md.MDL_SHIFT_X, objId),
-                    mdImgs.getValue(md.MDL_SHIFT_Y, objId),
-                ])
-        else:
-            for i in range(self.numberOfFitting):
-                mdImg = md.MetaData(self._getExtraPath("%s_current_angles.xmd" % str(i + 1).zfill(5)))
-                params.append([
-                    mdImg.getValue(md.MDL_ANGLE_ROT, 1),
-                    mdImg.getValue(md.MDL_ANGLE_TILT, 1),
-                    mdImg.getValue(md.MDL_ANGLE_PSI, 1),
-                    mdImg.getValue(md.MDL_SHIFT_X, 1),
-                    mdImg.getValue(md.MDL_SHIFT_Y, 1),
-                ])
-
-        return params
 
 
 
@@ -772,17 +671,12 @@ class ProtGenesis(EMProtocol):
     ################################################################################
 
     def createOutputStep(self):
-
-        # COMPUTE CC AND RMSD IF NEEDED
-        if self.EMfitChoice.get() == EMFIT_VOLUMES or self.EMfitChoice.get() == EMFIT_IMAGES :
-            self.generateExtraOutputs()
-
         # CREATE SET OF PDBs
         pdbset = self._createSetOfPDBs("outputPDBs")
         numberOfReplicas = self.nreplica.get() \
             if self.replica_exchange.get() else 1
 
-        for i in range(self.numberOfFitting):
+        for i in range(self.getNumberOfFitting()):
             outputPrefix = self._getExtraPath("%s_output" % str(i + 1).zfill(5))
             for j in range(numberOfReplicas):
                 if self.replica_exchange.get():
@@ -790,89 +684,6 @@ class ProtGenesis(EMProtocol):
                 pdbset.append(AtomStruct(outputPrefix + ".pdb"))
 
         self._defineOutputs(outputPDBs=pdbset)
-
-    def generateExtraOutputs(self):
-        # COMPUTE CC AND RMSD IF NEEDED
-        for i in range(self.numberOfFitting):
-            outputPrefix = self._getExtraPath("%s_output" % (str(i + 1).zfill(5)))
-            numberOfReplicas = self.nreplica.get() \
-                if self.replica_exchange.get() else 1
-            numberOfIterImg = self.n_iter.get() if self.EMfitChoice.get() == EMFIT_IMAGES and \
-                                                   self.estimateAngleShift.get() else 1
-            for j in range(numberOfReplicas):
-                for k in range(numberOfIterImg):
-                    if self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get():
-                        outputPrefix = self._getExtraPath("%s_iter%i_output" % (str(i + 1).zfill(5), k))
-                    if self.replica_exchange.get() :
-                        outputPrefix += "_remd%i" % (j+1)
-
-                    # comp CC
-                    cc = self.ccFromLogFile(outputPrefix)
-                    np.savetxt(outputPrefix + "_cc.txt", cc)
-
-                    # comp RMSD
-                    if self.rmsdChoice.get():
-                        inputPDB = self.inputPDBfn[i] if not(self.EMfitChoice.get() == EMFIT_IMAGES and \
-                                                   self.estimateAngleShift.get()) \
-                            else self._getExtraPath("%s_iter%i.pdb" % (str(i + 1).zfill(5), k))
-                        rmsd = self.rmsdFromDCD(outputPrefix, inputPDB)
-                        np.savetxt(outputPrefix + "_rmsd.txt", rmsd)
-
-    def rmsdFromDCD(self, outputPrefix, inputPDB):
-
-        # EXTRACT PDBs from dcd file
-        with open("%s_dcd2pdb.tcl" % outputPrefix, "w") as f:
-            s = ""
-            s += "mol load pdb %s dcd %s.dcd\n" % (inputPDB, outputPrefix)
-            s += "set nf [molinfo top get numframes]\n"
-            s += "for {set i 0 } {$i < $nf} {incr i} {\n"
-            s += "[atomselect top all frame $i] writepdb %stmp$i.pdb\n" % outputPrefix
-            s += "}\n"
-            s += "exit\n"
-            f.write(s)
-        runProgram("vmd"," -dispdev text -e %s_dcd2pdb.tcl > /dev/null" % outputPrefix)
-
-        # DEF RMSD
-        def RMSD(c1, c2):
-            return np.sqrt(np.mean(np.square(np.linalg.norm(c1 - c2, axis=1))))
-
-        # COMPUTE RMSD
-        rmsd = []
-        N = (self.n_steps.get() // self.crdout_period.get())
-        initPDB = PDBMol(inputPDB)
-        targetPDB = PDBMol(self.target_pdb.get().getFileName())
-
-        idx = matchPDBatoms([initPDB, targetPDB], ca_only=True)
-        rmsd.append(RMSD(initPDB.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
-        for i in range(N):
-            f = outputPrefix + "tmp" + str(i + 1) + ".pdb"
-            if os.path.exists(f):
-                mol = PDBMol(f)
-                rmsd.append(RMSD(mol.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
-
-        # CLEAN TMP FILES AND SAVE
-        runProgram("rm","-f %stmp*" % (outputPrefix))
-        return rmsd
-
-    def ccFromLogFile(self,outputPrefix):
-        # READ CC IN GENESIS LOG FILE
-        with open(outputPrefix+".log","r") as f:
-            header = None
-            cc = []
-            cc_idx = 0
-            for i in f:
-                if i.startswith("INFO:"):
-                    if header is None:
-                        header = i.split()
-                        for i in range(len(header)):
-                            if 'RESTR_CVS001' in header[i]:
-                                cc_idx = i
-                    else:
-                        splitline = i.split()
-                        if len(splitline) == len(header):
-                            cc.append(float(splitline[cc_idx]))
-
-        return cc
 
     # --------------------------- STEPS functions --------------------------------------------
     # --------------------------- INFO functions --------------------------------------------
@@ -891,3 +702,98 @@ class ProtGenesis(EMProtocol):
         pass
 
     # --------------------------- UTILS functions --------------------------------------------
+
+    def getNumberOfInputPDB(self):
+        if isinstance(self.inputPDB.get(), SetOfAtomStructs) or \
+                isinstance(self.inputPDB.get(), SetOfPDBs):
+            return self.inputPDB.get().getSize()
+        else: return 1
+
+    def getNumberOfInputEM(self):
+        if self.EMfitChoice.get() == EMFIT_VOLUMES:
+            if isinstance(self.inputVolume.get(), SetOfVolumes): return self.inputVolume.get().getSize()
+            else: return 1
+        elif self.EMfitChoice.get() == EMFIT_IMAGES:
+            if isinstance(self.inputImage.get(), SetOfParticles): return self.inputImage.get().getSize()
+            else: return 1
+        else: return 0
+
+    def getNumberOfFitting(self):
+        numberOfInputPDB = self.getNumberOfInputPDB()
+        numberOfInputEM = self.getNumberOfInputEM()
+
+        # Check input volumes/images correspond to input PDBs
+        if numberOfInputPDB != numberOfInputEM and \
+                numberOfInputEM != 1 and numberOfInputPDB != 1:
+            raise RuntimeError("Number of input volumes and PDBs must be the same.")
+        return np.max([numberOfInputEM, numberOfInputPDB])
+
+    def getInputPDBfn(self):
+        initFn = []
+        if isinstance(self.inputPDB.get(), SetOfAtomStructs) or \
+                isinstance(self.inputPDB.get(), SetOfPDBs):
+            for i in range(self.inputPDB.get().getSize()):
+                initFn.append(self.inputPDB.get()[i+1].getFileName())
+
+        else:
+            initFn.append(self.inputPDB.get().getFileName())
+        return initFn
+
+    def getInputEMfn(self):
+        inputEMfn = []
+        if self.EMfitChoice.get() == EMFIT_VOLUMES:
+            if isinstance(self.inputVolume.get(), SetOfVolumes) :
+                for i in self.inputVolume.get():
+                    inputEMfn.append(i.getFileName())
+            else:
+                inputEMfn.append(self.inputVolume.get().getFileName())
+        elif self.EMfitChoice.get() == EMFIT_IMAGES:
+            if isinstance(self.inputImage.get(), SetOfParticles) :
+                for i in self.inputImage.get():
+                    inputEMfn.append(i.getFileName())
+            else:
+                inputEMfn.append(self.inputImage.get().getFileName())
+        return inputEMfn
+
+    def getInputPDBprefix(self, index):
+        prefix = self._getExtraPath("%s_inputPDB")
+        if self.getNumberOfInputPDB() == 1:
+            return prefix % str(1).zfill(5)
+        else:
+            return prefix % str(index + 1).zfill(5)
+
+    def getInputEMprefix(self, index):
+        prefix = self._getExtraPath("%s_inputEM")
+        if self.getNumberOfInputEM() == 0:
+            return ""
+        elif self.getNumberOfInputEM() == 1:
+            return prefix % str(1).zfill(5)
+        else:
+            return prefix % str(index + 1).zfill(5)
+
+    def getMPIParams(self):
+        """
+        return numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
+        """
+        n_fit = self.getNumberOfFitting()
+        if n_fit <= self.numberOfMpi.get():
+            return self.numberOfMpi.get()//n_fit, 1, n_fit, 0
+        else:
+            return 1, n_fit//self.numberOfMpi.get(),  self.numberOfMpi.get(), n_fit % self.numberOfMpi.get()
+
+    def getRigidBodyParams(self, index):
+        if not self.estimateAngleShift.get():
+            mdImg = md.MetaData(self.imageAngleShift.get())
+            idx = int(index + 1)
+        else:
+            mdImg = md.MetaData(self._getExtraPath("%s_current_angles.xmd" % str(index + 1).zfill(5)))
+            idx=1
+        return [
+            mdImg.getValue(md.MDL_ANGLE_ROT, idx),
+            mdImg.getValue(md.MDL_ANGLE_TILT, idx),
+            mdImg.getValue(md.MDL_ANGLE_PSI, idx),
+            mdImg.getValue(md.MDL_SHIFT_X, idx),
+            mdImg.getValue(md.MDL_SHIFT_Y, idx),
+        ]
+
+
