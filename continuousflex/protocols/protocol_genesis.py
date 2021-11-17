@@ -417,7 +417,7 @@ class ProtGenesis(EMProtocol):
 
                     # Loop 4 times to refine the angles
                     sampling_rate = [10.0, 5.0, 3.0, 2.0]
-                    angular_distance = [-1, 10, 20, 5]
+                    angular_distance = [-1, 20, 10, 5]
                     for i_align in range(4):
                         cmds_projectVol = []
                         cmds_projectMatch = []

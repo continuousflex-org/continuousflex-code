@@ -30,6 +30,8 @@ from .plotter import FlexPlotter
 from pyworkflow.utils import getListFromRangeString
 import numpy as np
 import os
+import glob
+
 
 from continuousflex.protocols.utilities.genesis_utilities import PDBMol, matchPDBatoms
 
@@ -143,7 +145,7 @@ class GenesisViewer(ProtocolViewer):
         # Plot CC
         x = np.array(log_file["STEP"])*time_step
         for i in range(len(cc)):
-            ax.plot(x, cc[-1], color="tab:blue", alpha=0.3)
+            ax.plot(x, cc[i], color="tab:blue", alpha=0.3)
         ax.errorbar(x = x, y=np.mean(cc, axis=0), yerr=np.std(cc, axis=0),
                     capthick=1.7, capsize=5,elinewidth=1.7, color="tab:blue", errorevery=len(log_file["STEP"]) //10)
 
@@ -154,21 +156,18 @@ class GenesisViewer(ProtocolViewer):
         ax = plotter.createSubPlot("RMSD ($\AA$)", "Time (ps)", "RMSD ($\AA$)")
         target_pdbs_list = [f for f in glob.glob(self.targetPDB.get())]
         target_pdbs_list.sort()
-        print(target_pdbs_list)
 
+        # Get RMSD list
         fitlist = self.getFitlist()
         time_step = float( self.protocol.time_step.get())
         rmsd = []
         for i in fitlist:
             outputPrefix = self.protocol._getExtraPath("%s_output" % (str(i).zfill(5)))
             log_file = readLogFile(outputPrefix + ".log")
-            if len(target_pdbs_list)  == 1:
-                target = target_pdbs_list[0]
-            else:
-                target = target_pdbs_list
             rmsd.append(rmsdFromDCD(outputPrefix=outputPrefix, inputPDB=self.protocol.getInputPDBprefix(i)+".pdb",
-                                    targetPDB=target[i]))
+                    targetPDB=target_pdbs_list[0] if len(target_pdbs_list)  == 1 else target_pdbs_list[i]))
 
+        # Plot RMSD
         x = np.array(log_file["STEP"])*time_step
         for i in range(len(rmsd)):
             ax.plot(x, rmsd[i], color="tab:blue", alpha=0.3)
