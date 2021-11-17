@@ -60,9 +60,9 @@ class GenesisViewer(ProtocolViewer):
                       label='[EMFIT] Display RMSD',
                       help='TODO')
 
-        form.addParam('targetPDB', params.FileParam,
-                      pointerClass='AtomStruct', label="[EMFIT] target PDB",
-                      help='Select the target PDB.')
+        form.addParam('targetPDB', params.PathParam, default=None,
+                        label="List of Target PDBs",
+                        help='Use the file pattern as file location with /*.pdb')
 
     def _getVisualizeDict(self):
         return {
@@ -152,6 +152,9 @@ class GenesisViewer(ProtocolViewer):
     def _plotRMSD(self, paramName):
         plotter = FlexPlotter()
         ax = plotter.createSubPlot("RMSD ($\AA$)", "Time (ps)", "RMSD ($\AA$)")
+        target_pdbs_list = [f for f in glob.glob(self.targetPDB.get())]
+        target_pdbs_list.sort()
+        print(target_pdbs_list)
 
         fitlist = self.getFitlist()
         time_step = float( self.protocol.time_step.get())
@@ -159,8 +162,12 @@ class GenesisViewer(ProtocolViewer):
         for i in fitlist:
             outputPrefix = self.protocol._getExtraPath("%s_output" % (str(i).zfill(5)))
             log_file = readLogFile(outputPrefix + ".log")
+            if len(target_pdbs_list)  == 1:
+                target = target_pdbs_list[0]
+            else:
+                target = target_pdbs_list
             rmsd.append(rmsdFromDCD(outputPrefix=outputPrefix, inputPDB=self.protocol.getInputPDBprefix(i)+".pdb",
-                                    targetPDB=self.targetPDB.get().getFileName()))
+                                    targetPDB=target[i]))
 
         x = np.array(log_file["STEP"])*time_step
         for i in range(len(rmsd)):
