@@ -270,7 +270,7 @@ class ProtGenesis(EMProtocol):
         if self.EMfitChoice.get() == EMFIT_VOLUMES:
             for i in range(n_em):
                 self.convertVolum2Situs(fnInput=inputEMfn[i],
-                                   volPrefix = self.getInputEMprefix(i), fnPDB=self.getInputPDBprefix(i))
+                                   volPrefix = self.getInputEMprefix(i), fnPDB=self.getInputPDBprefix(i)+".pdb")
 
         # Initialize rigid body fitting parameters
         elif self.EMfitChoice.get() == EMFIT_IMAGES:
@@ -529,6 +529,7 @@ class ProtGenesis(EMProtocol):
         # CREATE INPUT FILE FOR GENESIS
         inputPDBprefix = self.getInputPDBprefix(indexFit)
         inputEMprefix = self.getInputEMprefix(indexFit)
+        inp_file = "%s_INP"% outputPrefix
 
         s = "\n[INPUT] \n" #-----------------------------------------------------------
         s += "pdbfile = %s\n" % inputPDB
@@ -644,7 +645,7 @@ class ProtGenesis(EMProtocol):
                 s += "nreplica1 = %i \n" % self.nreplica.get()
                 s += "rest_function1 = 1 \n"
 
-        with open("%s_INP"% outputPrefix, "w") as f:
+        with open(inp_file, "w") as f:
             f.write(s)
 
 
@@ -677,16 +678,11 @@ class ProtGenesis(EMProtocol):
     def createOutputStep(self):
         # CREATE SET OF PDBs
         pdbset = self._createSetOfPDBs("outputPDBs")
-        numberOfReplicas = self.nreplica.get() \
-            if self.replica_exchange.get() else 1
 
         for i in range(self.getNumberOfFitting()):
-            outputPrefix = self._getExtraPath("%s_output" % str(i + 1).zfill(5))
-            for j in range(numberOfReplicas):
-                if self.replica_exchange.get():
-                    outputPrefix = self._getExtraPath("%s_output_remd%i" % (str(i + 1).zfill(5), j + 1))
-                pdbset.append(AtomStruct(outputPrefix + ".pdb"))
-
+            outputPrefix =self.getOutputPrefix(i)
+            for j in outputPrefix:
+                pdbset.append(AtomStruct(j + ".pdb"))
         self._defineOutputs(outputPDBs=pdbset)
 
     # --------------------------- STEPS functions --------------------------------------------
@@ -706,6 +702,7 @@ class ProtGenesis(EMProtocol):
         pass
 
     # --------------------------- UTILS functions --------------------------------------------
+
 
     def getNumberOfInputPDB(self):
         if isinstance(self.inputPDB.get(), SetOfAtomStructs) or \
@@ -774,6 +771,17 @@ class ProtGenesis(EMProtocol):
             return prefix % str(1).zfill(5)
         else:
             return prefix % str(index + 1).zfill(5)
+
+
+    def getOutputPrefix(self, index):
+        outputPrefix=[]
+        if self.replica_exchange.get() :
+            for i in range(self.nreplica.get()):
+                outputPrefix.append(self._getExtraPath("%s_output_remd%i" %
+                                (str(index + 1).zfill(5), i + 1)))
+        else:
+            outputPrefix.append(self._getExtraPath("%s_output" % str(index + 1).zfill(5)))
+        return outputPrefix
 
     def getMPIParams(self):
         """

@@ -103,13 +103,15 @@ class GenesisViewer(ProtocolViewer):
         fitlist = self.getFitlist()
         ene = {}
         for i in fitlist:
-            log_file = readLogFile(self.protocol._getExtraPath("%s_output.log" % (str(i).zfill(5))))
-            for e in ene_default:
-                if e in log_file:
-                    if e in ene :
-                        ene[e].append(log_file[e])
-                    else:
-                        ene[e] = [log_file[e]]
+            outputPrefix = self.protocol.getOutputPrefix(i - 1)
+            for j in outputPrefix:
+                log_file = readLogFile(j + ".log")
+                for e in ene_default:
+                    if e in log_file:
+                        if e in ene :
+                            ene[e].append(log_file[e])
+                        else:
+                            ene[e] = [log_file[e]]
 
         x = self.getStep(log_file["STEP"])
 
@@ -128,13 +130,15 @@ class GenesisViewer(ProtocolViewer):
         fitlist = self.getFitlist()
         ene = {}
         for i in fitlist:
-            log_file = readLogFile(self.protocol._getExtraPath("%s_output.log" % (str(i).zfill(5))))
-            for e in ene_default:
-                if e in log_file:
-                    if e in ene :
-                        ene[e].append(log_file[e])
-                    else:
-                        ene[e] = [log_file[e]]
+            outputPrefix = self.protocol.getOutputPrefix(i - 1)
+            for j in outputPrefix:
+                log_file = readLogFile(j+".log")
+                for e in ene_default:
+                    if e in log_file:
+                        if e in ene :
+                            ene[e].append(log_file[e])
+                        else:
+                            ene[e] = [log_file[e]]
 
         x = self.getStep(log_file["STEP"])
 
@@ -152,9 +156,10 @@ class GenesisViewer(ProtocolViewer):
         fitlist = self.getFitlist()
         cc = []
         for i in fitlist:
-            outputPrefix = self.protocol._getExtraPath("%s_output" % (str(i).zfill(5)))
-            log_file = readLogFile(outputPrefix + ".log")
-            cc.append(log_file['RESTR_CVS001'])
+            outputPrefix = self.protocol.getOutputPrefix(i-1)
+            for j in outputPrefix:
+                log_file = readLogFile(j + ".log")
+                cc.append(log_file['RESTR_CVS001'])
 
         # Plot CC
         x = self.getStep(log_file["STEP"])
@@ -169,19 +174,16 @@ class GenesisViewer(ProtocolViewer):
     def _plotRMSD(self, paramName):
         plotter = FlexPlotter()
         ax = plotter.createSubPlot("RMSD ($\AA$)", "Time (ps)", "RMSD ($\AA$)")
-        target_pdbs_list = self.getTargetList()
 
         # Get RMSD list
         fitlist = self.getFitlist()
-        print("////")
-        print(fitlist)
-        print(target_pdbs_list)
         rmsd = []
-        for i in range(len(fitlist)):
-            outputPrefix = self.protocol._getExtraPath("%s_output" % (str(i+1).zfill(5)))
-            log_file = readLogFile(outputPrefix + ".log")
-            rmsd.append(rmsdFromDCD(outputPrefix=outputPrefix, inputPDB=self.protocol.getInputPDBprefix(i)+".pdb",
-                    targetPDB=target_pdbs_list[0] if len(target_pdbs_list)  == 1 else target_pdbs_list[i]))
+        for i in fitlist:
+            outputPrefix = self.protocol.getOutputPrefix(i-1)
+            for j in outputPrefix:
+                log_file = readLogFile(j + ".log")
+                rmsd.append(rmsdFromDCD(outputPrefix=j, inputPDB=self.protocol.getInputPDBprefix(i-1)+".pdb",
+                    targetPDB=self.getTargetPDB(i)))
 
         # Plot RMSD
         for i in range(len(rmsd)):
@@ -240,8 +242,7 @@ class GenesisViewer(ProtocolViewer):
 
         # MAtch atoms with target
         if self.targetPDB.get() is not None:
-            targetPDBlist = self.getTargetList()
-            targetPDB = PDBMol(targetPDBlist[0])
+            targetPDB = PDBMol(self.getTargetPDB(1))
             idx = matchPDBatoms([initPDB,targetPDB], ca_only=False)
         else:
             idx = np.array([np.arange(initPDB.n_atoms)]).T
@@ -256,8 +257,10 @@ class GenesisViewer(ProtocolViewer):
         fitlist = self.getFitlist()
         fitPDBs = []
         for i in fitlist:
-            mol = PDBMol(self.protocol._getExtraPath("%s_output.pdb" % (str(i).zfill(5))))
-            fitPDBs.append(mol.coords[idx[:,0]].flatten())
+            outputPrefix = self.protocol.getOutputPrefix(i - 1)
+            for j in outputPrefix:
+                mol = PDBMol(j+".pdb")
+                fitPDBs.append(mol.coords[idx[:,0]].flatten())
 
         data = fitPDBs + initPDBs
         length=[len(fitPDBs), len(initPDBs)]
@@ -265,10 +268,9 @@ class GenesisViewer(ProtocolViewer):
 
         # Get TargetPDBs coords
         if self.targetPDB.get() is not None:
-            targetPDBlist = self.getTargetList()
             targetPDBs=[]
-            for i in targetPDBlist:
-                targetPDBs.append(PDBMol(i).coords[idx[:,1]].flatten())
+            for i in fitlist:
+                targetPDBs.append(PDBMol(self.getTargetPDB(i)).coords[idx[:,1]].flatten())
             data = data+targetPDBs
             length.append(len(targetPDBs))
             labels.append("Target PDBs")
@@ -283,13 +285,13 @@ class GenesisViewer(ProtocolViewer):
         time_step = float( self.protocol.time_step.get())
         return np.arange(len(step))*(step[1]-step[0]) * time_step
 
-    def getTargetList(self):
-        targetPDBlistall = [f for f in glob.glob(self.targetPDB.get())]
-        targetPDBlistall.sort()
-        targetPDBlist = []
-        for i in self.getFitlist():
-            targetPDBlist.append(targetPDBlistall[i-1])
-        return targetPDBlist
+    def getTargetPDB(self, index):
+        targetPDBlist = [f for f in glob.glob(self.targetPDB.get())]
+        targetPDBlist.sort()
+        if index-1 < len(targetPDBlist):
+            return targetPDBlist[index-1]
+        else:
+            return targetPDBlist[0]
 
 
 
