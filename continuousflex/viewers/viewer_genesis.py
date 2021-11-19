@@ -31,9 +31,11 @@ from pyworkflow.utils import getListFromRangeString
 import numpy as np
 import os
 import glob
+from xmippLib import SymList
+import pwem.emlib.metadata as md
 
 
-from continuousflex.protocols.utilities.genesis_utilities import PDBMol, matchPDBatoms
+from continuousflex.protocols.utilities.genesis_utilities import PDBMol, matchPDBatoms,compute_pca
 
 class GenesisViewer(ProtocolViewer):
     """ Visualization of results from the GENESIS protocol
@@ -51,26 +53,41 @@ class GenesisViewer(ProtocolViewer):
                            ' "1,3-5" -> [1,3,4,5]\n'
                            ' "1, 2, 4" -> [1,2,4]\n')
         form.addParam('displayEnergy', params.LabelParam,
-                      label='[EMFIT] Display Energy',
+                      label='Display Energy',
                       help='TODO')
 
         form.addParam('displayCC', params.LabelParam,
-                      label='[EMFIT] Display correlation coefficient',
+                      label='Display correlation coefficient',
                       help='TODO')
 
         form.addParam('displayRMSD', params.LabelParam,
-                      label='[EMFIT] Display RMSD',
+                      label='Display RMSD',
                       help='TODO')
 
         form.addParam('targetPDB', params.PathParam, default=None,
                         label="List of Target PDBs",
                         help='Use the file pattern as file location with /*.pdb')
 
+        form.addParam('displayAngularDistance', params.LabelParam,
+                      label='Display Angular distance',
+                      help='TODO')
+
+        form.addParam('rigidBodyParams', params.FileParam, default=None,
+                        label="Target Rigid Body Parameters",
+                        help='TODO')
+
+
+        form.addParam('displayPCA', params.LabelParam,
+                      label='Display PCA',
+                      help='TODO')
+
     def _getVisualizeDict(self):
         return {
             'displayEnergy': self._plotEnergy,
             'displayCC': self._plotCC,
             'displayRMSD': self._plotRMSD,
+            'displayAngularDistance': self._plotAngularDistance,
+            'displayPCA': self._plotPCA,
                 }
 
 
@@ -85,7 +102,6 @@ class GenesisViewer(ProtocolViewer):
 
         fitlist = self.getFitlist()
         ene = {}
-        time_step = float( self.protocol.time_step.get())
         for i in fitlist:
             log_file = readLogFile(self.protocol._getExtraPath("%s_output.log" % (str(i).zfill(5))))
             for e in ene_default:
@@ -95,7 +111,7 @@ class GenesisViewer(ProtocolViewer):
                     else:
                         ene[e] = [log_file[e]]
 
-        x = np.array(log_file["STEP"])*time_step
+        x = self.getStep(log_file["STEP"])
 
         for e in ene:
             ax.errorbar(x = x, y=np.mean(ene[e], axis=0), yerr=np.std(ene[e], axis=0), label=e,
@@ -111,7 +127,6 @@ class GenesisViewer(ProtocolViewer):
 
         fitlist = self.getFitlist()
         ene = {}
-        time_step = float( self.protocol.time_step.get())
         for i in fitlist:
             log_file = readLogFile(self.protocol._getExtraPath("%s_output.log" % (str(i).zfill(5))))
             for e in ene_default:
@@ -121,7 +136,7 @@ class GenesisViewer(ProtocolViewer):
                     else:
                         ene[e] = [log_file[e]]
 
-        x = np.array(log_file["STEP"])*time_step
+        x = self.getStep(log_file["STEP"])
 
         for e in ene:
             ax.errorbar(x = x, y=np.mean(ene[e], axis=0), yerr=np.std(ene[e], axis=0), label=e,
@@ -135,7 +150,6 @@ class GenesisViewer(ProtocolViewer):
 
         # Get CC list
         fitlist = self.getFitlist()
-        time_step = float( self.protocol.time_step.get())
         cc = []
         for i in fitlist:
             outputPrefix = self.protocol._getExtraPath("%s_output" % (str(i).zfill(5)))
@@ -143,9 +157,10 @@ class GenesisViewer(ProtocolViewer):
             cc.append(log_file['RESTR_CVS001'])
 
         # Plot CC
-        x = np.array(log_file["STEP"])*time_step
+        x = self.getStep(log_file["STEP"])
         for i in range(len(cc)):
-            ax.plot(x, cc[i], color="tab:blue", alpha=0.3)
+            if len(cc) <= 10:
+                ax.plot(x, cc[i], color="tab:blue", alpha=0.3)
         ax.errorbar(x = x, y=np.mean(cc, axis=0), yerr=np.std(cc, axis=0),
                     capthick=1.7, capsize=5,elinewidth=1.7, color="tab:blue", errorevery=len(log_file["STEP"]) //10)
 
@@ -154,23 +169,26 @@ class GenesisViewer(ProtocolViewer):
     def _plotRMSD(self, paramName):
         plotter = FlexPlotter()
         ax = plotter.createSubPlot("RMSD ($\AA$)", "Time (ps)", "RMSD ($\AA$)")
-        target_pdbs_list = [f for f in glob.glob(self.targetPDB.get())]
-        target_pdbs_list.sort()
+        target_pdbs_list = self.getTargetList()
 
         # Get RMSD list
         fitlist = self.getFitlist()
-        time_step = float( self.protocol.time_step.get())
+        print("////")
+        print(fitlist)
+        print(target_pdbs_list)
         rmsd = []
-        for i in fitlist:
-            outputPrefix = self.protocol._getExtraPath("%s_output" % (str(i).zfill(5)))
+        for i in range(len(fitlist)):
+            outputPrefix = self.protocol._getExtraPath("%s_output" % (str(i+1).zfill(5)))
             log_file = readLogFile(outputPrefix + ".log")
             rmsd.append(rmsdFromDCD(outputPrefix=outputPrefix, inputPDB=self.protocol.getInputPDBprefix(i)+".pdb",
                     targetPDB=target_pdbs_list[0] if len(target_pdbs_list)  == 1 else target_pdbs_list[i]))
 
         # Plot RMSD
-        x = np.array(log_file["STEP"])*time_step
         for i in range(len(rmsd)):
-            ax.plot(x, rmsd[i], color="tab:blue", alpha=0.3)
+            x = self.getStep(log_file["STEP"])[:len(rmsd[i])]
+            if len(rmsd) <=10:
+                ax.plot(x, rmsd[i], color="tab:blue", alpha=0.3)
+
         ax.errorbar(x = x, y=np.mean(rmsd, axis=0), yerr=np.std(rmsd, axis=0),
                     capthick=1.7, capsize=5,elinewidth=1.7, color="tab:blue", errorevery=len(log_file["STEP"]) //10)
 
@@ -179,6 +197,101 @@ class GenesisViewer(ProtocolViewer):
 
     def getFitlist(self):
         return np.array(getListFromRangeString(self.fitRange.get()))
+
+    def _plotAngularDistance(self, paramName):
+        angular_dist = []
+        shift_dist = []
+        mdImgGT = md.MetaData(self.rigidBodyParams.get())
+        fitlist = self.getFitlist()
+        for i in fitlist:
+            rot0 = mdImgGT.getValue(md.MDL_ANGLE_ROT, int(i))
+            tilt0 = mdImgGT.getValue(md.MDL_ANGLE_TILT, int(i))
+            psi0 = mdImgGT.getValue(md.MDL_ANGLE_PSI, int(i))
+            shiftx0 = -mdImgGT.getValue(md.MDL_SHIFT_X, int(i))
+            shifty0 = -mdImgGT.getValue(md.MDL_SHIFT_Y, int(i))
+
+            mdImgFn = self.protocol._getExtraPath("%s_current_angles.xmd" % (str(i).zfill(5)))
+            mdImg = md.MetaData(mdImgFn)
+            rot = mdImg.getValue(md.MDL_ANGLE_ROT, 1)
+            tilt = mdImg.getValue(md.MDL_ANGLE_TILT, 1)
+            psi = mdImg.getValue(md.MDL_ANGLE_PSI, 1)
+            shiftx = -mdImg.getValue(md.MDL_SHIFT_X, 1)
+            shifty = -mdImg.getValue(md.MDL_SHIFT_Y, 1)
+
+            angular_dist.append(SymList.computeDistanceAngles(SymList(),
+                    rot, tilt, psi, rot0, tilt0, psi0, False, True, False))
+
+            shift_dist.append(np.linalg.norm(np.array([shiftx, shifty, 0.0])
+                                             - np.array([shiftx0, shifty0, 0.0])))
+
+        plotter1 = FlexPlotter()
+        ax1 = plotter1.createSubPlot("Angular Distance (°)", "# Image", "Angular Distance (°)")
+        ax1.plot(angular_dist, "o")
+        plotter1.show()
+
+        plotter2 = FlexPlotter()
+        ax2 = plotter2.createSubPlot("Shift Distance ($\AA$)", "# Image", "Shift Distance ($\AA$)")
+        ax2.plot(shift_dist, "o")
+        plotter2.show()
+
+    def _plotPCA(self, paramName):
+
+        initPDB = PDBMol(self.protocol.getInputPDBprefix(0)+".pdb")
+
+        # MAtch atoms with target
+        if self.targetPDB.get() is not None:
+            targetPDBlist = self.getTargetList()
+            targetPDB = PDBMol(targetPDBlist[0])
+            idx = matchPDBatoms([initPDB,targetPDB], ca_only=False)
+        else:
+            idx = np.array([np.arange(initPDB.n_atoms)]).T
+
+        # Get Init PDB coords
+        initPDBs = []
+        for i in range(self.protocol.getNumberOfInputPDB()):
+            mol = PDBMol(self.protocol.getInputPDBprefix(i)+".pdb")
+            initPDBs.append(mol.coords[idx[:,0]].flatten())
+
+        # Get fitted PDBs coords
+        fitlist = self.getFitlist()
+        fitPDBs = []
+        for i in fitlist:
+            mol = PDBMol(self.protocol._getExtraPath("%s_output.pdb" % (str(i).zfill(5))))
+            fitPDBs.append(mol.coords[idx[:,0]].flatten())
+
+        data = fitPDBs + initPDBs
+        length=[len(fitPDBs), len(initPDBs)]
+        labels=["Fitted PDBs", "Init. PDBs"]
+
+        # Get TargetPDBs coords
+        if self.targetPDB.get() is not None:
+            targetPDBlist = self.getTargetList()
+            targetPDBs=[]
+            for i in targetPDBlist:
+                targetPDBs.append(PDBMol(i).coords[idx[:,1]].flatten())
+            data = data+targetPDBs
+            length.append(len(targetPDBs))
+            labels.append("Target PDBs")
+
+        # Display PCA
+        initPDB.select_atoms(idx[:,0])
+        fig, ax=compute_pca(data=data, length=length, labels=labels,
+                    n_components=2, figsize=(5, 5), initdcd=initPDB)
+        fig.show()
+
+    def getStep(self, step):
+        time_step = float( self.protocol.time_step.get())
+        return np.arange(len(step))*(step[1]-step[0]) * time_step
+
+    def getTargetList(self):
+        targetPDBlistall = [f for f in glob.glob(self.targetPDB.get())]
+        targetPDBlistall.sort()
+        targetPDBlist = []
+        for i in self.getFitlist():
+            targetPDBlist.append(targetPDBlistall[i-1])
+        return targetPDBlist
+
+
 
 
 def readLogFile(log_file):
@@ -195,13 +308,17 @@ def readLogFile(log_file):
                     splitline = line.split()
                     if len(splitline) == len(header):
                         for i in range(1,len(header)):
-                            dic[header[i]].append(float(splitline[i]))
+                            try :
+                                dic[header[i]].append(float(splitline[i]))
+                            except ValueError:
+                                pass
+
     return dic
 
 def rmsdFromDCD(outputPrefix, inputPDB, targetPDB):
 
     # EXTRACT PDBs from dcd file
-    with open("%s_dcd2pdb.tcl" % outputPrefix, "w") as f:
+    with open("%s_tmp_dcd2pdb.tcl" % outputPrefix, "w") as f:
         s = ""
         s += "mol load pdb %s dcd %s.dcd\n" % (inputPDB, outputPrefix)
         s += "set nf [molinfo top get numframes]\n"
@@ -210,7 +327,7 @@ def rmsdFromDCD(outputPrefix, inputPDB, targetPDB):
         s += "}\n"
         s += "exit\n"
         f.write(s)
-    os.system("vmd -dispdev text -e %s_dcd2pdb.tcl > /dev/null" % outputPrefix)
+    os.system("vmd -dispdev text -e %s_tmp_dcd2pdb.tcl > /dev/null" % outputPrefix)
 
     # DEF RMSD
     def RMSD(c1, c2):

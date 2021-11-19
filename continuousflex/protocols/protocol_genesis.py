@@ -383,10 +383,11 @@ class ProtGenesis(EMProtocol):
                 n_parallel = numParallelFit if i1<numLinearFit else numLastIter
                 for i2 in range(n_parallel):
                     indexFit = i2 + i1*numParallelFit
-                    prefix = self._getExtraPath(str(indexFit + 1).zfill(5))
+                    prefix = self._getExtraPath("%s_output"%str(indexFit + 1).zfill(5))
 
                     # Create INP file
-                    self.createINP(prefix=prefix, indexFit=indexFit)
+                    self.createINP(inputPDB=self.getInputPDBprefix(indexFit)+".pdb",
+                                   outputPrefix=prefix, indexFit=indexFit)
 
                     # Create Genesis command
                     cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
@@ -409,7 +410,7 @@ class ProtGenesis(EMProtocol):
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numParallelFit
                         inputPDB = self.getInputPDBprefix(indexFit)+".pdb" if iterFit ==0 \
-                            else  self._getExtraPath("%s_iter%i_output.pdb" % (str(indexFit + 1).zfill(5), iterFit-1))
+                            else  self._getExtraPath("%s_output.pdb" % str(indexFit + 1).zfill(5))
 
                         tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
                         cmds_pdb2vol.append(self.pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix))
@@ -428,9 +429,12 @@ class ProtGenesis(EMProtocol):
                             currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
 
                             # get commands
-                            cmds_projectVol.append(self.projectVol(inputVol=tmpPrefix, outputProj=tmpPrefix, expImage=currentAngles,
-                                                sampling_rate=sampling_rate[i_align], angular_distance=angular_distance[i_align]))
-                            cmds_projectMatch.append(self.projectMatch(inputImage= inputImage, inputProj=tmpPrefix, outputMeta=currentAngles))
+                            cmds_projectVol.append(self.projectVol(inputVol=tmpPrefix,
+                                                outputProj=tmpPrefix, expImage=currentAngles,
+                                                sampling_rate=sampling_rate[i_align],
+                                                angular_distance=angular_distance[i_align]))
+                            cmds_projectMatch.append(self.projectMatch(inputImage= inputImage,
+                                                inputProj=tmpPrefix, outputMeta=currentAngles))
 
                         # run parallel jobs
                         self.runParallelJobs(cmds_projectVol)
@@ -447,14 +451,39 @@ class ProtGenesis(EMProtocol):
                     cmds = []
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numParallelFit
-                        prefix = self._getExtraPath("%s_iter%i" % (str(indexFit + 1).zfill(5), iterFit))
+                        if iterFit == 0:
+                            prefix = self._getExtraPath("%s_output" % str(indexFit + 1).zfill(5))
+                            inputPDB = self.getInputPDBprefix(indexFit)+".pdb"
+                        else:
+                            prefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                            inputPDB = self._getExtraPath("%s_output.pdb" % str(indexFit + 1).zfill(5))
+
 
                         # Create INP file
-                        self.createINP(prefix=prefix, indexFit=indexFit)
+                        self.createINP(inputPDB=inputPDB,
+                                       outputPrefix=prefix, indexFit=indexFit)
 
                         # run GENESIS
                         cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
                     self.runParallelJobs(cmds)
+
+                    # append files
+                    if iterFit != 0:
+                        for i2 in range(n_parallel):
+                            tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                            newPrefix = self._getExtraPath("%s_output" % str(indexFit + 1).zfill(5))
+
+                            indexFit = i2 + i1 * numParallelFit
+                            cat_cmd = "cat %s.log >> %s.log"%(tmpPrefix, newPrefix)
+                            tcl_cmd = "animate read dcd %s.dcd waitfor all\n"%(newPrefix)
+                            tcl_cmd += "animate read dcd %s.dcd waitfor all\n"%(tmpPrefix)
+                            tcl_cmd += "animate write dcd %s.dcd \nexit \n"%newPrefix
+                            with open("%s.tcl"%tmpPrefix, "w") as f:
+                                f.write(tcl_cmd)
+                            cp_cmd = "cp %s.pdb %s.pdb" %(tmpPrefix, newPrefix)
+                            os.system(cat_cmd)
+                            os.system(cp_cmd)
+                            os.system("vmd -dispdev text -e %s.tcl"%tmpPrefix)
 
                 for i2 in range(n_parallel):
                     idx = str(i2 + i1 * numParallelFit+ 1).zfill(5)
@@ -493,17 +522,16 @@ class ProtGenesis(EMProtocol):
         if self.normalModesChoice.get():
             cmd += "%s/ %i %f %f" % (self.genesisDir.get(), self.n_modes.get(),
                                       self.global_mass.get(), self.global_limit.get())
-        cmd += " > %s_output.log" % prefix
+        cmd += " > %s.log" % prefix
         return cmd
 
-    def createINP(self,prefix, indexFit):
+    def createINP(self,inputPDB, outputPrefix, indexFit):
         # CREATE INPUT FILE FOR GENESIS
-        outputPrefix = "%s_output"%prefix
         inputPDBprefix = self.getInputPDBprefix(indexFit)
         inputEMprefix = self.getInputEMprefix(indexFit)
 
         s = "\n[INPUT] \n" #-----------------------------------------------------------
-        s += "pdbfile = %s.pdb\n" % inputPDBprefix
+        s += "pdbfile = %s\n" % inputPDB
         if self.forcefield.get() == FORCEFIELD_CHARMM:
             s += "topfile = %s\n" % self.inputRTF.get()
             s += "parfile = %s\n" % self.inputPRM.get()
@@ -616,7 +644,7 @@ class ProtGenesis(EMProtocol):
                 s += "nreplica1 = %i \n" % self.nreplica.get()
                 s += "rest_function1 = 1 \n"
 
-        with open("%s_INP"% prefix, "w") as f:
+        with open("%s_INP"% outputPrefix, "w") as f:
             f.write(s)
 
 
@@ -636,35 +664,11 @@ class ProtGenesis(EMProtocol):
             args += "--near_exp_data"
         return cmd+ " "+ args
 
-    def projectMatch(self, inputImage, inputProj, outputMeta, max_shift = 1000.0):
+    def projectMatch(self, inputImage, inputProj, outputMeta):
         cmd = "xmipp_angular_projection_matching "
         args= "-i %s -o %s --ref %s.stk "%(inputImage, outputMeta, inputProj)
-        args +="--max_shift %f --search5d_shift 10.0 --search5d_step 2.0" %max_shift
+        args +="--search5d_shift 5.0 --search5d_step 2.0"
         return cmd + " "+ args
-
-
-
-    # def applyTransform2PDB(self, inputPDB, outputPDB, inputMeta, tmpPrefix):
-    #
-    #     mdImgs = md.MetaData("%s.xmd"%inputMeta)
-    #     Ts = self.voxel_size.get()
-    #     for objId in mdImgs:
-    #         rot = str(mdImgs.getValue(md.MDL_ANGLE_ROT, objId))
-    #         tilt = str(mdImgs.getValue(md.MDL_ANGLE_TILT, objId))
-    #         psi = str(mdImgs.getValue(md.MDL_ANGLE_PSI, objId))
-    #
-    #         shiftx = str(-mdImgs.getValue(md.MDL_SHIFT_X, objId)*Ts)
-    #         shifty = str(-mdImgs.getValue(md.MDL_SHIFT_Y, objId)*Ts)
-    #
-    #         cmd = "xmipp_phantom_transform "
-    #         args = "-i %s -o %s.pdb --operation rotate_euler %s %s %s" % \
-    #                (inputPDB, tmpPrefix, rot, tilt,psi)
-    #         runProgram(cmd, args)
-    #
-    #         cmd = "xmipp_phantom_transform "
-    #         args = "-i %s.pdb -o %s --operation shift %s %s 0.0" % \
-    #                (tmpPrefix, outputPDB, shiftx, shifty)
-    #         runProgram(cmd, args)
 
     ################################################################################
     ##                 CREATE OUTPUT STEP
@@ -795,5 +799,4 @@ class ProtGenesis(EMProtocol):
             mdImg.getValue(md.MDL_SHIFT_X, idx),
             mdImg.getValue(md.MDL_SHIFT_Y, idx),
         ]
-
 
