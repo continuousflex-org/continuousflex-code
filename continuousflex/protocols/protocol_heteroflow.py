@@ -102,7 +102,7 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
                                    ' (independently). The more powerful your GPU, the higher the number you can choose.')
         group.addParam('pyr_scale', params.FloatParam, default=0.5,
                       label='pyr_scale', allowsNull=True,
-                       help='parameter specifying the image scale to build pyramids for each image (scale < 1). '
+                       help='parameter specifying the image scale to build pyramids for each image (pyr_scale < 1). '
                             'A classic pyramid is of generally 0.5 scale, every new layer added, it is halved to the previous one.')
         group.addParam('levels', params.IntParam, default=4, allowsNull=True,
                       label='levels',
@@ -111,19 +111,22 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
                            ' The coarsest possible pyramid level is 32x32x32 voxels')
         group.addParam('winsize', params.IntParam, default=10, allowsNull=True,
                       label='winsize',
-                      help='It is the average window size, larger the size, the more robust the algorithm is to noise, '
+                      help='It is the averaging window size, larger the size, the more robust the algorithm is to noise, '
                            'and provide fast motion detection, though gives blurred motion fields.')
         group.addParam('iterations', params.IntParam, default=10, allowsNull=True,
                       label='iterations',
-                      help='Number of iterations to be performed at each pyramid level.')
+                      help='Number of iterations to be performed at each pyramid level. It refines the optical flow'
+                           ' accuracy at each scale and allows accounting for larger displacements.')
         group.addParam('poly_n', params.IntParam, default=5, allowsNull=True,
                       label='poly_n',
-                      help='It is typically 5 or 7, it is the degree of'
-                           ' polynomial expansion in Farneback optical flow method.')
+                      help='Size of the pixel neighborhood used to find polynomial expansion in each pixel;'
+                           ' larger values mean that the image will be approximated with smoother surfaces,'
+                           ' yielding more robust algorithm and more blurred motion field, typically poly_n = 5 or 7.')
         group.addParam('poly_sigma', params.FloatParam, default=1.2,
                       label='poly_sigma',
-                      help='standard deviation of the gaussian that is for derivatives to be smooth as the basis of'
-                           ' the polynomial expansion. It can be 1.2 for poly= 5 and 1.5 for poly= 7.')
+                      help='Standard deviation of the Gaussian that is used to smooth derivatives used as '
+                           'a basis for the polynomial expansion; for poly_n = 5, you can set poly_sigma = 1.2,'
+                           ' for poly_n = 7, a good value would be poly_sigma = 1.5.')
         group.addHidden('flags', params.IntParam, default=0,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='flags',
