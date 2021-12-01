@@ -63,6 +63,9 @@ NUCLEIC_NO = 0
 NUCLEIC_RNA =1
 NUCLEIC_DNA = 2
 
+PREPROCESS_VOL_NORM = 0
+PREPROCESS_VOL_OPT = 1
+PREPROCESS_VOL_MATCH = 2
 
 class ProtGenesis(EMProtocol):
     """ Protocol for the molecular dynamics software GENESIS. """
@@ -162,6 +165,9 @@ class ProtGenesis(EMProtocol):
                       , condition="EMfitChoice==1")
         form.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=False,
                       help="TODo", condition="EMfitChoice==1")
+        form.addParam('preprocessingVol', params.EnumParam, label="Volume preprocessing", default=0,
+                      choices=['Standard Normal', 'Match values range', 'Match Histograms'],
+                      help="TODO", condition="EMfitChoice==1")
 
         # Images
         form.addParam('inputImage', params.PointerParam, pointerClass="Particle, SetOfParticles",
@@ -338,8 +344,18 @@ class ProtGenesis(EMProtocol):
         with mrcfile.open(fnTmpVol+".mrc") as tmp_mrc:
             tmpMRCData = tmp_mrc.data
 
-        # MATCH HISTOGRAMS
-        mrc_data = match_histograms(inputMRCData, tmpMRCData)
+        # PREPROCESS VOLUME
+        if self.preprocessingVol.get() == PREPROCESS_VOL_NORM:
+            mrc_data =  ((inputMRCData-inputMRCData.mean())/inputMRCData.std())\
+                        *tmpMRCData.std() + tmpMRCData.mean()
+        elif self.preprocessingVol.get() == PREPROCESS_VOL_OPT:
+            min1 = tmpMRCData.min()
+            min2 = inputMRCData.min()
+            max1 = tmpMRCData.max()
+            max2 = inputMRCData.max()
+            mrc_data = ((inputMRCData - (min2 + min1))*(max1 - min1) )/ (max2 - min2)
+        elif self.preprocessingVol.get() == PREPROCESS_VOL_MATCH:
+            mrc_data = match_histograms(inputMRCData, tmpMRCData)
 
         # SAVE TO MRC
         with mrcfile.new("%sConv.mrc"%volPrefix, overwrite=True) as mrc:
@@ -373,6 +389,7 @@ class ProtGenesis(EMProtocol):
     ################################################################################
 
     def fittingStep(self):
+
         # SETUP MPI parameters
         numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
 

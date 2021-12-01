@@ -3,6 +3,7 @@ import os
 import copy
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
+from Bio.SVDSuperimposer import SVDSuperimposer
 
 class PDBMol:
     def __init__(self, pdb_file):
@@ -567,3 +568,19 @@ def compute_pca(data, length=None, labels=None, n_components=2, figsize=(5,5), c
 
 def traj_viewer(pdb_file, dcd_file):
     os.system("vmd %s %s" %(pdb_file,dcd_file))
+
+def alignMol(mol1, mol2, idx=None):
+    print("> Aligning PDB ...")
+
+    sup = SVDSuperimposer()
+    if idx is not None:
+        c1 = mol1.coords[idx[:, 0]]
+        c2 = mol2.coords[idx[:, 1]]
+    else:
+        c1 = mol1.coords
+        c2 = mol2.coords
+    sup.set(c1, c2)
+    sup.run()
+    rot, tran = sup.get_rotran()
+    mol2.coords = np.dot(mol2.coords, rot) + tran
+    print("\t Done \n")

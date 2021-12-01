@@ -26,6 +26,7 @@
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 import pyworkflow.protocol.params as params
 from continuousflex.protocols.protocol_genesis import ProtGenesis
+from continuousflex.protocols.utilities.genesis_utilities import traj_viewer, alignMol
 from .plotter import FlexPlotter
 from pyworkflow.utils import getListFromRangeString
 import numpy as np
@@ -33,6 +34,7 @@ import os
 import glob
 from xmippLib import SymList
 import pwem.emlib.metadata as md
+
 
 
 from continuousflex.protocols.utilities.genesis_utilities import PDBMol, matchPDBatoms,compute_pca
@@ -68,6 +70,10 @@ class GenesisViewer(ProtocolViewer):
                         label="List of Target PDBs",
                         help='Use the file pattern as file location with /*.pdb')
 
+        form.addParam('alignTarget', params.BooleanParam, default=False,
+                        label="Align Target PDB",
+                        help='TODO')
+
         form.addParam('displayAngularDistance', params.LabelParam,
                       label='Display Angular distance',
                       help='TODO')
@@ -81,6 +87,10 @@ class GenesisViewer(ProtocolViewer):
                       label='Display PCA',
                       help='TODO')
 
+        form.addParam('displayTraj', params.LabelParam,
+                      label='Display Trajecory',
+                      help='TODO')
+
     def _getVisualizeDict(self):
         return {
             'displayEnergy': self._plotEnergy,
@@ -88,8 +98,13 @@ class GenesisViewer(ProtocolViewer):
             'displayRMSD': self._plotRMSD,
             'displayAngularDistance': self._plotAngularDistance,
             'displayPCA': self._plotPCA,
+            'displayTraj': self._plotTraj,
                 }
 
+    def _plotTraj(self, paramName):
+        fitlist = self.getFitlist()
+        traj_viewer(pdb_file=self.protocol.getInputPDBprefix(fitlist[0] - 1)+".pdb",
+                    dcd_file=self.protocol.getOutputPrefix(fitlist[0] - 1)[0]+".dcd")
 
     def _plotEnergy(self, paramName):
         self._plotEnergyTotal()
@@ -113,11 +128,11 @@ class GenesisViewer(ProtocolViewer):
                         else:
                             ene[e] = [log_file[e]]
 
-        x = self.getStep(log_file["STEP"])
-
+        x = self.getStep(log_file["STEP"], len(log_file["STEP"]))
         for e in ene:
             ax.errorbar(x = x, y=np.mean(ene[e], axis=0), yerr=np.std(ene[e], axis=0), label=e,
-                        capthick=1.7, capsize=5,elinewidth=1.7, errorevery=len(log_file["STEP"]) //10)
+                        capthick=1.7, capsize=5,elinewidth=1.7,
+                        errorevery=np.max([len(log_file["STEP"]) //10,1]))
         plotter.legend()
         plotter.show()
 
@@ -125,7 +140,7 @@ class GenesisViewer(ProtocolViewer):
         plotter = FlexPlotter()
         ax = plotter.createSubPlot("Energy", "Time (ps)", "CC")
         ene_default = ["BOND", "ANGLE", "UREY-BRADLEY", "DIHEDRAL", "IMPROPER", "CMAP", "VDWAALS", "ELECT", "NATIVE_CONTACT",
-               "NON-NATIVE_CONT"]
+               "NON-NATIVE_CONT", "RESTRAINT_TOTAL"]
 
         fitlist = self.getFitlist()
         ene = {}
@@ -140,11 +155,11 @@ class GenesisViewer(ProtocolViewer):
                         else:
                             ene[e] = [log_file[e]]
 
-        x = self.getStep(log_file["STEP"])
-
+        x = self.getStep(log_file["STEP"], len(log_file["STEP"]))
         for e in ene:
             ax.errorbar(x = x, y=np.mean(ene[e], axis=0), yerr=np.std(ene[e], axis=0), label=e,
-                        capthick=1.7, capsize=5,elinewidth=1.7, errorevery=len(log_file["STEP"]) //10)
+                        capthick=1.7, capsize=5,elinewidth=1.7,
+                        errorevery=np.max([len(log_file["STEP"]) //10,1]))
         plotter.legend()
         plotter.show()
 
@@ -162,12 +177,13 @@ class GenesisViewer(ProtocolViewer):
                 cc.append(log_file['RESTR_CVS001'])
 
         # Plot CC
-        x = self.getStep(log_file["STEP"])
         for i in range(len(cc)):
+            x = self.getStep(log_file["STEP"], len(cc[i]))
             if len(cc) <= 10:
                 ax.plot(x, cc[i], color="tab:blue", alpha=0.3)
         ax.errorbar(x = x, y=np.mean(cc, axis=0), yerr=np.std(cc, axis=0),
-                    capthick=1.7, capsize=5,elinewidth=1.7, color="tab:blue", errorevery=len(log_file["STEP"]) //10)
+                    capthick=1.7, capsize=5,elinewidth=1.7, color="tab:blue",
+                    errorevery=np.max([len(log_file["STEP"]) //10,1]))
 
         plotter.show()
 
@@ -183,16 +199,17 @@ class GenesisViewer(ProtocolViewer):
             for j in outputPrefix:
                 log_file = readLogFile(j + ".log")
                 rmsd.append(rmsdFromDCD(outputPrefix=j, inputPDB=self.protocol.getInputPDBprefix(i-1)+".pdb",
-                    targetPDB=self.getTargetPDB(i)))
+                    targetPDB=self.getTargetPDB(i), align = self.alignTarget.get()))
 
         # Plot RMSD
         for i in range(len(rmsd)):
-            x = self.getStep(log_file["STEP"])[:len(rmsd[i])]
+            x = self.getStep(log_file["STEP"], len(rmsd[i]))
             if len(rmsd) <=10:
                 ax.plot(x, rmsd[i], color="tab:blue", alpha=0.3)
 
         ax.errorbar(x = x, y=np.mean(rmsd, axis=0), yerr=np.std(rmsd, axis=0),
-                    capthick=1.7, capsize=5,elinewidth=1.7, color="tab:blue", errorevery=len(log_file["STEP"]) //10)
+                    capthick=1.7, capsize=5,elinewidth=1.7,
+                    color="tab:blue", errorevery=np.max([len(log_file["STEP"]) //10,1]))
 
         plotter.show()
 
@@ -281,9 +298,9 @@ class GenesisViewer(ProtocolViewer):
                     n_components=2, figsize=(5, 5), initdcd=initPDB)
         fig.show()
 
-    def getStep(self, step):
+    def getStep(self, step, length):
         time_step = float( self.protocol.time_step.get())
-        return np.arange(len(step))*(step[1]-step[0]) * time_step
+        return np.arange(length)*(step[1]-step[0]) * time_step
 
     def getTargetPDB(self, index):
         targetPDBlist = [f for f in glob.glob(self.targetPDB.get())]
@@ -317,7 +334,7 @@ def readLogFile(log_file):
 
     return dic
 
-def rmsdFromDCD(outputPrefix, inputPDB, targetPDB):
+def rmsdFromDCD(outputPrefix, inputPDB, targetPDB, align=False):
 
     # EXTRACT PDBs from dcd file
     with open("%s_tmp_dcd2pdb.tcl" % outputPrefix, "w") as f:
@@ -340,13 +357,17 @@ def rmsdFromDCD(outputPrefix, inputPDB, targetPDB):
     inputPDBmol = PDBMol(inputPDB)
     targetPDBmol = PDBMol(targetPDB)
 
-    idx = matchPDBatoms([inputPDBmol, targetPDBmol], ca_only=True)
-    rmsd.append(RMSD(inputPDBmol.coords[idx[:, 0]], targetPDBmol.coords[idx[:, 1]]))
+    idx = matchPDBatoms([targetPDBmol, inputPDBmol], ca_only=True)
+    if align:
+        alignMol(targetPDBmol, inputPDBmol, idx=idx)
+    rmsd.append(RMSD(inputPDBmol.coords[idx[:, 1]], targetPDBmol.coords[idx[:, 0]]))
     i=0
     while(os.path.exists("%stmp%i.pdb"%(outputPrefix,i+1))):
         f = "%stmp%i.pdb"%(outputPrefix,i+1)
         mol = PDBMol(f)
-        rmsd.append(RMSD(mol.coords[idx[:, 0]], targetPDBmol.coords[idx[:, 1]]))
+        if align:
+            alignMol(targetPDBmol, mol, idx=idx)
+        rmsd.append(RMSD(mol.coords[idx[:, 1]], targetPDBmol.coords[idx[:, 0]]))
         i+=1
 
     # CLEAN TMP FILES AND SAVE
