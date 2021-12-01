@@ -646,7 +646,7 @@ class ProtGenesis(EMProtocol):
             elif self.EMfitChoice.get()==EMFIT_IMAGES :
                 s += "emfit_exp_image = %s.spi \n" % inputEMprefix
                 s += "emfit_image_size =  %i\n" %self.image_size.get()
-                s += "emfit_pixel_size =  %i\n" % self.pixel_size.get()
+                s += "emfit_pixel_size =  %f\n" % self.pixel_size.get()
                 rigid_body_params = self.getRigidBodyParams(indexFit)
                 s += "emfit_roll_angle = %f\n" % rigid_body_params[0]
                 s += "emfit_tilt_angle = %f\n" % rigid_body_params[1]
