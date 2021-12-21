@@ -40,6 +40,12 @@ REFERENCE_NONE = 0
 REFERENCE_EXISTS = 1
 REFERENCE_IMPORTED = 2
 
+PERFORM_STA = 0
+COPY_STA = 1
+
+IMPORT_XMIPP_MD = 0
+IMPORT_DYNAMO_TBL = 1
+IMPORT_TOMBOX_MTV = 2
 
 class FlexProtSubtomogramAveraging(ProtAnalysis3D):
     """ Protocol for subtomogram averaging. """
@@ -47,65 +53,103 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
-        form.addSection(label='Input')
-        form.addParam('inputVolumes', params.PointerParam,
-                      pointerClass='SetOfVolumes,Volume',
+        form.addSection(label='')
+        group = form.addGroup('Settings')
+        # form.addSection(label='Input')
+        group.addParam('inputVolumes', params.PointerParam,
+                      pointerClass='SetOfVolumes',
                       label="Input volume(s)", important=True,
                       help='Select volumes')
-        form.addParam('StartingReference', params.EnumParam,
-                      choices=['start from scratch', 'import a volume file and use it as reference',
-                               'select a volume and use as reference'],
+        group.addParam('StA_choice', params.EnumParam,
+                      choices=['Perform StA using Fast Rotational Matching (FRM)',
+                               'Import parameters of a previously performed StA'],
+                      default=PERFORM_STA,
+                      label='Choose what processes you want to perform:', display=params.EnumParam.DISPLAY_COMBO,
+                       help='If you choose to "Perform StA" using FRM you have to set the parameters in the last tab.'
+                            ' Otherwise, if you import a pervious StA, the remaining parameters are not used')
+        group = form.addGroup('Importing a previous StA protocol',
+                              condition='StA_choice==%d'% COPY_STA)
+        group.addParam('import_choice', params.EnumParam,
+                       label='From which software?',
+                       choices=['Import Scipion/Xmipp metadata',
+                                'Import Dynamo table',
+                                'Import TOM-ToolBox motive list'],
+                       default=IMPORT_XMIPP_MD,
+                       help='You have to provide a pervious table of rigid-body alignment parameters in one of the list'
+                            'of supported formats. The software will evaluate the average based on the provided file. '
+                            'If the average is correct (corresponds to what you have before) then the alignment went correctly,'
+                            ' and in this case you can proceed in further processing (refinement and heterogeneity analysis).'
+                       )
+        group.addParam('xmippMD', params.PathParam, allowsNull=True,
+                       condition='import_choice==%d' %IMPORT_XMIPP_MD,
+                      label='Import Scipion/Xmipp metadata file',
+                      help='import a the metadata file that contains the StA parameters. This option will evaluate '
+                           'the average and allows you to perform post-StA processes (refinement and heterogeneity analysis).')
+        group.addParam('dynamoTable', params.PathParam, allowsNull=True,
+                       condition='import_choice==%d' % IMPORT_DYNAMO_TBL,
+                       label='Import a Dynamo table [Beta]',
+                      help='import a Dynamo table that contains the StA parameters. This option will evaluate '
+                           'the average and transform the Dynamo table to Scipion metadata format. and allows you to '
+                           'perform post-StA processes (refinement and heterogeneity analysis).')
+        group.addParam('tomBoxTable', params.PathParam, allowsNull=True,
+                       condition='import_choice==%d' % IMPORT_TOMBOX_MTV,
+                       label='Import a TOM-toolbox table (motive list) [Beta]',
+                      help='import a TOM-toolbox table that contains the STA parameters. This option will evaluate '
+                           'the average and transform the motive list to Scipion metadata format. and allows you to '
+                           'perform post-StA processes (refinement and heterogeneity analysis).')
+        group = form.addGroup('Subtomogram Averaging using Fast Rotational Matching (FRM)',
+                              condition='StA_choice==%d'% PERFORM_STA)
+        group.addParam('StartingReference', params.EnumParam,
+                      choices=['start from scratch', 'browse for a volume file and use it as reference',
+                               'select a volume from the workspace and use as reference'],
                       default=REFERENCE_NONE,
                       label='Starting reference', display=params.EnumParam.DISPLAY_COMBO,
                       help='Align from scratch of choose a template')
-        form.addParam('ReferenceVolume', params.FileParam,
+        group.addParam('ReferenceVolume', params.FileParam,
                       pointerClass='params.FileParam', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_EXISTS,
                       label="starting reference file",
                       help='Choose a starting reference from an external volume file')
-        form.addParam('ReferenceImported', params.PointerParam,
+        group.addParam('ReferenceImported', params.PointerParam,
                       pointerClass='SetOfVolumes,Volume', allowsNull=True,
                       condition='StartingReference==%d' % REFERENCE_IMPORTED,
                       label="selected starting reference",
                       help='Choose an imported volume as a starting reference')
-        form.addParam('NumOfIters', params.IntParam, default=10,
+        group.addParam('applyMask', params.BooleanParam, label='Use a mask?', default=False,
+                       help='A mask that can be applied on the reference without cropping it. The same mask will be'
+                            ' applied on the aligned subtomograms at each iteration (do not apply this mask in advance)'
+                       )
+        group.addParam('Mask', params.PointerParam,
+                       condition='applyMask',
+                       pointerClass='Volume', allowsNull=True,
+                       label="Select mask")
+        group.addParam('NumOfIters', params.IntParam, default=10,
                       label='Number of iterations', help='How many times you want to iterate while performing'
                                                          ' subtomogram alignment and averaging.')
-        form.addParam('dynamoTable', params.PathParam, allowsNull=True,
-                      expertLevel=params.LEVEL_ADVANCED,
-                      label='Import a Dynamo table',
-                      help='import a Dynamo table that contains the STA parameters. This option will evaluate '
-                           'the average and transform the Dynamo table to Scipion metadata format')
-        form.addSection(label='Missing-wedge Compensation')
-        form.addParam('WedgeMode', params.EnumParam,
+        group.addParam('WedgeMode', params.EnumParam,
                       choices=['Do not compensate', 'Compensate'],
                       default=WEDGE_MASK_THRE,
-                      label='Wedge mode', display=params.EnumParam.DISPLAY_COMBO,
+                      label='Missing-wedge Compensation', display=params.EnumParam.DISPLAY_COMBO,
                       help='Choose to compensate for the missing wedge if aligning subtomograms.'
                            ' However, if you are working with previously aligned subtomograms, then its better not to.')
-        form.addParam('tiltLow', params.IntParam, default=-60,
-                      # expertLevel=params.LEVEL_ADVANCED,
-                      condition='WedgeMode==%d' % WEDGE_MASK_THRE,
-                      label='Lower tilt value',
-                      help='The lower tilt angle used in obtaining the tilt series')
-        form.addParam('tiltHigh', params.IntParam, default=60,
-                      # expertLevel=params.LEVEL_ADVANCED,
-                      condition='WedgeMode==%d' % WEDGE_MASK_THRE,
-                      label='Upper tilt value',
-                      help='The upper tilt angle used in obtaining the tilt series')
-        form.addSection(label='Advanced parameters')
-        form.addParam('frm_freq', params.FloatParam, default=0.25,
-                      expertLevel=params.LEVEL_ADVANCED,
-                      label='Maximum cross correlation frequency',
-                      help='The normalized frequency should be between 0 and 0.5 '
-                           'The more it is, the bigger the search frequency is, the more time it demands, '
-                           'keeping it as default is recommended.')
-        form.addParam('frm_maxshift', params.IntParam, default=10,
-                      expertlevel=params.LEVEL_ADVANCED,
-                      label='Maximum shift for rigid body alignment (in pixels)',
-                      help='The maximum shift is a number between 1 and half the size of your volume. '
-                           'It represents the maximum distance searched in x,y and z directions. Keep as default'
-                           ' if your target is near the center in your subtomograms')
+        line = group.addLine('Low and high tilt values:', condition='WedgeMode==%d' % WEDGE_MASK_THRE,
+                             help='The lower and upper tilt angles used in obtaining the tilt series')
+        line.addParam('tiltLow', params.IntParam, default=-60,
+                      label='Lower tilt value')
+        line.addParam('tiltHigh', params.IntParam, default=60,
+                      label='Upper tilt value')
+        line = group.addLine('FRM parameters:',
+                             help='The normalized frequency should be between 0 and 0.5 '
+                                  'The more it is, the bigger the search frequency is, the more time it demands, '
+                                  'keeping it as default is recommended. The maximum shift is a number between 1 and half the '
+                                  'size of your volume. It represents the maximum distance searched in x,y and'
+                                  ' z directions.'
+                             )
+        line.addParam('frm_freq', params.FloatParam, default=0.25,
+                      label='Maximum searched frequency (0->0.5)')
+        line.addParam('frm_maxshift', params.IntParam, default=10,
+                      label='Maximum shift search (in pixels)',
+                      help='')
         form.addParallelSection(threads=0, mpi=5)
 
     # --------------------------- INSERT steps functions --------------------------------------------
@@ -117,10 +161,14 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         self.outputMD = self._getExtraPath('final_md.xmd')
 
         self._insertFunctionStep('convertInputStep')
-        if self.dynamoTable.empty():
+        if self.StA_choice.get() == PERFORM_STA:
             self._insertFunctionStep('doAlignmentStep')
-        else:
+        elif self.StA_choice.get() == COPY_STA and self.import_choice.get() == IMPORT_DYNAMO_TBL:
             self._insertFunctionStep('adaptDynamoStep', self.dynamoTable.get())
+        elif self.StA_choice.get() == COPY_STA and self.import_choice.get() == IMPORT_TOMBOX_MTV:
+            self._insertFunctionStep('adaptTomboxStep', self.tomBoxTable.get())
+        else:
+            self._insertFunctionStep('adaptXmippStep', self.xmippMD.get())
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
@@ -184,8 +232,9 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                 # args += " %(tilt0)d %(tiltF)d "
                 args += "--tilt_values %(tilt0)d %(tiltF)d "
 
-            # This command does not allow mpi processing
-            # runProgram("xmipp_volumeset_align", args % locals())
+            if self.applyMask.get():
+                args += "--mask " + self.Mask.get().getFileName()
+
             self.runJob("xmipp_volumeset_align", args % locals(),
                         env = Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
 
@@ -332,20 +381,118 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
 
         pass
 
+    def adaptTomboxStep(self, Table):
+        volumes_in = self.imgsFn
+        volume_out = self.outputVolume
+        md_out = self.outputMD
+        from continuousflex.protocols.utilities.tombox import motivelist2metadata
+        motivelist2metadata(Table, volumes_in, md_out)
+
+        # Averaging based on the metadata:
+        mdImgs = md.MetaData(md_out)
+        counter = 0
+
+        for objId in mdImgs:
+            counter = counter + 1
+
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+            tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+            psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+
+            x_shift = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+            y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+            z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+
+            flip = mdImgs.getValue(md.MDL_ANGLE_Y, objId)
+            tempVol = self._getExtraPath('temp.mrc')
+            extra = self._getExtraPath()
+
+            params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                     ' --shift %(x_shift)s %(y_shift)s %(z_shift)s' % locals()
+
+            runProgram('xmipp_transform_geometry', params)
+
+            if counter == 1:
+                os.system("cp %(tempVol)s %(volume_out)s" % locals())
+
+            else:
+                params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
+                runProgram('xmipp_image_operate', params)
+
+        params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
+        runProgram('xmipp_image_operate', params)
+        os.system("rm -f %(tempVol)s" % locals())
+         # Averaging is done
+        pass
+
+    def adaptXmippStep(self, Table):
+        volumes_in = self.imgsFn
+        volume_out = self.outputVolume
+        md_out = Table
+
+        # Averaging based on the metadata:
+        mdImgs = md.MetaData(md_out)
+        mdImgs.write(self._getExtraPath('final_md.xmd'))
+        counter = 0
+
+        for objId in mdImgs:
+            counter = counter + 1
+
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+            tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+            psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+
+            x_shift = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+            y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+            z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+
+            flip = mdImgs.getValue(md.MDL_ANGLE_Y, objId)
+            tempVol = self._getExtraPath('temp.mrc')
+            extra = self._getExtraPath()
+
+            if flip == 0 or flip is None:
+                params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                     ' --shift %(x_shift)s %(y_shift)s %(z_shift)s' % locals()
+            else:
+                # First got to rotate each volume 90 degrees about the y axis, align it, then sum it
+                params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
+                runProgram('xmipp_transform_geometry', params)
+                params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
+
+
+            runProgram('xmipp_transform_geometry', params)
+
+            if counter == 1:
+                os.system("cp %(tempVol)s %(volume_out)s" % locals())
+
+            else:
+                params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
+                runProgram('xmipp_image_operate', params)
+
+        params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
+        runProgram('xmipp_image_operate', params)
+        os.system("rm -f %(tempVol)s" % locals())
+         # Averaging is done
+        pass
+
     def createOutputStep(self):
+        # TODO: this is not needed any more, if no issue is reported then deleted it
         inputSet = self.inputVolumes.get()
-        partSet = self._createSetOfVolumes()
-        partSet.copyInfo(inputSet)
-        partSet.setAlignmentProj()
-        partSet.copyItems(inputSet,
-                          updateItemCallback=self._updateParticle,
-                          itemDataIterator=md.iterRows(self.imgsFn, sortByLabel=md.MDL_ITEM_ID))
+        # partSet = self._createSetOfVolumes()
+        # partSet.copyInfo(inputSet)
+        # partSet.setAlignmentProj()
+        # partSet.copyItems(inputSet,
+        #                   updateItemCallback=self._updateParticle,
+        #                   itemDataIterator=md.iterRows(self.imgsFn, sortByLabel=md.MDL_ITEM_ID))
         outvolume = Volume()
         outvolume.setSamplingRate(inputSet.getSamplingRate())
         outvolume.setFileName(self.outputVolume)
-
-        self._defineOutputs(outputParticles=partSet, outputvolume=outvolume)
-        self._defineTransformRelation(self.inputVolumes, partSet)
+        self._defineOutputs(SubtomogramAverage=outvolume)
+        # self._defineOutputs(outputParticles=partSet, outputvolume=outvolume)
+        # self._defineTransformRelation(self.inputVolumes, partSet)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):

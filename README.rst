@@ -55,11 +55,11 @@ Protocols
 * HEMNMA: Hybrid Electron Microscopy Normal Mode Analysis method to interpret heterogeneity of a set of single particle cryo-EM images in terms of continuous macromolecular conformational transitions [1-3]
 * StructMap: Structural Mapping method to interpret heterogeneity of a set of single particle cryo-EM maps in terms of continuous conformational transitions [4]
 * HEMNMA-3D: Extension of HEMNMA to continuous conformational variability analysis of macromolecules from in situ cryo-ET subtomograms [5]
-
+* TomoFlow: Method for analyzing continuous conformational variability of macromolecules in in vitro and in situ cryogenic subtomograms based on 3D dense optical flow [7]
 
 Notes:
 
-* The plugin additionally provides the test data and automated tests of the protocols in Scipion 3. The following two types of tests of HEMNMA and HEMNMA-3D can be produced by running, in the terminal, "scipion3 tests continuousflex.tests.test_workflow_HEMNMA" and “scipion3 tests continuousflex.tests.test_workflow_HEMNMA3D”, respectively: (1) tests of the entire protocol with the flexible references coming from an atomic structure and from an EM map; and (2) test of the alignment module (test run using 5 MPI threads).
+* The plugin additionally provides the test data and automated tests of the protocols in Scipion 3. The following two types of tests of HEMNMA and HEMNMA-3D can be produced by running, in the terminal, "scipion3 tests continuousflex.tests.test_workflow_HEMNMA" and “scipion3 tests continuousflex.tests.test_workflow_HEMNMA3D”, respectively: (1) tests of the entire protocol with the flexible references coming from an atomic structure and from an EM map; and (2) test of the alignment module (test run using 5 MPI threads). The automated tests of the TomoFlow method are also available and can be run using scipion3 tests continuousflex.tests.test_workflow_TomoFlow.
 * HEMNMA additionally provides tools for synthesizing noisy and CTF-affected single particle cryo-EM images with flexible or rigid biomolecular conformations, for several types of conformational distributions, from a given atomic structure or an EM map. One part of the noise is applied on the ideal projections before and the other after the CTF, as described in [6].
 * HEMNMA-3D additionally provides tools for synthesizing noisy, CTF and missing wedge affected cryo-ET tomograms and single particle subtomograms with flexible or rigid biomolecular conformations, for several types of conformational distributions, from a given atomic structure or an EM map. One part of the noise is applied on the ideal projections before and the other after the CTF, as described in [6].
 * A reproduction of some utility codes with their corresponding licenses are contained in this plugin for subtomogram averaging, missing wedge correction, denoising and data reading. These codes are not used in the methods above, but they are made optional for data preprocessing and visualization.
@@ -75,9 +75,10 @@ References
 
 [4] Sanchez Sorzano CO, Alvarez-Cabrera AL, Kazemi M, Carazo JM, Jonic S: StructMap: Elastic Distance Analysis of Electron Microscopy Maps for Studying Conformational Changes. Biophys J 2016, 110:1753-1765. `[Open-access] <http://www-ext.impmc.upmc.fr/~jonic/Papers/StructMap.pdf>`__
 
-[5] Harastani M, Eltsov M, Leforestier A, Jonic S: HEMNMA-3D: Cryo Electron Tomography Method Based on Normal Mode Analysis to Study Continuous Conformational Variability of Macromolecular Complexes. Front Mol Biosci 2021. `[Open-access] <https://www.frontiersin.org/articles/10.3389/fmolb.2021.663121/abstract>`__ (in press)
+[5] Harastani M, Eltsov M, Leforestier A, Jonic S: HEMNMA-3D: Cryo Electron Tomography Method Based on Normal Mode Analysis to Study Continuous Conformational Variability of Macromolecular Complexes. Front Mol Biosci 2021, 8:663121. `[Open-access] <https://www.frontiersin.org/articles/10.3389/fmolb.2021.663121/abstract>`__
 
 [6] Jonic S, Sorzano CO, Thevenaz P, El-Bez C, De Carlo S, Unser M: Spline-based image-to-volume registration for three-dimensional electron microscopy. Ultramicroscopy 2005, 103:303-317. `[Author’s version] <http://www-ext.impmc.upmc.fr/~jonic/Papers/Ultramicroscopy_2005_v103_p303.pdf>`__
 
+[7] Harastani M, Eltsov M, Leforestier A, Jonic S: TomoFlow: Analysis of continuous conformational variability of macromolecules in cryogenic subtomograms based on 3D dense optical flow. J Mol Biol 2021,167381. `[Author’s version] <https://hal.archives-ouvertes.fr/hal-03452809>`__ `[Journal] <https://doi.org/10.1016/j.jmb.2021.167381>`__
 
 # scipion-em-continuousflex

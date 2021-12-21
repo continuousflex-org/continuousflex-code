@@ -61,7 +61,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
     def _defineParams(self, form):
         form.addSection(label='Visualization')
         form.addParam('displayRawDeformation', StringParam, default='1 2',
-                      label='Display the principle axes',
+                      label='Display the principal axes',
                       help='Type 1 to see the histogram of PCA axis 1; \n'
                            'type 2 to to see the histogram of PCA axis 2, etc.\n'
                            'Type 1 2 to see the 2D plot of amplitudes for PCA axes 1 2.\n'
@@ -130,12 +130,18 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         X = np.loadtxt(fname=self.protocol.getOutputMatrixFile())
         if dim == 1:
             plt.hist(X[:,components[0]-1])
+            plt.title('Histogram of principal axis %d values' %components[0])
         if dim == 2:
             plt.scatter(X[:,components[0]-1],X[:,components[1]-1])
             if self.xlimits_mode.get() == X_LIMITS:
                 plt.xlim([x_low,x_high])
             if self.ylimits_mode.get() == Y_LIMITS:
                 plt.ylim([y_low,y_high])
+            plt.xlabel('Principal Component Axis %d' %components[0])
+            plt.ylabel('Principal Component Axis %d' %components[1])
+            modeNameList = 'Principal Axes %d vs %d' %(components[0], components[1])
+            plt.title(modeNameList)
+
         if dim == 3:
             fig = plt.figure()
             ax = fig.gca(projection='3d')
@@ -146,6 +152,11 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                 ax.set_ylim([y_low,y_high])
             if self.zlimits_mode.get() == Z_LIMITS:
                 ax.set_zlim([z_low,z_high])
+            ax.set_xlabel('Principal Component Axis %d' %components[0])
+            ax.set_ylabel('Principal Component Axis %d' %components[1])
+            ax.set_zlabel('Principal Component Axis %d' %components[2])
+            modeNameList = 'Principal Axes %d vs %d vs %d' %(components[0], components[1], components[2])
+            ax.set_title(modeNameList)
         plt.show()
 
     def viewPcaSinglularValues(self, paramName):

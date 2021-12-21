@@ -64,12 +64,12 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         form.addSection(label='Input')
         form.addParam('pdbSource', EnumParam, default=0,
                       label='Source of PDBs',
-                      choices=['After subtomogram synthesis', 'File pattern'],
+                      choices=['Used for subtomogram synthesis', 'File pattern'],
                       help='Use the file pattern as file location with /*.pdb')
         form.addParam('pdbs', params.PointerParam, pointerClass='FlexProtSynthesizeSubtomo',
                       condition='pdbSource == 0',
                       label="Subtomogram synthesis",
-                      help='All PDBs should have the same size')
+                      help='Point to a protocol of synthesizing subtomograms, the ground truth PDBs will be used as input')
         form.addParam('pdbs_file', params.PathParam,
                       condition='pdbSource == 1',
                       label="List of PDBs",

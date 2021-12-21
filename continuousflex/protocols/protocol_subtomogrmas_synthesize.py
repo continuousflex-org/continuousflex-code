@@ -45,6 +45,10 @@ import os
 import numpy as np
 from pwem.utils import runProgram
 import time
+import glob
+from joblib import dump
+from math import cos, sin, pi
+
 
 NMA_ALIGNMENT_WAV = 0
 NMA_ALIGNMENT_PROJ = 1
@@ -57,6 +61,9 @@ MODE_RELATION_PARABOLA = 4
 
 MISSINGWEDGE_YES = 0
 MISSINGWEDGE_NO = 1
+
+LOWPASS_YES = 0
+LOWPASS_NO = 1
 
 ROTATION_SHIFT_YES = 0
 ROTATION_SHIFT_NO = 1
@@ -92,12 +99,22 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         group1.addParam('refVolume', params.PointerParam ,pointerClass='Volume', allowsNull=True, label='EM volume')
 
         group2 = form.addGroup('conformational variability', condition='confVar==%d' % NMA_YES)
+        group2.addParam('importPdbs', params.BooleanParam, default=False,
+                        expertLevel=params.LEVEL_ADVANCED, label='Do you want to improt a set of heterogenous PDBs?',
+                        help='if you keep this as No, you can use a set of normal modes to generate conformational '
+                             'heterogeneity. Otherwise, set as Yes if you have a set of different PDBs that you want '
+                             'to use to simulate subtomograms (for example a trajectory from molecular '
+                             'dynamics simulation)')
+        group2.addParam('pdbs_path', params.PathParam,
+                      condition='importPdbs',
+                      label="List of PDBs",
+                      help='Use the file pattern as file location with /*.pdb')
         group2.addParam('inputModes', params.PointerParam, pointerClass='SetOfNormalModes',
-                      allowsNull=True,
+                      allowsNull=True, condition='importPdbs==False',
                       label="Normal modes",
                       help='Set of modes computed by normal mode analysis.')
         group2.addParam('modeList', NumericRangeParam,
-                      label="Modes selection",
+                      label="Modes selection", condition='importPdbs==False',
                       allowsNull=True,
                       default='7-8',
                       help='Select the normal modes that will be used for image synthesis. \n'
@@ -108,7 +125,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                            ' "8, 10, 12" -> [8,10,12]\n'
                            ' "8 9, 10-12" -> [8,9,10,11,12])\n')
         group2.addParam('modeRelationChoice', params.EnumParam, default=MODE_RELATION_LINEAR,
-                      allowsNull=True,
+                      allowsNull=True, condition='importPdbs==False',
                       choices=['Linear relationship', '3 Clusters', 'Grid', 'Random', 'Upper half circle'],
                       label='Relationship between the modes',
                       help='linear relationship: all the selected modes will have equal amplitudes. \n'
@@ -118,7 +135,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                            'Parabolic: The relationship between two modes will be upper half circle.')
         group2.addParam('centerPoint', params.IntParam, default=100,
                       allowsNull=True,
-                      condition='modeRelationChoice==%d' % MODE_RELATION_3CLUSTERS,
+                      condition='importPdbs==False and modeRelationChoice==%d' % MODE_RELATION_3CLUSTERS,
                       label='Center point',
                       help='This number will be used to determine the distance between the clusters'
                            'center1 = (-center_point, 0)'
@@ -126,19 +143,19 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                            'center3 = (0, center_point)')
         group2.addParam('modesAmplitudeRange', params.IntParam, default=150,
                         allowsNull=True,
-                        condition='modeRelationChoice==%d or modeRelationChoice==%d or modeRelationChoice==%d'
+                        condition='importPdbs==False and modeRelationChoice==%d or modeRelationChoice==%d or modeRelationChoice==%d'
                                   ' or modeRelationChoice==%d' % (MODE_RELATION_LINEAR, MODE_RELATION_MESH,
                                                                   MODE_RELATION_RANDOM, MODE_RELATION_PARABOLA),
                         label='Amplitude range N --> [-N, N]',
                         help='Choose the number N for which the generated normal mode amplitudes are in the range of [-N, N]')
         group2.addParam('meshRowPoints', params.IntParam, default=6,
                       allowsNull=True,
-                      condition='modeRelationChoice==%d' % MODE_RELATION_MESH,
+                      condition='importPdbs==False and modeRelationChoice==%d' % MODE_RELATION_MESH,
                       label='Grid number of steps',
                       help='This number will be the number of points in the row and the column (grid shape will be size*size)')
         form.addParam('numberOfVolumes', params.IntParam, default=36,
                       label='Number of volumes',
-                      condition='modeRelationChoice!=%d'% MODE_RELATION_MESH,
+                      condition='importPdbs==False and modeRelationChoice!=%d'% MODE_RELATION_MESH,
                       help='Number of volumes that will be generated')
         form.addParam('samplingRate', params.FloatParam, default=2.2,
                       condition='confVar==%d or refAtomic!=None' % NMA_YES,
@@ -208,6 +225,24 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='CTF Q0',
                       help='Microscope attribute')
+
+        form.addSection(label='Low pass filtering')
+        form.addParam('lowPassChoice', params.EnumParam, default=LOWPASS_NO,
+                      choices=['Add extra dose accumulation', 'Stay with only CTF'],
+                      label='Use low pass filtering',
+                      help='The generated volumes will be low pass filtered before projection into a tilt series.'
+                           ' This simulates extra distortions similar to dose accumulation.'
+                           ' However, CTF will already have such an effect.')
+        line = form.addLine('Frequency (normalized)',
+                            condition='lowPassChoice==%d' % LOWPASS_YES,
+                            help='The cufoff frequency and raised coside width of the low pass filter.'
+                                 ' For details: see "xmipp_transform_filter --fourier low_pass"')
+        line.addParam('w1', params.FloatParam, default=0.25,
+                      condition='lowPassChoice==%d' % LOWPASS_YES,
+                      label='Cutoff frequency (0 -> 0.5)')
+        line.addParam('raisedw', params.FloatParam, default=0.02,
+                      condition='lowPassChoice==%d' % LOWPASS_YES,
+                      label='Raised cosine width')
 
         form.addSection('Reconstruction')
         form.addParam('reconstructionChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
@@ -377,7 +412,10 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         else:
             np.random.seed(0)
         if(self.confVar.get()==NMA_YES):
-            self._insertFunctionStep("generate_deformations")
+            if(self.importPdbs.get()):
+                self._insertFunctionStep("copy_deformations")
+            else:
+                self._insertFunctionStep("generate_deformations")
             self._insertFunctionStep("generate_volume_from_pdb")
         else:
             self._insertFunctionStep("generate_copies_of_volume")
@@ -423,10 +461,11 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         mode8_samples = YY.reshape(-1)
 
         # iterate over the number of outputs (if mesh this has to be calculated)
-        if self.modeRelationChoice.get() is MODE_RELATION_MESH:
-            numberOfVolumes = self.meshRowPoints.get()*self.meshRowPoints.get()
-        else:
-            numberOfVolumes = self.numberOfVolumes.get()
+        numberOfVolumes = self.get_number_of_volumes()
+        # if self.modeRelationChoice.get() is MODE_RELATION_MESH:
+        #     numberOfVolumes = self.meshRowPoints.get()*self.meshRowPoints.get()
+        # else:
+        #     numberOfVolumes = self.numberOfVolumes.get()
         for i in range(numberOfVolumes):
             deformations = np.zeros(numberOfModes)
 
@@ -457,6 +496,11 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             elif self.modeRelationChoice == MODE_RELATION_MESH:
                 new_point=(mode7_samples[i],mode8_samples[i])
                 deformations[modeSelection - 1] = new_point
+            elif self.modeRelationChoice == MODE_RELATION_PARABOLA:
+                amplitude=self.modesAmplitudeRange.get()
+                rv = np.random.uniform(0,1)
+                point = (amplitude*cos(rv*pi), amplitude*sin(rv*pi))
+                deformations[modeSelection-1] = point
 
             # we won't keep the first 6 modes
             deformations = deformations[6:]
@@ -473,11 +517,25 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         subtomogramMD.write(deformationFile)
 
 
+    def copy_deformations(self):
+        pdbs_list = [f for f in glob.glob(self.pdbs_path.get())]
+        # print(pdbs_list)
+        # saving the list
+        dump(pdbs_list, self._getExtraPath('pdb_list.pkl'))
+        subtomogramMD = md.MetaData()
+        print(self.get_number_of_volumes())
+        i = 0
+        for pdbfn in pdbs_list:
+            i += 1
+            createLink(pdbfn, self._getExtraPath(str(i).zfill(5)+'_df.pdb'))
+            subtomogramMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i).zfill(5)+'_subtomogram'+'.vol'),
+                                   subtomogramMD.addObject())
+        subtomogramMD.write(self._getExtraPath('GroundTruth.xmd'))
+
+
     def generate_volume_from_pdb(self):
-        if self.modeRelationChoice.get() is MODE_RELATION_MESH:
-            numberOfVolumes = self.meshRowPoints.get()*self.meshRowPoints.get()
-        else:
-            numberOfVolumes = self.numberOfVolumes.get()
+        numberOfVolumes = self.get_number_of_volumes()
+
         for i in range(numberOfVolumes):
             params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_df.pdb')
             params += " --sampling " + str(self.samplingRate.get())
@@ -485,12 +543,17 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             params += " -v 0 --centerPDB "
             runProgram('xmipp_volume_from_pdb', params)
 
+        if self.lowPassChoice.get() is LOWPASS_YES:
+            cutoff = self.w1.get()
+            raisedw = self.raisedw.get()
+            for i in range(numberOfVolumes):
+                params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_df.vol')
+                params += " --fourier low_pass " + str(cutoff) + ' ' + str(raisedw)
+                runProgram('xmipp_transform_filter', params)
+
     def generate_rotation_and_shift(self):
         subtomogramMD = md.MetaData(self._getExtraPath('GroundTruth.xmd'))
-        if self.modeRelationChoice.get() is MODE_RELATION_MESH:
-            numberOfVolumes = self.meshRowPoints.get()*self.meshRowPoints.get()
-        else:
-            numberOfVolumes = self.numberOfVolumes.get()
+        numberOfVolumes = self.get_number_of_volumes()
 
         for i in range(numberOfVolumes):
             if (self.shiftx.get()==ROTATION_UNIFORM):
@@ -578,11 +641,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         # The number of particles per tomogram is the integer division of the number of volumes
         #  and the number of tomograms
         numberOfTomograms = self.numberOfTomograms.get()
-
-        if self.modeRelationChoice.get() is MODE_RELATION_MESH:
-            numberOfVolumes = self.meshRowPoints.get()*self.meshRowPoints.get()
-        else:
-            numberOfVolumes = self.numberOfVolumes.get()
+        numberOfVolumes=self.get_number_of_volumes()
 
         particlesPerTomogram = numberOfVolumes//numberOfTomograms
 
@@ -620,10 +679,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             # else, the deformed volumes are projected
             sizeX = self.volumeSize.get()
             sizeY = self.volumeSize.get()
-            if self.modeRelationChoice.get() is MODE_RELATION_MESH:
-                numberOfVolumes = self.meshRowPoints.get() * self.meshRowPoints.get()
-            else:
-                numberOfVolumes = self.numberOfVolumes.get()
+            numberOfVolumes = self.get_number_of_volumes()
 
             volumeName = "_df.vol"
 
@@ -670,10 +726,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             numberOfVolumes = self.numberOfTomograms.get()
 
         else:
-            if self.modeRelationChoice.get() is MODE_RELATION_MESH:
-                numberOfVolumes = self.meshRowPoints.get() * self.meshRowPoints.get()
-            else:
-                numberOfVolumes = self.numberOfVolumes.get()
+            numberOfVolumes = self.get_number_of_volumes()
 
         with open(self._getExtraPath('ctf.param'), 'a') as file:
             file.write(
@@ -703,11 +756,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
                 runProgram('xmipp_ctf_phase_flip', params_j)
 
     def reconstruct(self):
-        if self.modeRelationChoice.get() is MODE_RELATION_MESH:
-            numberOfVolumes = self.meshRowPoints.get() * self.meshRowPoints.get()
-        else:
-            numberOfVolumes = self.numberOfVolumes.get()
-
+        numberOfVolumes = self.get_number_of_volumes()
         for i in range(numberOfVolumes):
             params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.sel')
             params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_subtomogram.vol')
@@ -737,12 +786,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             params += " -o " + fn_volume + ".vol --type vol"
             runProgram('xmipp_image_convert', params)
             # print(self.refVolume.get().getFileName())
-
-        if self.modeRelationChoice.get() is MODE_RELATION_MESH:
-            numberOfVolumes = self.meshRowPoints.get()*self.meshRowPoints.get()
-        else:
-            numberOfVolumes = self.numberOfVolumes.get()
-
+        numberOfVolumes = self.get_number_of_volumes()
         deformationFile = self._getExtraPath('GroundTruth.xmd')
         imagesMD = md.MetaData()
         for i in range(numberOfVolumes):
@@ -781,6 +825,14 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
     def _methods(self):
         pass
 
+    def get_number_of_volumes(self):
+        if(self.importPdbs.get()):
+            numberOfVolumes = len(glob.glob(self.pdbs_path.get()))
+        elif self.modeRelationChoice.get() is MODE_RELATION_MESH:
+            numberOfVolumes = self.meshRowPoints.get()*self.meshRowPoints.get()
+        else:
+            numberOfVolumes = self.numberOfVolumes.get()
+        return numberOfVolumes
     # --------------------------- UTILS functions --------------------------------------------
     def _printWarnings(self, *lines):
         """ Print some warning lines to 'warnings.xmd', 

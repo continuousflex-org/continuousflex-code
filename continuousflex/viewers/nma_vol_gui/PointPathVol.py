@@ -39,16 +39,16 @@ class PointPathVol():
     It also allow to modify the point positions on the path.
     """
 
-    def __init__(self, ax, data, pathData, callback=None, tolerance=3, maxPoints=10, LimitL = None, LimitH = None):
+    def __init__(self, ax, data, pathData, callback=None, tolerance=3, maxPoints=10, LimitL = None, LimitH = None,
+                 s = None, alpha = None):
         self.ax = ax
         self.data = data
-
         # plotArray2D(ax, self.data)
         # To avoid plotting the sidebar twice
         if(LimitL):
-            plotArray2D_xy(ax, self.data, vvmin=LimitL, vvmax=LimitH)
+            plotArray2D_xy(ax, self.data, vvmin=LimitL, vvmax=LimitH, s= s, alpha= alpha)
         else:
-            plotArray2D_xy(ax, self.data)
+            plotArray2D_xy(ax, self.data, s= s, alpha= alpha)
 
         self.callback = callback
 

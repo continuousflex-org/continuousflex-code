@@ -38,15 +38,16 @@ class PointPath():
     It also allow to modify the point positions on the path.
     """
 
-    def __init__(self, ax, data, pathData, callback=None, tolerance=3, maxPoints=10, LimitL = None, LimitH = None):
+    def __init__(self, ax, data, pathData, callback=None, tolerance=3, maxPoints=10, LimitL = None, LimitH = None,
+                 alpha = None, s = None):
         self.ax = ax
         self.data = data
 
         # plotArray2D(ax, self.data)
         if(LimitL):
-            plotArray2D_xy(ax, self.data, vvmin=LimitL, vvmax=LimitH)
+            plotArray2D_xy(ax, self.data, vvmin=LimitL, vvmax=LimitH, alpha=alpha, s=s)
         else:
-            plotArray2D_xy(ax, self.data)
+            plotArray2D_xy(ax, self.data, alpha=alpha, s=s)
         self.callback = callback
 
         self.dragIndex = None

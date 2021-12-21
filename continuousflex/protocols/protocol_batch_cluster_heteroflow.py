@@ -1,7 +1,5 @@
 # **************************************************************************
-# *
 # * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
-# *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -23,33 +21,29 @@
 # *
 # **************************************************************************
 
-
 from pyworkflow.protocol.params import PointerParam, FileParam, IntParam
 from pwem.protocols import BatchProtocol
 from pwem.objects import Volume, SetOfVolumes
 from xmipp3.convert import writeSetOfVolumes
 import pwem.emlib.metadata as md
 import os
-from pwem.utils import runProgram
 
 
-
-class FlexBatchProtNMAClusterVol(BatchProtocol):
+class FlexBatchProtHeteroFlowCluster(BatchProtocol):
     """ Protocol executed when a cluster is created
-    from NMA volumes and theirs deformations.
+    from HeteroFlow dimred.
     """
-    _label = 'nma vol cluster'
+    _label = 'tomoflow vol cluster'
 
     def _defineParams(self, form):
-        form.addHidden('inputNmaDimred', PointerParam, pointerClass='EMObject')
+        form.addHidden('inputHeteroFlowDimred', PointerParam, pointerClass='EMObject')
         form.addHidden('sqliteFile', FileParam)
-        form.addHidden('angleYflag', IntParam)
 
     #--------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
         volumesMd = self._getExtraPath('volumes.xmd')
-        outputVol = self._getExtraPath('average.vol')
+        outputVol = self._getExtraPath('average.spi')
 
         self._insertFunctionStep('convertInputStep', volumesMd)
         self._insertFunctionStep('averagingStep')
@@ -60,8 +54,10 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
     def convertInputStep(self, volumesMd):
         # It is unusual to create the output in the convertInputStep,
         # but just to avoid reading twice the sqlite with particles
-        inputSet = self.inputNmaDimred.get().getInputParticles()
+        # inputSet = self.inputHeteroFlowDimred.get().getInputParticles().get()
+        inputSet = self.inputHeteroFlowDimred.get().getInputParticles()
         partSet = self._createSetOfVolumes()
+        # partSet = SetOfVolumes()
         partSet.copyInfo(inputSet)
         tmpSet = SetOfVolumes(filename=self.sqliteFile.get())
         partSet.appendFromImages(tmpSet)
@@ -69,82 +65,33 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
         partSet.setAlignmentProj()
 
         self._defineOutputs(OutputVolumes=partSet)
-        self._defineTransformRelation(inputSet, partSet)
+        # self._defineTransformRelation(inputSet, partSet)
         writeSetOfVolumes(partSet, volumesMd)
-
-        # Add the NMA displacement to clusters XMD files
-        md_file_nma = md.MetaData(self.inputNmaDimred.get().getParticlesMD())
-        md_file_org = md.MetaData(volumesMd)
-        for objID in md_file_org:
-            # if image name is the same, we add the nma displacement from nma to org
-            id_org = md_file_org.getValue(md.MDL_ITEM_ID, objID)
-            for j in md_file_nma:
-                id_nma = md_file_nma.getValue(md.MDL_ITEM_ID, j)
-                #print(id_nma)
-                if id_org == id_nma:
-                    displacements = md_file_nma.getValue(md.MDL_NMA, j)
-                    md_file_org.setValue(md.MDL_NMA, displacements, objID)
-                    break
-        md_file_org.write(volumesMd)
-
 
 
     def averagingStep(self):
-        flag = self.angleYflag.get()
-
         volumesMd = self._getExtraPath('volumes.xmd')
         mdVols = md.MetaData(volumesMd)
-
         counter = 0
-        first = True
         for objId in mdVols:
             counter = counter + 1
             imgPath = mdVols.getValue(md.MDL_IMAGE, objId)
-
-            rot = mdVols.getValue(md.MDL_ANGLE_ROT, objId)
-            tilt = mdVols.getValue(md.MDL_ANGLE_TILT, objId)
-            psi = mdVols.getValue(md.MDL_ANGLE_PSI, objId)
-            x_shift = mdVols.getValue(md.MDL_SHIFT_X, objId)
-            y_shift = mdVols.getValue(md.MDL_SHIFT_Y, objId)
-            z_shift = mdVols.getValue(md.MDL_SHIFT_Z, objId)
-
-            # The flip one is used here to determine if we need to use the option --inverse
-            # with xmipp_transform_geometry
-            flip = mdVols.getValue(md.MDL_ANGLE_Y, objId)
-
-            outputVol = self._getExtraPath('average.vol')
-            tempVol = self._getExtraPath('temp.vol')
+            outputVol = self._getExtraPath('average.spi')
+            tempVol = self._getExtraPath('temp.spi')
             extra = self._getExtraPath()
 
-            if flag == 0 :
-                if first:
-                    print("THERE IS NO COMPENSATION FOR THE MISSING WEDGE")
-                    first = False
-
-                params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
-                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
-
-            else:
-                if first:
-                    print("THERE IS A COMPENSATION FOR THE MISSING WEDGE")
-                    first = False
-                # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
-                params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
-                runProgram('xmipp_transform_geometry', params)
-                params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
-                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
-
-            runProgram('xmipp_transform_geometry', params)
+            params = '-i %(imgPath)s -o %(tempVol)s --type vol ' % locals()
+            self.runJob('xmipp_image_convert',params)
 
             if counter == 1 :
                 os.system("mv %(tempVol)s %(outputVol)s" % locals())
 
             else:
                 params = '-i %(tempVol)s --plus %(outputVol)s -o %(outputVol)s ' % locals()
-                runProgram('xmipp_image_operate', params)
+                self.runJob('xmipp_image_operate', params)
 
         params = '-i %(outputVol)s --divide %(counter)s -o %(outputVol)s ' % locals()
-        runProgram('xmipp_image_operate', params)
+        self.runJob('xmipp_image_operate', params)
         os.system("rm -f %(tempVol)s" % locals())
 
 

@@ -25,18 +25,21 @@
 # **************************************************************************
 
 from continuousflex.viewers.nma_plotter import plotArray2D_xy
-
+from math import sqrt
 
 class PointSelector():
     """ Graphical manager based on Matplotlib to handle mouse
     events of click, drag and release and mark some point
     from input Data as 'selected'.
     """
-    def __init__(self, ax, data, callback=None, LimitL=None, LimitH=None):
+    def __init__(self, ax, data, callback=None, LimitL=None, LimitH=None, alpha=None, s=None):
         self.ax = ax
         self.data = data
         self.LimitL = LimitL
         self.LimitH = LimitH
+        # Point size and transparancy:
+        self.alpha = alpha.get()
+        self.s = s.get()
         self.createPlots(ax)
         self.press = None
         self.callback = callback
@@ -51,9 +54,9 @@ class PointSelector():
     def createPlots(self, ax):
         # plotArray2D(ax, self.data)
         if(self.LimitL):
-            plotArray2D_xy(ax, self.data, vvmin=self.LimitL, vvmax=self.LimitH)
+            plotArray2D_xy(ax, self.data, vvmin=self.LimitL, vvmax=self.LimitH, alpha=self.alpha, s=self.s)
         else:
-            plotArray2D_xy(ax, self.data)
+            plotArray2D_xy(ax, self.data, alpha=self.alpha, s=self.s)
         self.createSelectionPlot(ax)
     
     def getSelectedData(self):
@@ -66,7 +69,10 @@ class PointSelector():
         
     def createSelectionPlot(self, ax):
         xs, ys = self.getSelectedData()
-        self.plot_selected, = ax.plot(xs, ys, 'o', ms=8, alpha=0.4,
+        markersize = None
+        if self.s:
+            markersize = sqrt(self.s)
+        self.plot_selected, = ax.plot(xs, ys, 'o', ms=markersize, alpha=0.4,
                                   color='yellow')
          
         self.rectangle_selection, = ax.plot([0], [0], ':')  # empty line      

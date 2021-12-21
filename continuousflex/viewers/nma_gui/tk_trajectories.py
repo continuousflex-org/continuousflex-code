@@ -64,7 +64,8 @@ class TrajectoriesWindow(gui.Window):
         self.ylim_high = kwargs.get('ylim_high')
         self.zlim_low = kwargs.get('zlim_low')
         self.zlim_high = kwargs.get('zlim_high')
-
+        self.s = kwargs.get('s')
+        self.alpha = kwargs.get('alpha')
         self.plotter = None
 
         content = tk.Frame(self.root)
@@ -216,13 +217,15 @@ class TrajectoriesWindow(gui.Window):
                     self.plotter = FlexNmaPlotter(data=self.data,
                                                 xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                 ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                                alpha=self.alpha, s=self.s)
                 else:
                     self.plotter = FlexNmaPlotter(data=self.data,
                                                 LimitL=self.LimitLow, LimitH=self.LimitHigh,
                                                 xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                 ylim_low=self.ylim_low, ylim_high=self.ylim_high,
-                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high,
+                                                alpha=self.alpha, s=self.s)
 
                 doShow = True
                 # self.plotter.useLastPlot = True
@@ -250,7 +253,8 @@ class TrajectoriesWindow(gui.Window):
                                                     *baseList)
                     self.ps = PointPath(ax, self.data, self.pathData,
                                         callback=self._checkNumberOfPoints,
-                                        LimitL = self.LimitLow, LimitH = self.LimitHigh)
+                                        LimitL = self.LimitLow, LimitH = self.LimitHigh,
+                                        alpha=self.alpha.get(), s = self.s.get())
                 elif dim == 3:
                     # del self.ps # Remove PointSelector
                     self.setDataIndex('ZIND', modeList[2])
