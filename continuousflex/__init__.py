@@ -111,7 +111,7 @@ class Plugin(pwem.Plugin):
                        # url='https://github.com/slajo/NMA_basic_code/raw/master/nma_v3.tar',
                        # url='https://github.com/MohamadHarastani/nma_basic_codes/raw/main/nma_v4.tar',
                        # url='https://github.com/MohamadHarastani/nma_basic_codes/raw/main/nma_v5.tar',
-                       url='https://github.com/slajo/NMA_basic_code/blob/master/nma_v5.tar',
+                       url='https://github.com/slajo/NMA_basic_code/raw/master/nma_v5.tgz',
                        createBuildDir=False,
                        buildDir='nma',
                        target="nma",
