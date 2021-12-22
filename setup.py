@@ -36,6 +36,7 @@ from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
 from os import path
+from continuousflex import __version__
 
 here = path.abspath(path.dirname(__file__))
 
@@ -45,6 +46,9 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 # Arguments marked as "Required" below must be included for upload to PyPI.
 # Fields marked as "Optional" may be commented out.
+# Load requirements.txt
+with open('requirements.txt') as f:
+    requirements = f.read().splitlines()
 
 setup(
     # This is the name of your project. The first time you publish this
@@ -66,7 +70,7 @@ setup(
     # For a discussion on single-sourcing the version across setup.py and the
     # project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.6',  # Required
+    version=__version__,  # Required
 
     # This is a one-line description or tagline of what your project does. This
     # corresponds to the "Summary" metadata field:
@@ -142,7 +146,7 @@ setup(
     #
     # For an analysis of "install_requires" vs pip's requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    #install_requires=['peppercorn'],  # Optional
+    install_requires=[requirements],  # Optional
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). Users will be able to install these using the "extras"
@@ -162,7 +166,7 @@ setup(
     #
     # If using Python 2.6 or earlier, then these have to be included in
     # MANIFEST.in as well.
-    # include_package_data=True,
+    include_package_data=True,
     package_data={  # Optional
        'continuousflex': ['protocols.conf'],
     },
@@ -195,7 +199,7 @@ setup(
     # maintainers, and where to support the project financially. The key is
     # what's used to render the link text on PyPI.
     project_urls={  # Optional
-        'Bug Reports': 'slavica.jonic@upmc.fr',
+        'Bug Reports': 'https://github.com/scipion-em/scipion-em-continuousflex/issues',
         'Source': 'https://github.com/scipion-em/scipion-em-continuousflex/',
     },
 )

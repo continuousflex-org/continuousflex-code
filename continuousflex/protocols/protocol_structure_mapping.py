@@ -29,22 +29,21 @@ import os
 import numpy as np
 
 import pwem.emlib.metadata as md
-import pwem as em
+from pwem.emlib import MetaData, MDL_IMAGE
+from pwem.objects import Volume, SetOfVolumes
 from pwem.protocols import EMProtocol
 import pyworkflow.protocol.params as params
 from pyworkflow import VERSION_1_1
 from pyworkflow.protocol.constants import LEVEL_ADVANCED, STEPS_PARALLEL
 from pyworkflow.utils.path import cleanPattern, copyFile, makePath
-# from pyworkflow.object import String
-# from pyworkflow.em.data import SetOfNormalModes
 
-import xmippLib
 from xmipp3.convert import getImageLocation
 # from xmipp3.base import XmippMdRow
 from continuousflex.protocols.pdb import FlexProtConvertToPseudoAtomsBase
 #from xmipp3.protocols.pdb.protocol_pseudoatoms_base import XmippProtConvertToPseudoAtomsBase
 #from ..pdb.protocol_pseudoatoms_base import XmippProtConvertToPseudoAtomsBase
 from .protocol_nma_base import FlexProtNMABase, NMA_CUTOFF_REL
+from pwem.utils import runProgram
 
 
 def mds(d, dimensions = 2):
@@ -182,7 +181,7 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
             args += " --dontScale"
         args += " --copyGeo %s" % (
                 self._getExtraPath('transformation-matrix_vol%06d.txt'%volId))        
-        self.runJob("xmipp_volume_align", args)
+        runProgram("xmipp_volume_align", args)
 
     def elasticAlignmentStep(self, nVoli, Ts, nVolj, fnAlignedVolj):
         fnVolOut = self._getExtraPath('DeformedVolume_Vol_%d_To_Vol_%d' % (nVolj, nVoli))
@@ -191,15 +190,13 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
         
         makePath(self._getExtraPath("modes%d"%nVoli))
         
-        for i in range(self.numberOfModes.get() + 1):
-            if i==0:
-                i += 1 
+        for i in range(1, self.numberOfModes.get() + 1):
             copyFile (self._getPath("modes/vec.%d"%i),
                       self._getExtraPath("modes%d/vec.%d"%(nVoli, i)))
             
-        mdVol = xmippLib.MetaData()
+        mdVol = MetaData()
         fnOutMeta = self._getExtraPath('RigidAlignVol_%d_To_Vol_%d.xmd' % (nVolj, nVoli))
-        mdVol.setValue(xmippLib.MDL_IMAGE, fnAlignedVolj, mdVol.addObject())
+        mdVol.setValue(MDL_IMAGE, fnAlignedVolj, mdVol.addObject())
         mdVol.write(fnOutMeta)
                                               
         fnPseudo = self._getPath("pseudoatoms_%d.pdb"%nVoli)
@@ -208,11 +205,11 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
         sigma = Ts * self.pseudoAtomRadius.get()
         fnPseudoOut = self._getExtraPath('PseudoatomsDeformedPDB_Vol_%d_To_Vol_%d.pdb' % 
                                          (nVolj, nVoli))
-        self.runJob('xmipp_nma_alignment_vol', 
+        runProgram('xmipp_nma_alignment_vol',
                     "-i %s --pdb %s --modes %s --sampling_rate %s -o %s --fixed_Gaussian %s --opdb %s"%\
                    (fnOutMeta, fnPseudo, fnModes, Ts, fnDeform, sigma, fnPseudoOut))
         
-        self.runJob('xmipp_volume_from_pdb', "-i %s -o %s --sampling %s --fixed_Gaussian %s" % 
+        runProgram('xmipp_volume_from_pdb', "-i %s -o %s --sampling %s --fixed_Gaussian %s" %
                     (fnPseudoOut, fnVolOut, Ts, sigma))
     
     def gatherSingleVolumeStep(self):
@@ -231,7 +228,7 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
                 if nVolj == nVoli:
                     score[(nVoli-1)][(nVolj-1)] = 0
                 else:
-                    elasticRow = xmippLib.MetaData(self._getExtraPath('compDeformVol_%d_To_Vol_%d.xmd' %
+                    elasticRow = MetaData(self._getExtraPath('compDeformVol_%d_To_Vol_%d.xmd' %
                                                                    (nVolj, nVoli)))
                     maxCc = elasticRow.getValue(md.MDL_MAXCC,1)
                     score[(nVoli-1)][(nVolj-1)] = (1 - maxCc)
@@ -311,10 +308,10 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
             if item is None:
                 break
             itemId = item.getObjId()
-            if isinstance(item, em.Volume):
+            if isinstance(item, Volume):
                 item.outputName = self._getExtraPath('output_vol%06d.vol' % itemId)
                 yield item
-            elif isinstance(item, em.SetOfVolumes):
+            elif isinstance(item, SetOfVolumes):
                 for vol in item:
                     vol.outputName = self._getExtraPath('output_vol%06d_%03d.vol' %
                                                          (itemId, vol.getObjId()))

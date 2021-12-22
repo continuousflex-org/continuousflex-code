@@ -24,12 +24,12 @@
 # *
 # **************************************************************************
 
-from os.path import basename
 
 from pyworkflow.object import String
 from pyworkflow.protocol.params import (PointerParam, StringParam, EnumParam,
                                         IntParam, LEVEL_ADVANCED)
 from pwem.protocols import ProtAnalysis3D
+from pwem.utils import runProgram
 
 
 DIMRED_PCA = 0
@@ -44,6 +44,9 @@ DIMRED_HLLE = 8
 DIMRED_SPE = 9
 DIMRED_NPE = 10
 
+USE_PDBS = 0
+USE_NMA_AMP = 1
+
 # Values to be passed to the program
 DIMRED_VALUES = ['PCA', 'LTSA', 'DM', 'LLTSA', 'LPP', 'kPCA', 'pPCA', 'LE', 'HLLE', 'SPE', 'NPE']
 
@@ -54,8 +57,7 @@ DIMRED_MAPPINGS = [DIMRED_PCA, DIMRED_LLTSA, DIMRED_LPP, DIMRED_PPCA, DIMRED_NPE
 class FlexProtDimredNMA(ProtAnalysis3D):
     """ This protocol will take the images with NMA deformations
     as points in a N-dimensional space (where N is the number
-    of computed normal modes) and will project them in a reduced
-    spaced (usually with less dimensions).
+    of computed normal modes) and will project them onto a reduced space
     """
     _label = 'nma dimred'
     
@@ -69,7 +71,14 @@ class FlexProtDimredNMA(ProtAnalysis3D):
         form.addParam('inputNMA', PointerParam, pointerClass='FlexProtAlignmentNMA',
                       label="Conformational distribution",                        
                       help='Select a previous run of the NMA alignment.')
-        
+
+        form.addParam('analyzeChoice', EnumParam, default=USE_NMA_AMP,
+                      choices=['Use deformed (pseudo)atomic models',
+                               'Use normal mode amplitudes'],
+                      label='Data to analyze',
+                      help='Choosing to analyze the fitted PDBs is slower but more accurate.'
+                           ' You can choose to use normal mode amplitudes for preliminary results.')
+
         form.addParam('dimredMethod', EnumParam, default=DIMRED_PCA,
                       choices=['Principal Component Analysis (PCA)',
                                'Local Tangent Space Alignment',
@@ -167,7 +176,7 @@ class FlexProtDimredNMA(ProtAnalysis3D):
             mappingFile = self._getExtraPath('projector.txt')
             args += " --saveMapping %(mappingFile)s"
             self.mappingFile.set(mappingFile)
-        self.runJob("xmipp_matrix_dimred", args % locals())
+        runProgram("xmipp_matrix_dimred", args % locals())
         
     def createOutputStep(self):
         pass
@@ -192,7 +201,11 @@ class FlexProtDimredNMA(ProtAnalysis3D):
     def getInputParticles(self):
         """ Get the output particles of the input NMA protocol. """
         return self.inputNMA.get().outputParticles
-    
+
+    def getParticlesMD(self):
+        "Get the metadata files that contain the NMA displacement"
+        return self.inputNMA.get()._getExtraPath('images.xmd')
+
     def getInputPdb(self):
         return self.inputNMA.get().getInputPdb()
     

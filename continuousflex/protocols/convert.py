@@ -29,17 +29,18 @@
 import os
 from collections import OrderedDict
 
+from pwem.emlib import (MDL_NMA_MODEFILE, MDL_NMA_COLLECTIVITY, MDL_NMA_SCORE,
+                        MDL_ORDER)
 from pyworkflow.utils import Environ
 from pwem.objects import NormalMode
 
-import xmippLib
 from xmipp3.convert import rowToObject, objectToRow
 from xmipp3.constants import NMA_HOME
             
 MODE_DICT = OrderedDict([ 
-       ("_modeFile", xmippLib.MDL_NMA_MODEFILE),
-       ("_collectivity", xmippLib.MDL_NMA_COLLECTIVITY),
-       ("_score", xmippLib.MDL_NMA_SCORE)
+       ("_modeFile", MDL_NMA_MODEFILE),
+       ("_collectivity", MDL_NMA_COLLECTIVITY),
+       ("_score", MDL_NMA_SCORE)
        ])
 
 
@@ -47,13 +48,13 @@ def rowToMode(row):
     """ Set properties of a NormalMode object from a Metadata row. """
     mode = NormalMode()
     rowToObject(row, mode, MODE_DICT)
-    mode.setObjId(row.getValue(xmippLib.MDL_ORDER))
+    mode.setObjId(row.getValue(MDL_ORDER))
     return mode
 
 
 def modeToRow(mode, row):
     """ Write the MetaData row from a given NormalMode object. """
-    row.setValue(xmippLib.MDL_ORDER, mode.getObjId())
+    row.setValue(MDL_ORDER, int(mode.getObjId()))
     objectToRow(mode, row, MODE_DICT)
     
     
