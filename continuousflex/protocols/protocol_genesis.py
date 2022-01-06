@@ -406,7 +406,7 @@ class ProtGenesis(EMProtocol):
                 n_parallel = numParallelFit if i1<numLinearFit else numLastIter
                 for i2 in range(n_parallel):
                     indexFit = i2 + i1*numParallelFit
-                    prefix = self.getOutputPrefix(indexFit)
+                    prefix = self.getOutputPrefix(indexFit)[0]
 
                     # Create INP file
                     self.createINP(inputPDB=self.getInputPDBprefix(indexFit)+".pdb",
@@ -433,7 +433,7 @@ class ProtGenesis(EMProtocol):
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numParallelFit
                         inputPDB = self.getInputPDBprefix(indexFit)+".pdb" if iterFit ==0 \
-                            else  self.getOutputPrefix(indexFit)
+                            else  self.getOutputPrefix(indexFit)[0]
 
                         tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
                         cmds_pdb2vol.append(self.pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix))
@@ -499,11 +499,11 @@ class ProtGenesis(EMProtocol):
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numParallelFit
                         if iterFit == 0:
-                            prefix = self.getOutputPrefix(indexFit)
+                            prefix = self.getOutputPrefix(indexFit)[0]
                             inputPDB = self.getInputPDBprefix(indexFit)+".pdb"
                         else:
                             prefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            inputPDB = self.getOutputPrefix(indexFit)
+                            inputPDB = self.getOutputPrefix(indexFit)[0]
 
 
                         # Create INP file
@@ -518,7 +518,7 @@ class ProtGenesis(EMProtocol):
                     if iterFit != 0:
                         for i2 in range(n_parallel):
                             tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            newPrefix = self.getOutputPrefix(indexFit)
+                            newPrefix = self.getOutputPrefix(indexFit)[0]
 
                             indexFit = i2 + i1 * numParallelFit
                             cat_cmd = "cat %s.log >> %s.log"%(tmpPrefix, newPrefix)
