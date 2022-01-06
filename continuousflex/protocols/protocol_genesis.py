@@ -67,6 +67,9 @@ PREPROCESS_VOL_NORM = 0
 PREPROCESS_VOL_OPT = 1
 PREPROCESS_VOL_MATCH = 2
 
+RB_PROJMATCH = 0
+RB_WAVELET = 1
+
 class ProtGenesis(EMProtocol):
     """ Protocol for the molecular dynamics software GENESIS. """
     _label = 'Genesis'
@@ -177,8 +180,11 @@ class ProtGenesis(EMProtocol):
                       help="TODO", condition="EMfitChoice==2")
         form.addParam('estimateAngleShift', params.BooleanParam, label="Estimate rigid body ?",
                       default=False,  condition="EMfitChoice==2", help="TODO")
-        form.addParam('n_iter', params.IntParam, default=10, label='Number of iterations for rigid body fitting',
+        form.addParam('rb_n_iter', params.IntParam, default=10, label='Number of iterations for rigid body fitting',
                       help="TODO", condition="EMfitChoice==2 and estimateAngleShift")
+        form.addParam('rb_method', params.EnumParam, label="Rigid body alignement method", default=0,
+                      choices=['Projection Matching', 'Wavelet'], help="TODO",
+                      condition="EMfitChoice==2 and estimateAngleShift")
         form.addParam('imageAngleShift', params.FileParam, label="Rigid body parameters (.xmd)",
                       condition="EMfitChoice==2 and not estimateAngleShift",
                       help='TODO')
@@ -400,7 +406,7 @@ class ProtGenesis(EMProtocol):
                 n_parallel = numParallelFit if i1<numLinearFit else numLastIter
                 for i2 in range(n_parallel):
                     indexFit = i2 + i1*numParallelFit
-                    prefix = self._getExtraPath("%s_output"%str(indexFit + 1).zfill(5))
+                    prefix = self.getOutputPrefix(indexFit)
 
                     # Create INP file
                     self.createINP(inputPDB=self.getInputPDBprefix(indexFit)+".pdb",
@@ -419,7 +425,7 @@ class ProtGenesis(EMProtocol):
                 n_parallel = numParallelFit if i1 < numLinearFit else numLastIter
 
                 # Loop rigidbody align / GENESIS fitting
-                for iterFit in range(self.n_iter.get()):
+                for iterFit in range(self.rb_n_iter.get()):
 
                 # ------   ALIGN PDBs---------
                     # Transform PDBs to volume
@@ -427,35 +433,59 @@ class ProtGenesis(EMProtocol):
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numParallelFit
                         inputPDB = self.getInputPDBprefix(indexFit)+".pdb" if iterFit ==0 \
-                            else  self._getExtraPath("%s_output.pdb" % str(indexFit + 1).zfill(5))
+                            else  self.getOutputPrefix(indexFit)
 
                         tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
                         cmds_pdb2vol.append(self.pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix))
                     self.runParallelJobs(cmds_pdb2vol)
 
                     # Loop 4 times to refine the angles
-                    sampling_rate = [10.0, 5.0, 3.0, 2.0]
-                    angular_distance = [-1, 20, 10, 5]
-                    for i_align in range(4):
+                    # sampling_rate = [10.0, 5.0, 3.0, 2.0]
+                    # angular_distance = [-1, 20, 10, 5]
+                    sampling_rate = [10.0]
+                    angular_distance = [-1]
+                    for i_align in range(len(sampling_rate)):
                         cmds_projectVol = []
-                        cmds_projectMatch = []
+                        cmds_alignement = []
                         for i2 in range(n_parallel):
                             indexFit = i2 + i1 * numParallelFit
                             tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
                             inputImage = self.getInputEMprefix(indexFit)+".spi"
+                            tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
                             currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
 
                             # get commands
-                            cmds_projectVol.append(self.projectVol(inputVol=tmpPrefix,
-                                                outputProj=tmpPrefix, expImage=currentAngles,
-                                                sampling_rate=sampling_rate[i_align],
-                                                angular_distance=angular_distance[i_align]))
-                            cmds_projectMatch.append(self.projectMatch(inputImage= inputImage,
-                                                inputProj=tmpPrefix, outputMeta=currentAngles))
-
+                            if self.rb_method.get == RB_PROJMATCH:
+                                cmds_projectVol.append(self.projectVol(inputVol=tmpPrefix,
+                                                    outputProj=tmpPrefix, expImage=inputImage,
+                                                    sampling_rate=sampling_rate[i_align],
+                                                    angular_distance=angular_distance[i_align]))
+                                cmds_alignement.append(self.projectMatch(inputImage= inputImage,
+                                                    inputProj=tmpPrefix, outputMeta=tmpMeta))
+                            else:
+                                cmds_projectVol.append(self.projectVol(inputVol=tmpPrefix,
+                                                    outputProj=tmpPrefix, expImage=inputImage,
+                                                    sampling_rate=sampling_rate[i_align],
+                                                    angular_distance=angular_distance[i_align],
+                                                                       compute_neighbors=False))
+                                cmds_alignement.append(self.waveletAssignement(inputImage= inputImage,
+                                                    inputProj=tmpPrefix, outputMeta=tmpMeta))
                         # run parallel jobs
                         self.runParallelJobs(cmds_projectVol)
-                        self.runParallelJobs(cmds_projectMatch)
+                        self.runParallelJobs(cmds_alignement)
+
+                        cmds_continuousAssign = []
+                        for i2 in range(n_parallel):
+                            indexFit = i2 + i1 * numParallelFit
+                            tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                            tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
+                            tmpMeta2 = self._getExtraPath("%s_tmp_angles2.xmd" % str(indexFit + 1).zfill(5))
+                            currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
+                            self.flipAngles(inputMeta=tmpMeta, outputMeta=tmpMeta2)
+                            cmds_continuousAssign.append(self.continuousAssign(inputMeta=tmpMeta2,
+                                                                               inputVol=tmpPrefix,
+                                                                               outputMeta=currentAngles))
+                        self.runParallelJobs(cmds_continuousAssign)
 
                     # Cleaning volumes and projections
                     for i2 in range(n_parallel):
@@ -469,11 +499,11 @@ class ProtGenesis(EMProtocol):
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numParallelFit
                         if iterFit == 0:
-                            prefix = self._getExtraPath("%s_output" % str(indexFit + 1).zfill(5))
+                            prefix = self.getOutputPrefix(indexFit)
                             inputPDB = self.getInputPDBprefix(indexFit)+".pdb"
                         else:
                             prefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            inputPDB = self._getExtraPath("%s_output.pdb" % str(indexFit + 1).zfill(5))
+                            inputPDB = self.getOutputPrefix(indexFit)
 
 
                         # Create INP file
@@ -488,7 +518,7 @@ class ProtGenesis(EMProtocol):
                     if iterFit != 0:
                         for i2 in range(n_parallel):
                             tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            newPrefix = self._getExtraPath("%s_output" % str(indexFit + 1).zfill(5))
+                            newPrefix = self.getOutputPrefix(indexFit)
 
                             indexFit = i2 + i1 * numParallelFit
                             cat_cmd = "cat %s.log >> %s.log"%(tmpPrefix, newPrefix)
@@ -504,7 +534,7 @@ class ProtGenesis(EMProtocol):
 
                 for i2 in range(n_parallel):
                     idx = str(i2 + i1 * numParallelFit+ 1).zfill(5)
-                    os.system("cp %s %s" % (self._getExtraPath("%s_iter%i_output.pdb" % (idx, self.n_iter.get()-1)),
+                    os.system("cp %s %s" % (self._getExtraPath("%s_iter%i_output.pdb" % (idx, self.rb_n_iter.get()-1)),
                                             self._getExtraPath("%s_output.pdb" % idx)))
 
 
@@ -668,25 +698,52 @@ class ProtGenesis(EMProtocol):
 
     def pdb2vol(self, inputPDB, outputVol):
         cmd = "xmipp_volume_from_pdb"
-        args = "-i %s  -o %s --sampling %f --size %i %i %i"%\
+        args = "-i %s  -o %s --sampling %f --size %i %i %i --centerPDB"%\
                (inputPDB, outputVol,self.pixel_size.get(),
                 self.image_size.get(),self.image_size.get(),self.image_size.get())
         return cmd+ " "+ args
 
-    def projectVol(self, inputVol, outputProj, expImage, sampling_rate=5.0, angular_distance=-1):
+    def projectVol(self, inputVol, outputProj, expImage, sampling_rate=5.0, angular_distance=-1, compute_neighbors=True):
         cmd = "xmipp_angular_project_library"
         args = "-i %s.vol -o %s.stk --sampling_rate %f " % (inputVol, outputProj, sampling_rate)
-        args +="--sym c1 --compute_neighbors --angular_distance %f --method real_space " % angular_distance
-        args += "--experimental_images %s "%expImage
-        if angular_distance != -1 :
-            args += "--near_exp_data"
+        if compute_neighbors :
+            args +="--compute_neighbors --angular_distance %f " % angular_distance
+            args += "--experimental_images %s "%expImage
+            if angular_distance != -1 :
+                args += "--near_exp_data"
         return cmd+ " "+ args
 
     def projectMatch(self, inputImage, inputProj, outputMeta):
         cmd = "xmipp_angular_projection_matching "
         args= "-i %s -o %s --ref %s.stk "%(inputImage, outputMeta, inputProj)
-        args +="--search5d_shift 5.0 --search5d_step 2.0"
+        args +="--search5d_shift 7.0 --search5d_step 1.0"
         return cmd + " "+ args
+
+    def waveletAssignement(self, inputImage, inputProj, outputMeta):
+        cmd = "xmipp_angular_discrete_assign "
+        args= "-i %s -o %s --ref %s.doc "%(inputImage, outputMeta, inputProj)
+        args +="--psi_step 5.0 --max_shift_change 7.0 --search5D"
+        return cmd + " "+ args
+
+    def continuousAssign(self, inputMeta, inputVol, outputMeta):
+        cmd = "xmipp_angular_continuous_assign "
+        args= "-i %s -o %s --ref %s.vol "%(inputMeta, outputMeta, inputVol)
+        return cmd + " "+ args
+
+    def flipAngles(self, inputMeta, outputMeta):
+        Md1 = md.MetaData(inputMeta)
+        flip = Md1.getValue(md.MDL_FLIP, 1)
+        tilt1 = Md1.getValue(md.MDL_ANGLE_TILT, 1)
+        psi1 = Md1.getValue(md.MDL_ANGLE_PSI, 1)
+        x1 = Md1.getValue(md.MDL_SHIFT_X, 1)
+        if flip:
+            x1 = -x1
+            newtilt1 = tilt1 + 180
+            newpsi1 = -psi1
+            Md1.setValue(md.MDL_SHIFT_X, x1, 1)
+            Md1.setValue(md.MDL_ANGLE_TILT, newtilt1, 1)
+            Md1.setValue(md.MDL_ANGLE_PSI, newpsi1, 1)
+        Md1.write(outputMeta)
 
     ################################################################################
     ##                 CREATE OUTPUT STEP

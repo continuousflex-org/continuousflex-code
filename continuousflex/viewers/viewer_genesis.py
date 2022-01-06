@@ -226,16 +226,16 @@ class GenesisViewer(ProtocolViewer):
             rot0 = mdImgGT.getValue(md.MDL_ANGLE_ROT, int(i))
             tilt0 = mdImgGT.getValue(md.MDL_ANGLE_TILT, int(i))
             psi0 = mdImgGT.getValue(md.MDL_ANGLE_PSI, int(i))
-            shiftx0 = -mdImgGT.getValue(md.MDL_SHIFT_X, int(i))
-            shifty0 = -mdImgGT.getValue(md.MDL_SHIFT_Y, int(i))
+            shiftx0 = mdImgGT.getValue(md.MDL_SHIFT_X, int(i))
+            shifty0 = mdImgGT.getValue(md.MDL_SHIFT_Y, int(i))
 
             mdImgFn = self.protocol._getExtraPath("%s_current_angles.xmd" % (str(i).zfill(5)))
             mdImg = md.MetaData(mdImgFn)
             rot = mdImg.getValue(md.MDL_ANGLE_ROT, 1)
             tilt = mdImg.getValue(md.MDL_ANGLE_TILT, 1)
             psi = mdImg.getValue(md.MDL_ANGLE_PSI, 1)
-            shiftx = -mdImg.getValue(md.MDL_SHIFT_X, 1)
-            shifty = -mdImg.getValue(md.MDL_SHIFT_Y, 1)
+            shiftx = mdImg.getValue(md.MDL_SHIFT_X, 1)
+            shifty = mdImg.getValue(md.MDL_SHIFT_Y, 1)
 
             angular_dist.append(SymList.computeDistanceAngles(SymList(),
                     rot, tilt, psi, rot0, tilt0, psi0, False, True, False))
