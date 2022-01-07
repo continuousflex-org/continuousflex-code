@@ -433,7 +433,7 @@ class ProtGenesis(EMProtocol):
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numParallelFit
                         inputPDB = self.getInputPDBprefix(indexFit)+".pdb" if iterFit ==0 \
-                            else  self.getOutputPrefix(indexFit)[0]
+                            else  self.getOutputPrefix(indexFit)[0]+".pdb"
 
                         tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
                         cmds_pdb2vol.append(self.pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix))
@@ -503,7 +503,7 @@ class ProtGenesis(EMProtocol):
                             inputPDB = self.getInputPDBprefix(indexFit)+".pdb"
                         else:
                             prefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            inputPDB = self.getOutputPrefix(indexFit)[0]
+                            inputPDB = self.getOutputPrefix(indexFit)[0]+".pdb"
 
 
                         # Create INP file
