@@ -455,7 +455,7 @@ class ProtGenesis(EMProtocol):
                             currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
 
                             # get commands
-                            if self.rb_method.get == RB_PROJMATCH:
+                            if self.rb_method.get() == RB_PROJMATCH:
                                 cmds_projectVol.append(self.projectVol(inputVol=tmpPrefix,
                                                     outputProj=tmpPrefix, expImage=inputImage,
                                                     sampling_rate=sampling_rate[i_align],
@@ -479,10 +479,10 @@ class ProtGenesis(EMProtocol):
                             indexFit = i2 + i1 * numParallelFit
                             tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
                             tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
-                            tmpMeta2 = self._getExtraPath("%s_tmp_angles2.xmd" % str(indexFit + 1).zfill(5))
                             currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
-                            self.flipAngles(inputMeta=tmpMeta, outputMeta=tmpMeta2)
-                            cmds_continuousAssign.append(self.continuousAssign(inputMeta=tmpMeta2,
+                            if self.rb_method.get() == RB_PROJMATCH:
+                                self.flipAngles(inputMeta=tmpMeta, outputMeta=tmpMeta)
+                            cmds_continuousAssign.append(self.continuousAssign(inputMeta=tmpMeta,
                                                                                inputVol=tmpPrefix,
                                                                                outputMeta=currentAngles))
                         self.runParallelJobs(cmds_continuousAssign)
@@ -737,12 +737,9 @@ class ProtGenesis(EMProtocol):
         psi1 = Md1.getValue(md.MDL_ANGLE_PSI, 1)
         x1 = Md1.getValue(md.MDL_SHIFT_X, 1)
         if flip:
-            x1 = -x1
-            newtilt1 = tilt1 + 180
-            newpsi1 = -psi1
-            Md1.setValue(md.MDL_SHIFT_X, x1, 1)
-            Md1.setValue(md.MDL_ANGLE_TILT, newtilt1, 1)
-            Md1.setValue(md.MDL_ANGLE_PSI, newpsi1, 1)
+            Md1.setValue(md.MDL_SHIFT_X, -x1, 1)
+            Md1.setValue(md.MDL_ANGLE_TILT, tilt1 + 180, 1)
+            Md1.setValue(md.MDL_ANGLE_PSI, -psi1, 1)
         Md1.write(outputMeta)
 
     ################################################################################

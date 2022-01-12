@@ -248,10 +248,16 @@ class GenesisViewer(ProtocolViewer):
         ax1.plot(angular_dist, "o")
         plotter1.show()
 
+        print("Angular distance mean %f:"%np.mean(angular_dist))
+        print("Angular distance std %f:"%np.std(angular_dist))
+
         plotter2 = FlexPlotter()
         ax2 = plotter2.createSubPlot("Shift Distance ($\AA$)", "# Image", "Shift Distance ($\AA$)")
         ax2.plot(shift_dist, "o")
         plotter2.show()
+
+        print("Shift distance mean %f:"%np.mean(shift_dist))
+        print("Shift distance std %f:"%np.std(shift_dist))
 
     def _plotPCA(self, paramName):
 
