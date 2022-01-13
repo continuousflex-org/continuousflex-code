@@ -275,8 +275,12 @@ class FlexProtNMA(FlexProtNMABase):
                             %(pseudoAtomRadius))
             else:
                 fhCmd.write("mol modcolor 0 0 Index\n")
-                #fhCmd.write("mol modstyle 0 0 Beads 1.000000 8.000000\n")
-                fhCmd.write("mol modstyle 0 0 NewRibbons 1.800000 6.000000 "
+                if self._checkPDB_CA(fn):
+                    fhCmd.write("mol modstyle 0 0 Beads 1.000000 8.000000\n")
+                    # fhCmd.write("mol modstyle 0 0 Beads 1.800000 6.000000 "
+                    #         "2.600000 0\n")
+                else:
+                    fhCmd.write("mol modstyle 0 0 NewRibbons 1.800000 6.000000 "
                             "2.600000 0\n")
             fhCmd.write("animate speed 0.5\n")
             fhCmd.write("animate forward\n")
@@ -333,3 +337,13 @@ class FlexProtNMA(FlexProtNMABase):
         nmSet.setPdb(inputPdb)
         self._defineOutputs(outputModes=nmSet)
         self._defineSourceRelation(self.inputStructure, nmSet)
+
+
+    def _checkPDB_CA(self, fnPDB):
+        # This function returns true if all the atoms are CA, otherwise false
+        from continuousflex.protocols.utilities.pdb_parser import m_inout_read_pdb
+        pdb_read = m_inout_read_pdb(fnPDB)
+        for atom in pdb_read:
+            if atom.type != " C" or atom.loc != "A ":
+                return False
+        return True
