@@ -51,6 +51,7 @@ SIMULATION_MIN = 1
 
 INTEGRATOR_VVERLET = 0
 INTEGRATOR_LEAPFROG = 1
+INTEGRATOR_NMMD = 2
 
 IMPLICIT_SOLVENT_GBSA = 0
 IMPLICIT_SOLVENT_NONE = 1
@@ -121,7 +122,7 @@ class ProtGenesis(EMProtocol):
         form.addParam('simulationType', params.EnumParam, label="Simulation type", default=0,
                       choices=['Molecular Dynamics', 'Minimization'],  help="TODO", important=True)
         form.addParam('integrator', params.EnumParam, label="Integrator", default=0,
-                      choices=['Velocity Verlet', 'Leapfrog'],  help="TODO", condition="simulationType==0")
+                      choices=['Velocity Verlet', 'Leapfrog', 'NMMD'],  help="TODO", condition="simulationType==0")
         form.addParam('time_step', params.FloatParam, default=0.002, label='Time step (ps)',
                       help="TODO", condition="simulationType==0")
         form.addParam('n_steps', params.IntParam, default=10000, label='Number of steps',
@@ -132,6 +133,20 @@ class ProtGenesis(EMProtocol):
                       help="TODO")
         form.addParam('nbupdate_period', params.IntParam, default=10, label='Non-bonded update period',
                       help="TODO")
+
+        form.addParam('nm_number', params.IntParam, default=10, label='Number of normal modes',
+                      help="TODO", condition="integrator==2")
+        form.addParam('nm_mass', params.FloatParam, default=10.0, label='Normal modes amplitude mass',
+                      help="TODO", condition="integrator==2")
+        form.addParam('nm_limit', params.FloatParam, default=1000.0, label='Normal modes amplitude limit',
+                      help="TODO", condition="integrator==2")
+        form.addParam('elnemo_cutoff', params.FloatParam, default=8.0, label='NMA cutoff (A)',
+                      help="TODO", condition="integrator==2")
+        form.addParam('elnemo_rtb_block', params.IntParam, default=10, label='NMA number of residue per RTB block',
+                      help="TODO", condition="integrator==2")
+        form.addParam('elnemo_path', params.FileParam, label="Elnemo Path",
+                       help='TODO '
+                      , condition="integrator==2")
         # ENERGY =================================================================================================
         form.addSection(label='Energy')
         form.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,
@@ -191,16 +206,6 @@ class ProtGenesis(EMProtocol):
         form.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
                       help="TODO", condition="EMfitChoice==2")
 
-        # NMMD =================================================================================================
-        form.addSection(label='NMMD')
-        form.addParam('normalModesChoice', params.BooleanParam, label="Normal Mode Molecular Dynamics",
-                      default=False, important=True, help="TODO")
-        form.addParam('n_modes', params.IntParam, default=10, label='Number of normal modes',
-                      help="TODO", condition="normalModesChoice")
-        form.addParam('global_mass', params.FloatParam, default=1.0, label='Normal modes amplitude mass',
-                      help="TODO", condition="normalModesChoice")
-        form.addParam('global_limit', params.FloatParam, default=300.0, label='Normal mode amplitude threshold',
-                      help="TODO", condition="normalModesChoice")
         # REMD =================================================================================================
         form.addSection(label='REMD')
         form.addParam('replica_exchange', params.BooleanParam, label="Replica Exchange",
@@ -406,7 +411,7 @@ class ProtGenesis(EMProtocol):
                 n_parallel = numParallelFit if i1<numLinearFit else numLastIter
                 for i2 in range(n_parallel):
                     indexFit = i2 + i1*numParallelFit
-                    prefix = self.getOutputPrefix(indexFit)[0]
+                    prefix = self.getOutputPrefix(indexFit)
 
                     # Create INP file
                     self.createINP(inputPDB=self.getInputPDBprefix(indexFit)+".pdb",
@@ -433,7 +438,7 @@ class ProtGenesis(EMProtocol):
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numParallelFit
                         inputPDB = self.getInputPDBprefix(indexFit)+".pdb" if iterFit ==0 \
-                            else  self.getOutputPrefix(indexFit)[0]+".pdb"
+                            else  self.getOutputPrefix(indexFit)+".pdb"
 
                         tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
                         cmds_pdb2vol.append(self.pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix))
@@ -499,11 +504,11 @@ class ProtGenesis(EMProtocol):
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numParallelFit
                         if iterFit == 0:
-                            prefix = self.getOutputPrefix(indexFit)[0]
+                            prefix = self.getOutputPrefix(indexFit)
                             inputPDB = self.getInputPDBprefix(indexFit)+".pdb"
                         else:
                             prefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            inputPDB = self.getOutputPrefix(indexFit)[0]+".pdb"
+                            inputPDB = self.getOutputPrefix(indexFit)+".pdb"
 
 
                         # Create INP file
@@ -518,7 +523,7 @@ class ProtGenesis(EMProtocol):
                     if iterFit != 0:
                         for i2 in range(n_parallel):
                             tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            newPrefix = self.getOutputPrefix(indexFit)[0]
+                            newPrefix = self.getOutputPrefix(indexFit)
 
                             indexFit = i2 + i1 * numParallelFit
                             cat_cmd = "cat %s.log >> %s.log"%(tmpPrefix, newPrefix)
@@ -566,9 +571,6 @@ class ProtGenesis(EMProtocol):
         if (n_mpi != 1):
             cmd += "mpirun -np %s " % n_mpi
         cmd +=  "%s/bin/atdyn %s " % (self.genesisDir.get(),"%s_INP" % prefix)
-        if self.normalModesChoice.get():
-            cmd += "%s/ %i %f %f" % (self.genesisDir.get(), self.n_modes.get(),
-                                      self.global_mass.get(), self.global_limit.get())
         cmd += " > %s.log" % prefix
         return cmd
 
@@ -592,12 +594,15 @@ class ProtGenesis(EMProtocol):
 
         s += "\n[OUTPUT] \n" #-----------------------------------------------------------
         if self.replica_exchange.get():
-            outputPrefix += "_remd{}"
-            s += "remfile = %s.rem\n" %outputPrefix
-            s += "logfile = %s.log\n" %outputPrefix
-        s += "dcdfile = %s.dcd\n" %outputPrefix
-        s += "rstfile = %s.rst\n" %outputPrefix
-        s += "pdbfile = %s.pdb\n" %outputPrefix
+            s += "remfile = %s_remd{}.rem\n" %outputPrefix
+            s += "logfile = %s_remd{}.log\n" %outputPrefix
+            s += "dcdfile = %s_remd{}.dcd\n" %outputPrefix
+            s += "rstfile = %s_remd{}.rst\n" %outputPrefix
+            s += "pdbfile = %s_remd{}.pdb\n" %outputPrefix
+        else:
+            s += "dcdfile = %s.dcd\n" %outputPrefix
+            s += "rstfile = %s.rst\n" %outputPrefix
+            s += "pdbfile = %s.pdb\n" %outputPrefix
 
         s += "\n[ENERGY] \n" #-----------------------------------------------------------
         if self.forcefield.get() == FORCEFIELD_CHARMM:
@@ -627,14 +632,30 @@ class ProtGenesis(EMProtocol):
             s += "\n[DYNAMICS] \n" #-----------------------------------------------------------
             if self.integrator.get() == INTEGRATOR_VVERLET:
                 s += "integrator = VVER  \n"
-            else:
+            elif self.integrator.get() == INTEGRATOR_LEAPFROG:
                 s += "integrator = LEAP  \n"
+            elif self.integrator.get() == INTEGRATOR_NMMD:
+                s += "integrator = NMMD  \n"
             s += "timestep = %f \n" % self.time_step.get()
         s += "nsteps = %i \n" % self.n_steps.get()
         s += "eneout_period = %i \n" % self.eneout_period.get()
         s += "crdout_period = %i \n" % self.crdout_period.get()
         s += "rstout_period = %i \n" % self.n_steps.get()
         s += "nbupdate_period = %i \n" % self.nbupdate_period.get()
+
+        if self.integrator.get() == INTEGRATOR_NMMD:
+            s += "\n[NMMD] \n" #-----------------------------------------------------------
+            s+= "nm_number = %i \n" % self.nm_number.get()
+            s+= "nm_mass = %f \n" % self.nm_mass.get()
+            s+= "nm_limit = %f \n" % self.nm_limit.get()
+            s+= "elnemo_cutoff = %f \n" % self.elnemo_cutoff.get()
+            s+= "elnemo_rtb_block = %i \n" % self.elnemo_rtb_block.get()
+            s+= "elnemo_path = %s \n" %  self.elnemo_path.get()
+            if self.replica_exchange.get():
+                s+= "nm_prefix = %s_remd{} \n" % outputPrefix
+            else:
+                s += "nm_prefix = %s \n" % outputPrefix
+            s+="\n"
 
         s += "\n[CONSTRAINTS] \n" #-----------------------------------------------------------
         s += "rigid_bond = NO \n"
@@ -751,7 +772,7 @@ class ProtGenesis(EMProtocol):
         pdbset = self._createSetOfPDBs("outputPDBs")
 
         for i in range(self.getNumberOfFitting()):
-            outputPrefix =self.getOutputPrefix(i)
+            outputPrefix =self.getOutputPrefix(i, alloutput=True)
             for j in outputPrefix:
                 pdbset.append(AtomStruct(j + ".pdb"))
         self._defineOutputs(outputPDBs=pdbset)
@@ -844,15 +865,18 @@ class ProtGenesis(EMProtocol):
             return prefix % str(index + 1).zfill(5)
 
 
-    def getOutputPrefix(self, index):
-        outputPrefix=[]
-        if self.replica_exchange.get() :
-            for i in range(self.nreplica.get()):
-                outputPrefix.append(self._getExtraPath("%s_output_remd%i" %
-                                (str(index + 1).zfill(5), i + 1)))
+    def getOutputPrefix(self, index, alloutput=False):
+        if alloutput :
+            outputPrefix=[]
+            if self.replica_exchange.get() :
+                for i in range(self.nreplica.get()):
+                    outputPrefix.append(self._getExtraPath("%s_output_remd%i" %
+                                    (str(index + 1).zfill(5), i + 1)))
+            else:
+                outputPrefix.append(self._getExtraPath("%s_output" % str(index + 1).zfill(5)))
+            return outputPrefix
         else:
-            outputPrefix.append(self._getExtraPath("%s_output" % str(index + 1).zfill(5)))
-        return outputPrefix
+            return self._getExtraPath("%s_output" % str(index + 1).zfill(5))
 
     def getMPIParams(self):
         """

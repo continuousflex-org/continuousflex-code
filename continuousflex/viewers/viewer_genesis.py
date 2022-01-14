@@ -104,7 +104,7 @@ class GenesisViewer(ProtocolViewer):
     def _plotTraj(self, paramName):
         fitlist = self.getFitlist()
         traj_viewer(pdb_file=self.protocol.getInputPDBprefix(fitlist[0] - 1)+".pdb",
-                    dcd_file=self.protocol.getOutputPrefix(fitlist[0] - 1)[0]+".dcd")
+                    dcd_file=self.protocol.getOutputPrefix(fitlist[0] - 1)+".dcd")
 
     def _plotEnergy(self, paramName):
         self._plotEnergyTotal()
@@ -118,7 +118,7 @@ class GenesisViewer(ProtocolViewer):
         fitlist = self.getFitlist()
         ene = {}
         for i in fitlist:
-            outputPrefix = self.protocol.getOutputPrefix(i - 1)
+            outputPrefix = self.protocol.getOutputPrefix(i - 1, alloutput=True)
             for j in outputPrefix:
                 log_file = readLogFile(j + ".log")
                 for e in ene_default:
@@ -145,7 +145,7 @@ class GenesisViewer(ProtocolViewer):
         fitlist = self.getFitlist()
         ene = {}
         for i in fitlist:
-            outputPrefix = self.protocol.getOutputPrefix(i - 1)
+            outputPrefix = self.protocol.getOutputPrefix(i - 1, alloutput=True)
             for j in outputPrefix:
                 log_file = readLogFile(j+".log")
                 for e in ene_default:
@@ -171,7 +171,7 @@ class GenesisViewer(ProtocolViewer):
         fitlist = self.getFitlist()
         cc = []
         for i in fitlist:
-            outputPrefix = self.protocol.getOutputPrefix(i-1)
+            outputPrefix = self.protocol.getOutputPrefix(i-1, alloutput=True)
             for j in outputPrefix:
                 log_file = readLogFile(j + ".log")
                 cc.append(log_file['RESTR_CVS001'])
@@ -195,7 +195,7 @@ class GenesisViewer(ProtocolViewer):
         fitlist = self.getFitlist()
         rmsd = []
         for i in fitlist:
-            outputPrefix = self.protocol.getOutputPrefix(i-1)
+            outputPrefix = self.protocol.getOutputPrefix(i-1, alloutput=True)
             for j in outputPrefix:
                 log_file = readLogFile(j + ".log")
                 rmsd.append(rmsdFromDCD(outputPrefix=j, inputPDB=self.protocol.getInputPDBprefix(i-1)+".pdb",
@@ -280,7 +280,7 @@ class GenesisViewer(ProtocolViewer):
         fitlist = self.getFitlist()
         fitPDBs = []
         for i in fitlist:
-            outputPrefix = self.protocol.getOutputPrefix(i - 1)
+            outputPrefix = self.protocol.getOutputPrefix(i - 1, alloutput=True)
             for j in outputPrefix:
                 mol = PDBMol(j+".pdb")
                 fitPDBs.append(mol.coords[idx[:,0]].flatten())
