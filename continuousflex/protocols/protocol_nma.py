@@ -340,10 +340,11 @@ class FlexProtNMA(FlexProtNMABase):
 
 
     def _checkPDB_CA(self, fnPDB):
-        # This function returns true if all the atoms are CA, otherwise false
+        # This function returns true if all the atoms are CA and P, otherwise false
         from continuousflex.protocols.utilities.pdb_parser import m_inout_read_pdb
         pdb_read = m_inout_read_pdb(fnPDB)
         for atom in pdb_read:
             if atom.type != " C" or atom.loc != "A ":
-                return False
+                if atom.type != " P":
+                    return False
         return True
