@@ -32,7 +32,7 @@ getXmippPath = pwem.Domain.importFromPlugin("xmipp3.base", 'getXmippPath')
 from pyworkflow.tests import DataSet
 
 _logo = "logo.png"
-__version__ = "3.1.0"
+__version__ = "3.1.2"
 
 class Plugin(pwem.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
@@ -111,7 +111,7 @@ class Plugin(pwem.Plugin):
                        # url='https://github.com/slajo/NMA_basic_code/raw/master/nma_v3.tar',
                        # url='https://github.com/MohamadHarastani/nma_basic_codes/raw/main/nma_v4.tar',
                        # url='https://github.com/MohamadHarastani/nma_basic_codes/raw/main/nma_v5.tar',
-                       url='https://github.com/slajo/NMA_basic_code/blob/master/nma_v5.tar',
+                       url='https://github.com/slajo/NMA_basic_code/raw/master/nma_v5.tar',
                        createBuildDir=False,
                        buildDir='nma',
                        target="nma",
