@@ -56,9 +56,20 @@ INTEGRATOR_NMMD = 2
 IMPLICIT_SOLVENT_GBSA = 0
 IMPLICIT_SOLVENT_NONE = 1
 
-TPCONTROL_LANGEVIN = 0
-TPCONTROL_BERENDSEN = 1
-TPCONTROL_NONE = 2
+TPCONTROL_NONE = 0
+TPCONTROL_LANGEVIN = 1
+TPCONTROL_BERENDSEN = 2
+TPCONTROL_BUSSI = 3
+
+ENSEMBLE_NVT = 0
+ENSEMBLE_NVE = 1
+ENSEMBLE_NPT = 2
+
+BOUNDARY_NOBC = 0
+BOUNDARY_PBC = 1
+
+ELECTROSTATICS_PME = 0
+ELECTROSTATICS_CUTOFF = 1
 
 NUCLEIC_NO = 0
 NUCLEIC_RNA =1
@@ -81,37 +92,40 @@ class ProtGenesis(EMProtocol):
         # Inputs ============================================================================================
         form.addSection(label='Inputs')
         form.addParam('genesisDir', params.FileParam, label="Genesis install path",
-                      help='Path to genesis installation', important=True)
+                      help='Path to Genesis directory', important=True)
         form.addParam('inputPDB', params.PointerParam,
                       pointerClass='AtomStruct, SetOfPDBs, SetOfAtomStructs', label="Input PDB (s)",
                       help='Select the input PDB or set of PDBs.')
         form.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0,
-                      choices=['CHARMM', 'AAGO', 'CAGO'], help="TODo")
+                      choices=['CHARMM', 'AAGO', 'CAGO'], help="Type of the force field used for energy and force calculation")
         form.addParam('generateTop', params.BooleanParam, label="Generate topology files ?",
-                      default=False, help="TODo")
+                      default=False, help="Use the GUI to generate topology files for you. Requires VMD psfgen for CHARMM forcefields"
+                                          "and SMOG2 for GO models. Note that the generated topology files will not include"
+                                          "solvation in the case of CHARMM forcefield.")
         form.addParam('smog_dir', params.FileParam, label="SMOG2 directory",
-                      help='TODO', condition="(forcefield==1 or forcefield==2) and generateTop")
+                      help='Path to SMOG2 directory', condition="(forcefield==1 or forcefield==2) and generateTop")
         form.addParam('inputTOP', params.FileParam, label="GROMACS Topology File (.top)",
                       condition="(forcefield==1 or forcefield==2) and not generateTop",
-                      help='TODO')
+                      help='Gromacs ‘top’ file containing information of the system such as atomic masses, charges,'
+                           'atom connectivities. For details about this format, see the Gromacs web site')
         form.addParam('inputPRM', params.FileParam, label="CHARMM Parameter File (.prm)",
                       condition = "forcefield==0",
-                      help='CHARMM force field parameter file (.prm). Can be founded at ' +
-                           'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm')
+                      help='CHARMM parameter file containing force field parameters, e.g. force constants and librium'
+                            'librium geometries' )
         form.addParam('inputRTF', params.FileParam, label="CHARMM Topology File (.rtf)",
                       condition="forcefield==0 or ((forcefield==1 or forcefield==2) and generateTop)",
-                      help='CHARMM force field topology file (.rtf). Can be founded at ' +
-                           'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm. '+
-                           'In the case of AAGO/CAGO model, used for completing the missing structure')
+                      help='CHARMM topology file containing information about atom connectivity of residues and'
+                           'other molecules. For details on the format, see the CHARMM web site')
         form.addParam('nucleicChoice', params.EnumParam, label="Contains nucleic acids ?", default=0,
                       choices=['NO', 'RNA', 'DNA'], condition ="generateTop",help="TODo")
 
         form.addParam('inputPSF', params.FileParam, label="Protein Structure File (.psf)",
                       condition="forcefield==0 and not generateTop",
-                      help='TODO')
+                      help='CHARMM/X-PLOR ‘psffile‘ containing information of the system such as atomic masses,'
+                            'charges, and atom connectivities')
 
         form.addParam('restartchoice', params.BooleanParam, label="Restart previous run ?", default=False,
-                     help="TODo")
+                     help="Restart previous Genesis simulation from restart file")
         form.addParam('inputRST', params.FileParam, label="GENESIS Restart File (.rst)",
                        help='Restart file from previous minimisation or MD run '
                       , condition="restartchoice")
@@ -120,72 +134,119 @@ class ProtGenesis(EMProtocol):
         # Simulation =================================================================================================
         form.addSection(label='Simulation')
         form.addParam('simulationType', params.EnumParam, label="Simulation type", default=0,
-                      choices=['Molecular Dynamics', 'Minimization'],  help="TODO", important=True)
+                      choices=['Molecular Dynamics', 'Minimization'],
+                      help="Type of simulation to be performed by GENESIS", important=True)
         form.addParam('integrator', params.EnumParam, label="Integrator", default=0,
-                      choices=['Velocity Verlet', 'Leapfrog', 'NMMD'],  help="TODO", condition="simulationType==0")
+                      choices=['Velocity Verlet', 'Leapfrog', 'NMMD'],
+                      help="Type of integrator for the MD simulation", condition="simulationType==0")
         form.addParam('time_step', params.FloatParam, default=0.002, label='Time step (ps)',
-                      help="TODO", condition="simulationType==0")
+                      help="Time step in the MD run", condition="simulationType==0")
         form.addParam('n_steps', params.IntParam, default=10000, label='Number of steps',
-                      help="Select the number of steps in the MD fitting")
-        form.addParam('eneout_period', params.IntParam, default=100, label='Energy output period',
+                      help="Total number of steps in one MD run")
+        form.addParam('eneout_period', params.IntParam, default=100, label='Output frequency for the energy data',
                       help="TODO")
-        form.addParam('crdout_period', params.IntParam, default=100, label='Coordinates output period',
+        form.addParam('crdout_period', params.IntParam, default=100, label='Output frequency for the coordinates data',
                       help="TODO")
-        form.addParam('nbupdate_period', params.IntParam, default=10, label='Non-bonded update period',
+        form.addParam('nbupdate_period', params.IntParam, default=10, label='Update frequency of the non-bonded pairlist',
                       help="TODO")
 
         form.addParam('nm_number', params.IntParam, default=10, label='Number of normal modes',
-                      help="TODO", condition="integrator==2")
+                      help="Number of normal modes for NMMD", condition="integrator==2 and simulationType==0")
         form.addParam('nm_mass', params.FloatParam, default=10.0, label='Normal modes amplitude mass',
-                      help="TODO", condition="integrator==2")
+                      help="Mass value for NMMD", condition="integrator==2 and simulationType==0")
         form.addParam('nm_limit', params.FloatParam, default=1000.0, label='Normal modes amplitude limit',
-                      help="TODO", condition="integrator==2")
+                      help="Threshold of normal mode amplitude above which the normal modes are updated",
+                      condition="integrator==2 and simulationType==0")
         form.addParam('elnemo_cutoff', params.FloatParam, default=8.0, label='NMA cutoff (A)',
-                      help="TODO", condition="integrator==2")
+                      help="Cutoff distance for elastic network model", condition="integrator==2 and simulationType==0")
         form.addParam('elnemo_rtb_block', params.IntParam, default=10, label='NMA number of residue per RTB block',
-                      help="TODO", condition="integrator==2")
+                      help="Number of residue per RTB block", condition="integrator==2 and simulationType==0")
         form.addParam('elnemo_path', params.FileParam, label="Elnemo Path",
-                       help='TODO '
-                      , condition="integrator==2")
+                       help='Path to ElNemo directory '
+                      , condition="integrator==2 and simulationType==0")
         # ENERGY =================================================================================================
         form.addSection(label='Energy')
         form.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,
                       choices=['GBSA', 'NONE'],
-                      help="TODo")
-        form.addParam('switch_dist', params.FloatParam, default=10.0, label='Switch Distance', help="TODO")
-        form.addParam('cutoff_dist', params.FloatParam, default=12.0, label='Cutoff Distance', help="TODO")
-        form.addParam('pairlist_dist', params.FloatParam, default=15.0, label='Pairlist Distance', help="TODO")
-        form.addParam('tpcontrol', params.EnumParam, label="Temperature control", default=0,
-                      choices=['LANGEVIN', 'BERENDSEN', 'NO'],
-                      help="TODo")
+                      help="Turn on Generalized Born/Solvent accessible surface area model. Boundary condition must be NO")
+
+        form.addParam('electrostatics', params.EnumParam, label="Non-bonded interactions", default=1,
+                      choices=['PME', 'Cutoff'],
+                      help="Type of Non-bonded interactions. "
+                           "CUTOFF: Non-bonded interactions including the van der Waals interaction are just"
+                           "truncated at cutoffdist; "
+                           "PME : Particle mesh Ewald (PME) method is employed for long-range interactions."
+                            "This option is only availabe in the periodic boundary condition")
+        form.addParam('switch_dist', params.FloatParam, default=10.0, label='Switch Distance',
+                      help="Switch-on distance for nonbonded interaction energy/force quenching")
+        form.addParam('cutoff_dist', params.FloatParam, default=12.0, label='Cutoff Distance',
+                      help="Cut-off distance for the non-bonded interactions. This distance must be larger than"
+                            "switchdist, while smaller than pairlistdist")
+        form.addParam('pairlist_dist', params.FloatParam, default=15.0, label='Pairlist Distance',
+                      help="Distance used to make a Verlet pair list for non-bonded interactions . This distance"
+                            "must be larger than cutoffdist")
+
+        # Ensemble =================================================================================================
+        form.addSection(label='Ensemble')
+        form.addParam('ensemble', params.EnumParam, label="Ensemble", default=0,
+                      choices=['NVT', 'NVE', 'NPT'],
+                      help="Type of ensemble, NVE: Microcanonical ensemble, NVT: Canonical ensemble,"
+                           "NPT: Isothermal-isobaric ensemble")
+        form.addParam('tpcontrol', params.EnumParam, label="Temperature control", default=1,
+                      choices=['NO', 'LANGEVIN', 'BERENDSEN', 'BUSSI'],
+                      help="Type of thermostat and barostat. The availabe algorithm depends on the integrator :"
+                           "LEAP : BERENDSEN, LANGEVIN;  VVER : BERENDSEN (NVT only), LANGEVIN, BUSSI; "
+                           "NMMD : LANGEVIN (NVT only)")
         form.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
-                      help="TODO")
-        # EM fit =================================================================================================
-        form.addSection(label='EM fit')
+                      help="Initial and target temperature")
+        form.addParam('pressure', params.FloatParam, default=1.0, label='Pressure (atm)',
+                      help="Target pressure in the NPT ensemble", condition="ensemble==2")
+        # Boundary =================================================================================================
+        form.addSection(label='Boundary')
+        form.addParam('boundary', params.EnumParam, label="Boundary", default=0,
+                      choices=['No boundary', 'Periodic Boundary Condition'], important=True,
+                      help="Type of boundary condition")
+        form.addParam('box_size_x', params.FloatParam, label='Box size X',
+                      help="Box size along the x dimension", condition="boundary==1")
+        form.addParam('box_size_y', params.FloatParam, label='Box size Y',
+                      help="Box size along the y dimension", condition="boundary==1")
+        form.addParam('box_size_z', params.FloatParam, label='Box size Z',
+                      help="Box size along the z dimension", condition="boundary==1")
+        # Experiments =================================================================================================
+        form.addSection(label='Experiments')
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
                       choices=['None', 'Volume (s)', 'Image (s)'], important=True,
-                      help="TODO")
+                      help="Type of cryo-EM data to be processed")
         form.addParam('constantK', params.IntParam, default=10000, label='Force constant K',
                       help="TODO", condition="EMfitChoice!=0")
         form.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EMfit Sigma",
-                      help="TODO", condition="EMfitChoice!=0")
+                      help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
+                        "of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
+                      condition="EMfitChoice!=0")
         form.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EMfit Tolerance',
-                      help="TODO", condition="EMfitChoice!=0")
+                      help="This variable determines the tail length of the Gaussian function. For example, if em-"
+                        "fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
+                        "than 0.1% of the maximum value. Smaller value requires large computational cost",
+                      condition="EMfitChoice!=0")
 
         # Volumes
         form.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
                       label="Input volume (s)", help='Select the target EM density volume',
                       condition="EMfitChoice==1")
         form.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
-                      help="TODO", condition="EMfitChoice==1")
+                      help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==1")
         form.addParam('situs_dir', params.FileParam,
                       label="Situs install path", help='Select the root directory of Situs installation'
                       , condition="EMfitChoice==1")
         form.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=False,
-                      help="TODo", condition="EMfitChoice==1")
+                      help="Center the volume to the origin", condition="EMfitChoice==1")
         form.addParam('preprocessingVol', params.EnumParam, label="Volume preprocessing", default=0,
                       choices=['Standard Normal', 'Match values range', 'Match Histograms'],
-                      help="TODO", condition="EMfitChoice==1")
+                      help="Pre-process the input volume to match gray-values of the simulated map"
+                           " used in the cryo-EM flexible fitting algorithm. Standard normal will normalize the "
+                           "mean and standard deviation of the gray values to match the simulated map. Match values range"
+                           "will linearly rescale the gray values range to match the simulated map range. Match histograms"
+                           "will match histograms of the target EM and the simulated EM maps", condition="EMfitChoice==1")
 
         # Images
         form.addParam('inputImage', params.PointerParam, pointerClass="Particle, SetOfParticles",
@@ -194,29 +255,43 @@ class ProtGenesis(EMProtocol):
         form.addParam('image_size', params.IntParam, default=64, label='Image Size',
                       help="TODO", condition="EMfitChoice==2")
         form.addParam('estimateAngleShift', params.BooleanParam, label="Estimate rigid body ?",
-                      default=False,  condition="EMfitChoice==2", help="TODO")
-        form.addParam('rb_n_iter', params.IntParam, default=10, label='Number of iterations for rigid body fitting',
-                      help="TODO", condition="EMfitChoice==2 and estimateAngleShift")
+                      default=False,  condition="EMfitChoice==2", help="If set, the GUI will perform rigid body alignement. "
+                            "Otherwise, you must provide a set of alignement parameters for each image")
+        form.addParam('rb_n_iter', params.IntParam, default=1, label='Number of iterations for rigid body fitting',
+                      help="Number of rigid body alignement during the simulation. If 1 is set, the rigid body alignement "
+                           "will be performed once at the begining of the simulation",
+                      condition="EMfitChoice==2 and estimateAngleShift")
         form.addParam('rb_method', params.EnumParam, label="Rigid body alignement method", default=0,
-                      choices=['Projection Matching', 'Wavelet'], help="TODO",
+                      choices=['Projection Matching', 'Wavelet'], help="Type of rigid body alignement. "
+                                                                       "Wavelet method is recommended",
                       condition="EMfitChoice==2 and estimateAngleShift")
         form.addParam('imageAngleShift', params.FileParam, label="Rigid body parameters (.xmd)",
                       condition="EMfitChoice==2 and not estimateAngleShift",
-                      help='TODO')
+                      help='Xmipp metadata file of rigid body parameters for each image (3 euler angles, 2 shift)')
         form.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
-                      help="TODO", condition="EMfitChoice==2")
+                      help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==2")
+        # Constraints =================================================================================================
+        form.addSection(label='Constraints')
+        form.addParam('rigid_bond', params.BooleanParam, label="Rigid bonds",
+                      default=False,
+                      help="Turn on or off the SHAKE/RATTLE algorithms for covalent bonds involving hydrogen")
+        form.addParam('fast_water', params.BooleanParam, label="Fast water",
+                      default=False,
+                      help="Turn on or off the SETTLE algorithm for the constraints of the water molecules")
+        form.addParam('water_model', params.StringParam, label='Water model', default="TIP3",
+                      help="Residue name of the water molecule to be rigidified in the SETTLE algorithm", condition="fast_water")
 
-        # REMD =================================================================================================
-        form.addSection(label='REMD')
-        form.addParam('replica_exchange', params.BooleanParam, label="Replica Exchange",
+        # Replica-exchange umbrella-sampling =================================================================================================
+        form.addSection(label='Replica-exchange umbrella-sampling')
+        form.addParam('replica_exchange', params.BooleanParam, label="Replica-exchange umbrella-sampling",
                       default=False, important=True,
-                      help="TODO")
+                      help="Replica-exchange umbrella-sampling is available for emfit force constant fitting only")
         form.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
-                      help="TODO", condition="replica_exchange")
+                      help="Number of MD steps between replica exchanges", condition="replica_exchange")
         form.addParam('nreplica', params.IntParam, default=1, label='Number of replicas',
-                      help="TODO", condition="replica_exchange")
+                      help="Number of replicas", condition="replica_exchange")
         form.addParam('constantKREMD', params.StringParam, label='K values ',
-                      help="TODO", condition="replica_exchange")
+                      help="Force constant values ", condition="replica_exchange")
 
         form.addParallelSection(threads=1, mpi=1)
         # --------------------------- INSERT steps functions --------------------------------------------
@@ -611,7 +686,11 @@ class ProtGenesis(EMProtocol):
             s += "forcefield = AAGO  \n"
         elif self.forcefield.get() == FORCEFIELD_CAGO:
             s += "forcefield = CAGO  \n"
-        s += "electrostatic = CUTOFF  \n"
+
+        if self.electrostatics.get() == ELECTROSTATICS_CUTOFF :
+            s += "electrostatic = CUTOFF  \n"
+        else:
+            s += "electrostatic = PME  \n"
         s += "switchdist   = %.2f \n" % self.switch_dist.get()
         s += "cutoffdist   = %.2f \n" % self.cutoff_dist.get()
         s += "pairlistdist = %.2f \n" % self.pairlist_dist.get()
@@ -655,20 +734,42 @@ class ProtGenesis(EMProtocol):
                 s+= "nm_prefix = %s_remd{} \n" % outputPrefix
             else:
                 s += "nm_prefix = %s \n" % outputPrefix
-            s+="\n"
 
         s += "\n[CONSTRAINTS] \n" #-----------------------------------------------------------
-        s += "rigid_bond = NO \n"
+        if self.rigid_bond.get()        : s += "rigid_bond = YES \n"
+        else                            : s += "rigid_bond = NO \n"
+        if self.fast_water.get()      :
+            s += "fast_water = YES \n"
+            s += "water_model = %s \n" %self.water_model.get()
+        else                            : s += "fast_water = NO \n"
+
+        s += "\n[BOUNDARY] \n" #-----------------------------------------------------------
+        if self.boundary.get() == BOUNDARY_PBC:
+            s += "type = PBC \n"
+            s += "box_size_x = %f \n" % self.box_size_x.get()
+            s += "box_size_y = %f \n" % self.box_size_y.get()
+            s += "box_size_z = %f \n" % self.box_size_z.get()
+        else :
+            s += "type = NOBC \n"
 
         s += "\n[ENSEMBLE] \n" #-----------------------------------------------------------
-        s += "ensemble = NVT \n"
+        if self.ensemble.get() == ENSEMBLE_NVE:
+            s += "ensemble = NVE  \n"
+        elif self.ensemble.get() == ENSEMBLE_NPT:
+            s += "ensemble = NPT  \n"
+        else:
+            s += "ensemble = NVT  \n"
         if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
             s += "tpcontrol = LANGEVIN  \n"
         elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
             s += "tpcontrol = BERENDSEN  \n"
+        elif self.tpcontrol.get() == TPCONTROL_BUSSI:
+            s += "tpcontrol = BUSSI  \n"
         else:
             s += "tpcontrol = NO  \n"
         s += "temperature = %.2f \n" % self.temperature.get()
+        if self.ensemble.get() == ENSEMBLE_NPT:
+            s += "pressure = %.2f \n" % self.pressure.get()
 
         s += "\n[BOUNDARY] \n" #-----------------------------------------------------------
         s += "type = NOBC  \n"
@@ -695,8 +796,8 @@ class ProtGenesis(EMProtocol):
             if self.EMfitChoice.get() == EMFIT_VOLUMES:
                 s += "emfit_target = %s.sit \n" % inputEMprefix
             elif self.EMfitChoice.get()==EMFIT_IMAGES :
-                s += "emfit_exp_image = %s.spi \n" % inputEMprefix
-                s += "emfit_image_size =  %i\n" %self.image_size.get()
+                s += "emfit_type = IMAGE \n"
+                s += "emfit_target = %s.spi \n" % inputEMprefix
                 s += "emfit_pixel_size =  %f\n" % self.pixel_size.get()
                 rigid_body_params = self.getRigidBodyParams(indexFit)
                 s += "emfit_roll_angle = %f\n" % rigid_body_params[0]
