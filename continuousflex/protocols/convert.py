@@ -29,7 +29,7 @@
 import os
 from collections import OrderedDict
 
-from pwem.emlib import (MDL_NMA_MODEFILE, MDL_NMA_COLLECTIVITY, MDL_NMA_SCORE,
+from pwem.emlib import (MDL_NMA_MODEFILE, MDL_NMA_COLLECTIVITY, MDL_NMA_SCORE, MDL_NMA_EIGENVAL,
                         MDL_ORDER)
 from pyworkflow.utils import Environ
 from pwem.objects import NormalMode
@@ -40,8 +40,9 @@ from xmipp3.constants import NMA_HOME
 MODE_DICT = OrderedDict([ 
        ("_modeFile", MDL_NMA_MODEFILE),
        ("_collectivity", MDL_NMA_COLLECTIVITY),
-       ("_score", MDL_NMA_SCORE)
-       ])
+       ("_score", MDL_NMA_SCORE),
+       ("_eigenvalue", MDL_NMA_EIGENVAL),
+])
 
 
 def rowToMode(row):
