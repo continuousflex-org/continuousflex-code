@@ -695,8 +695,7 @@ class ProtGenesis(EMProtocol):
             if self.EMfitChoice.get() == EMFIT_VOLUMES:
                 s += "emfit_target = %s.sit \n" % inputEMprefix
             elif self.EMfitChoice.get()==EMFIT_IMAGES :
-                s += "emfit_exp_image = %s.spi \n" % inputEMprefix
-                s += "emfit_image_size =  %i\n" %self.image_size.get()
+                s += "emfit_target = %s.spi \n" % inputEMprefix
                 s += "emfit_pixel_size =  %f\n" % self.pixel_size.get()
                 rigid_body_params = self.getRigidBodyParams(indexFit)
                 s += "emfit_roll_angle = %f\n" % rigid_body_params[0]
