@@ -310,7 +310,7 @@ class TestGENESIS_1(TestWorkflow):
               md_program = PROGRAM_SPDYN,
               simulationType = SIMULATION_MIN,
               time_step = 0.002,
-              n_steps = 1000,
+              n_steps = 100, # should be >2000
               eneout_period = 10,
               crdout_period = 10,
               nbupdate_period = 10,
