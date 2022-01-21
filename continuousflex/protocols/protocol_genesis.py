@@ -30,13 +30,17 @@ from pwem.objects.data import AtomStruct, SetOfAtomStructs, SetOfPDBs, SetOfVolu
 import numpy as np
 import mrcfile
 import os
+import sys
 from skimage.exposure import match_histograms
 import pwem.emlib.metadata as md
 from pwem.utils import runProgram
 from subprocess import Popen
 from xmippLib import Euler_angles2matrix
 
-from .utilities.genesis_utilities import PDBMol,generatePSF, generateGROTOP
+from .utilities.genesis_utilities import generatePSF, generateGROTOP
+from xmipp3 import Plugin
+import pyworkflow.utils as pwutils
+from pyworkflow.utils import runCommand
 
 EMFIT_NONE = 0
 EMFIT_VOLUMES = 1
@@ -49,6 +53,9 @@ FORCEFIELD_CAGO = 2
 SIMULATION_MD = 0
 SIMULATION_MIN = 1
 
+PROGRAM_ATDYN = 0
+PROGRAM_SPDYN= 1
+
 INTEGRATOR_VVERLET = 0
 INTEGRATOR_LEAPFROG = 1
 INTEGRATOR_NMMD = 2
@@ -56,17 +63,29 @@ INTEGRATOR_NMMD = 2
 IMPLICIT_SOLVENT_GBSA = 0
 IMPLICIT_SOLVENT_NONE = 1
 
-TPCONTROL_LANGEVIN = 0
-TPCONTROL_BERENDSEN = 1
-TPCONTROL_NONE = 2
+TPCONTROL_NONE = 0
+TPCONTROL_LANGEVIN = 1
+TPCONTROL_BERENDSEN = 2
+TPCONTROL_BUSSI = 3
+
+ENSEMBLE_NVT = 0
+ENSEMBLE_NVE = 1
+ENSEMBLE_NPT = 2
+
+BOUNDARY_NOBC = 0
+BOUNDARY_PBC = 1
+
+ELECTROSTATICS_PME = 0
+ELECTROSTATICS_CUTOFF = 1
 
 NUCLEIC_NO = 0
 NUCLEIC_RNA =1
 NUCLEIC_DNA = 2
 
-PREPROCESS_VOL_NORM = 0
-PREPROCESS_VOL_OPT = 1
-PREPROCESS_VOL_MATCH = 2
+PREPROCESS_VOL_NONE = 0
+PREPROCESS_VOL_NORM = 1
+PREPROCESS_VOL_OPT = 2
+PREPROCESS_VOL_MATCH = 3
 
 RB_PROJMATCH = 0
 RB_WAVELET = 1
@@ -80,112 +99,171 @@ class ProtGenesis(EMProtocol):
 
         # Inputs ============================================================================================
         form.addSection(label='Inputs')
-        form.addParam('genesisDir', params.FileParam, label="Genesis install path",
-                      help='Path to genesis installation', important=True)
         form.addParam('inputPDB', params.PointerParam,
                       pointerClass='AtomStruct, SetOfPDBs, SetOfAtomStructs', label="Input PDB (s)",
                       help='Select the input PDB or set of PDBs.')
         form.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0,
-                      choices=['CHARMM', 'AAGO', 'CAGO'], help="TODo")
+                      choices=['CHARMM', 'AAGO', 'CAGO'], help="Type of the force field used for energy and force calculation")
         form.addParam('generateTop', params.BooleanParam, label="Generate topology files ?",
-                      default=False, help="TODo")
-        form.addParam('smog_dir', params.FileParam, label="SMOG2 directory",
-                      help='TODO', condition="(forcefield==1 or forcefield==2) and generateTop")
-        form.addParam('inputTOP', params.FileParam, label="GROMACS Topology File (.top)",
-                      condition="(forcefield==1 or forcefield==2) and not generateTop",
-                      help='TODO')
-        form.addParam('inputPRM', params.FileParam, label="CHARMM Parameter File (.prm)",
-                      condition = "forcefield==0",
-                      help='CHARMM force field parameter file (.prm). Can be founded at ' +
-                           'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm')
-        form.addParam('inputRTF', params.FileParam, label="CHARMM Topology File (.rtf)",
-                      condition="forcefield==0 or ((forcefield==1 or forcefield==2) and generateTop)",
-                      help='CHARMM force field topology file (.rtf). Can be founded at ' +
-                           'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm. '+
-                           'In the case of AAGO/CAGO model, used for completing the missing structure')
+                      default=False, help="Use the GUI to generate topology files for you. Requires VMD psfgen for CHARMM forcefields"
+                                          "and SMOG2 for GO models. Note that the generated topology files will not include"
+                                          "solvation in the case of CHARMM forcefield.")
         form.addParam('nucleicChoice', params.EnumParam, label="Contains nucleic acids ?", default=0,
                       choices=['NO', 'RNA', 'DNA'], condition ="generateTop",help="TODo")
-
-        form.addParam('inputPSF', params.FileParam, label="Protein Structure File (.psf)",
+        form.addParam('smog_dir', params.FileParam, label="SMOG2 directory",
+                      help='Path to SMOG2 directory', condition="(forcefield==1 or forcefield==2) and generateTop")
+        form.addParam('inputTOP', params.FileParam, label="GROMACS Topology File",
+                      condition="(forcefield==1 or forcefield==2) and not generateTop",
+                      help='Gromacs ‘top’ file containing information of the system such as atomic masses, charges,'
+                           'atom connectivities. For details about this format, see the Gromacs web site')
+        form.addParam('inputPRM', params.FileParam, label="CHARMM parameter file",
+                      condition = "forcefield==0",
+                      help='CHARMM parameter file containing force field parameters, e.g. force constants and librium'
+                            'librium geometries' )
+        form.addParam('inputRTF', params.FileParam, label="CHARMM topology file",
+                      condition="forcefield==0 or ((forcefield==1 or forcefield==2) and generateTop)",
+                      help='CHARMM topology file containing information about atom connectivity of residues and'
+                           'other molecules. For details on the format, see the CHARMM web site')
+        form.addParam('inputPSF', params.FileParam, label="CHARMM Structure File",
                       condition="forcefield==0 and not generateTop",
-                      help='TODO')
+                      help='CHARMM/X-PLOR psf file containing information of the system such as atomic masses,'
+                            'charges, and atom connectivities')
+        form.addParam('inputSTR', params.FileParam, label="CHARMM stream file (optional)",
+                      condition="forcefield==0", default="",
+                      help='CHARMM stream file containing both topology information and parameters')
 
-        form.addParam('restartchoice', params.BooleanParam, label="Restart previous run ?", default=False,
-                     help="TODo")
-        form.addParam('inputRST', params.FileParam, label="GENESIS Restart File (.rst)",
-                       help='Restart file from previous minimisation or MD run '
-                      , condition="restartchoice")
+
+        form.addParam('inputRST', params.FileParam, label="GENESIS Restart File (optional)",
+                       help='Restart .rst file from previous minimisation or MD run ', default="")
 
 
         # Simulation =================================================================================================
         form.addSection(label='Simulation')
+        form.addParam('md_program', params.EnumParam, label="MD program", default=0,
+                      choices=['ATDYN', 'SPDYN'],
+                      help="SPDYN (Spatial decomposition dynamics) and ATDYN (Atomic decomposition dynamics)"
+                    " share almost the same data structures, subroutines, and modules, but differ in"
+                    " their parallelization schemes. In SPDYN, the spatial decomposition scheme is implemented with new"
+                    " parallel algorithms and GPGPU calculation. In ATDYN, the atomic decomposition scheme"
+                    " is introduced for simplicity. The performance of ATDYN is not comparable to SPDYN due to the"
+                    " simple parallelization scheme but contains new methods and features.", important=True)
         form.addParam('simulationType', params.EnumParam, label="Simulation type", default=0,
-                      choices=['Molecular Dynamics', 'Minimization'],  help="TODO", important=True)
+                      choices=['Molecular Dynamics', 'Minimization'],
+                      help="Type of simulation to be performed by GENESIS", important=True)
         form.addParam('integrator', params.EnumParam, label="Integrator", default=0,
-                      choices=['Velocity Verlet', 'Leapfrog', 'NMMD'],  help="TODO", condition="simulationType==0")
+                      choices=['Velocity Verlet', 'Leapfrog', 'NMMD'],
+                      help="Type of integrator for the MD simulation", condition="simulationType==0")
         form.addParam('time_step', params.FloatParam, default=0.002, label='Time step (ps)',
-                      help="TODO", condition="simulationType==0")
+                      help="Time step in the MD run", condition="simulationType==0")
         form.addParam('n_steps', params.IntParam, default=10000, label='Number of steps',
-                      help="Select the number of steps in the MD fitting")
+                      help="Total number of steps in one MD run")
         form.addParam('eneout_period', params.IntParam, default=100, label='Energy output period',
-                      help="TODO")
-        form.addParam('crdout_period', params.IntParam, default=100, label='Coordinates output period',
-                      help="TODO")
+                      help="Output frequency for the energy data")
+        form.addParam('crdout_period', params.IntParam, default=100, label='Coordinate output period',
+                      help="Output frequency for the coordinates data")
         form.addParam('nbupdate_period', params.IntParam, default=10, label='Non-bonded update period',
-                      help="TODO")
+                      help="Update frequency of the non-bonded pairlist")
 
         form.addParam('nm_number', params.IntParam, default=10, label='Number of normal modes',
-                      help="TODO", condition="integrator==2")
+                      help="Number of normal modes for NMMD", condition="integrator==2 and simulationType==0")
         form.addParam('nm_mass', params.FloatParam, default=10.0, label='Normal modes amplitude mass',
-                      help="TODO", condition="integrator==2")
+                      help="Mass value for NMMD", condition="integrator==2 and simulationType==0")
         form.addParam('nm_limit', params.FloatParam, default=1000.0, label='Normal modes amplitude limit',
-                      help="TODO", condition="integrator==2")
+                      help="Threshold of normal mode amplitude above which the normal modes are updated",
+                      condition="integrator==2 and simulationType==0")
         form.addParam('elnemo_cutoff', params.FloatParam, default=8.0, label='NMA cutoff (A)',
-                      help="TODO", condition="integrator==2")
+                      help="Cutoff distance for elastic network model", condition="integrator==2 and simulationType==0")
         form.addParam('elnemo_rtb_block', params.IntParam, default=10, label='NMA number of residue per RTB block',
-                      help="TODO", condition="integrator==2")
+                      help="Number of residue per RTB block", condition="integrator==2 and simulationType==0")
         form.addParam('elnemo_path', params.FileParam, label="Elnemo Path",
-                       help='TODO '
-                      , condition="integrator==2")
+                       help='Path to ElNemo directory '
+                      , condition="integrator==2 and simulationType==0")
         # ENERGY =================================================================================================
         form.addSection(label='Energy')
         form.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,
                       choices=['GBSA', 'NONE'],
-                      help="TODo")
-        form.addParam('switch_dist', params.FloatParam, default=10.0, label='Switch Distance', help="TODO")
-        form.addParam('cutoff_dist', params.FloatParam, default=12.0, label='Cutoff Distance', help="TODO")
-        form.addParam('pairlist_dist', params.FloatParam, default=15.0, label='Pairlist Distance', help="TODO")
-        form.addParam('tpcontrol', params.EnumParam, label="Temperature control", default=0,
-                      choices=['LANGEVIN', 'BERENDSEN', 'NO'],
-                      help="TODo")
+                      help="Turn on Generalized Born/Solvent accessible surface area model. Boundary condition must be NO."
+                           "ATDYN only.")
+
+        form.addParam('electrostatics', params.EnumParam, label="Non-bonded interactions", default=1,
+                      choices=['PME', 'Cutoff'],
+                      help="Type of Non-bonded interactions. "
+                           "CUTOFF: Non-bonded interactions including the van der Waals interaction are just"
+                           "truncated at cutoffdist; "
+                           "PME : Particle mesh Ewald (PME) method is employed for long-range interactions."
+                            "This option is only availabe in the periodic boundary condition")
+        form.addParam('vdw_force_switch', params.BooleanParam, label="Switch function Van der Waals", default=True,
+                      help="This paramter determines whether the force switch function for van der Waals interactions is"
+                        " employed or not. The users must take care about this parameter, when the CHARMM"
+                        " force field is used. Typically, vdw_force_switch=YES should be specified in the case of"
+                        " CHARMM36")
+        form.addParam('switch_dist', params.FloatParam, default=10.0, label='Switch Distance',
+                      help="Switch-on distance for nonbonded interaction energy/force quenching")
+        form.addParam('cutoff_dist', params.FloatParam, default=12.0, label='Cutoff Distance',
+                      help="Cut-off distance for the non-bonded interactions. This distance must be larger than"
+                            "switchdist, while smaller than pairlistdist")
+        form.addParam('pairlist_dist', params.FloatParam, default=15.0, label='Pairlist Distance',
+                      help="Distance used to make a Verlet pair list for non-bonded interactions . This distance"
+                            "must be larger than cutoffdist")
+
+        # Ensemble =================================================================================================
+        form.addSection(label='Ensemble')
+        form.addParam('ensemble', params.EnumParam, label="Ensemble", default=0,
+                      choices=['NVT', 'NVE', 'NPT'],
+                      help="Type of ensemble, NVE: Microcanonical ensemble, NVT: Canonical ensemble,"
+                           "NPT: Isothermal-isobaric ensemble")
+        form.addParam('tpcontrol', params.EnumParam, label="Temperature control", default=1,
+                      choices=['NO', 'LANGEVIN', 'BERENDSEN', 'BUSSI'],
+                      help="Type of thermostat and barostat. The availabe algorithm depends on the integrator :"
+                           "LEAP : BERENDSEN, LANGEVIN;  VVER : BERENDSEN (NVT only), LANGEVIN, BUSSI; "
+                           "NMMD : LANGEVIN (NVT only)")
         form.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
-                      help="TODO")
-        # EM fit =================================================================================================
-        form.addSection(label='EM fit')
+                      help="Initial and target temperature")
+        form.addParam('pressure', params.FloatParam, default=1.0, label='Pressure (atm)',
+                      help="Target pressure in the NPT ensemble", condition="ensemble==2")
+        # Boundary =================================================================================================
+        form.addSection(label='Boundary')
+        form.addParam('boundary', params.EnumParam, label="Boundary", default=0,
+                      choices=['No boundary', 'Periodic Boundary Condition'], important=True,
+                      help="Type of boundary condition")
+        form.addParam('box_size_x', params.FloatParam, label='Box size X',
+                      help="Box size along the x dimension", condition="boundary==1")
+        form.addParam('box_size_y', params.FloatParam, label='Box size Y',
+                      help="Box size along the y dimension", condition="boundary==1")
+        form.addParam('box_size_z', params.FloatParam, label='Box size Z',
+                      help="Box size along the z dimension", condition="boundary==1")
+        # Experiments =================================================================================================
+        form.addSection(label='Experiments')
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
                       choices=['None', 'Volume (s)', 'Image (s)'], important=True,
-                      help="TODO")
+                      help="Type of cryo-EM data to be processed")
         form.addParam('constantK', params.IntParam, default=10000, label='Force constant K',
                       help="TODO", condition="EMfitChoice!=0")
         form.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EMfit Sigma",
-                      help="TODO", condition="EMfitChoice!=0")
+                      help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
+                        "of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
+                      condition="EMfitChoice!=0")
         form.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EMfit Tolerance',
-                      help="TODO", condition="EMfitChoice!=0")
+                      help="This variable determines the tail length of the Gaussian function. For example, if em-"
+                        "fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
+                        "than 0.1% of the maximum value. Smaller value requires large computational cost",
+                      condition="EMfitChoice!=0")
 
         # Volumes
         form.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
                       label="Input volume (s)", help='Select the target EM density volume',
                       condition="EMfitChoice==1")
         form.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
-                      help="TODO", condition="EMfitChoice==1")
-        form.addParam('situs_dir', params.FileParam,
-                      label="Situs install path", help='Select the root directory of Situs installation'
-                      , condition="EMfitChoice==1")
+                      help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==1")
         form.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=False,
-                      help="TODo", condition="EMfitChoice==1")
+                      help="Center the volume to the origin", condition="EMfitChoice==1")
         form.addParam('preprocessingVol', params.EnumParam, label="Volume preprocessing", default=0,
-                      choices=['Standard Normal', 'Match values range', 'Match Histograms'],
-                      help="TODO", condition="EMfitChoice==1")
+                      choices=['None', 'Standard Normal', 'Match values range', 'Match Histograms'],
+                      help="Pre-process the input volume to match gray-values of the simulated map"
+                           " used in the cryo-EM flexible fitting algorithm. Standard normal will normalize the "
+                           "mean and standard deviation of the gray values to match the simulated map. Match values range"
+                           "will linearly rescale the gray values range to match the simulated map range. Match histograms"
+                           "will match histograms of the target EM and the simulated EM maps", condition="EMfitChoice==1")
 
         # Images
         form.addParam('inputImage', params.PointerParam, pointerClass="Particle, SetOfParticles",
@@ -194,29 +272,43 @@ class ProtGenesis(EMProtocol):
         form.addParam('image_size', params.IntParam, default=64, label='Image Size',
                       help="TODO", condition="EMfitChoice==2")
         form.addParam('estimateAngleShift', params.BooleanParam, label="Estimate rigid body ?",
-                      default=False,  condition="EMfitChoice==2", help="TODO")
-        form.addParam('rb_n_iter', params.IntParam, default=10, label='Number of iterations for rigid body fitting',
-                      help="TODO", condition="EMfitChoice==2 and estimateAngleShift")
+                      default=False,  condition="EMfitChoice==2", help="If set, the GUI will perform rigid body alignement. "
+                            "Otherwise, you must provide a set of alignement parameters for each image")
+        form.addParam('rb_n_iter', params.IntParam, default=1, label='Number of iterations for rigid body fitting',
+                      help="Number of rigid body alignement during the simulation. If 1 is set, the rigid body alignement "
+                           "will be performed once at the begining of the simulation",
+                      condition="EMfitChoice==2 and estimateAngleShift")
         form.addParam('rb_method', params.EnumParam, label="Rigid body alignement method", default=0,
-                      choices=['Projection Matching', 'Wavelet'], help="TODO",
+                      choices=['Projection Matching', 'Wavelet'], help="Type of rigid body alignement. "
+                                                                       "Wavelet method is recommended",
                       condition="EMfitChoice==2 and estimateAngleShift")
         form.addParam('imageAngleShift', params.FileParam, label="Rigid body parameters (.xmd)",
                       condition="EMfitChoice==2 and not estimateAngleShift",
-                      help='TODO')
+                      help='Xmipp metadata file of rigid body parameters for each image (3 euler angles, 2 shift)')
         form.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
-                      help="TODO", condition="EMfitChoice==2")
+                      help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==2")
+        # Constraints =================================================================================================
+        form.addSection(label='Constraints')
+        form.addParam('rigid_bond', params.BooleanParam, label="Rigid bonds",
+                      default=False,
+                      help="Turn on or off the SHAKE/RATTLE algorithms for covalent bonds involving hydrogen")
+        form.addParam('fast_water', params.BooleanParam, label="Fast water",
+                      default=False,
+                      help="Turn on or off the SETTLE algorithm for the constraints of the water molecules")
+        form.addParam('water_model', params.StringParam, label='Water model', default="TIP3",
+                      help="Residue name of the water molecule to be rigidified in the SETTLE algorithm", condition="fast_water")
 
-        # REMD =================================================================================================
-        form.addSection(label='REMD')
-        form.addParam('replica_exchange', params.BooleanParam, label="Replica Exchange",
+        # Replica-exchange umbrella-sampling =================================================================================================
+        form.addSection(label='Replica-exchange umbrella-sampling')
+        form.addParam('replica_exchange', params.BooleanParam, label="Replica-exchange umbrella-sampling",
                       default=False, important=True,
-                      help="TODO")
+                      help="Replica-exchange umbrella-sampling is available for emfit force constant fitting only")
         form.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
-                      help="TODO", condition="replica_exchange")
+                      help="Number of MD steps between replica exchanges", condition="replica_exchange")
         form.addParam('nreplica', params.IntParam, default=1, label='Number of replicas',
-                      help="TODO", condition="replica_exchange")
+                      help="Number of replicas", condition="replica_exchange")
         form.addParam('constantKREMD', params.StringParam, label='K values ',
-                      help="TODO", condition="replica_exchange")
+                      help="Force constant values ", condition="replica_exchange")
 
         form.addParallelSection(threads=1, mpi=1)
         # --------------------------- INSERT steps functions --------------------------------------------
@@ -321,52 +413,56 @@ class ProtGenesis(EMProtocol):
                 origin = -self.voxel_size.get() * (np.array(inputMRCData.shape)) / 2
             else:
                 origin = np.zeros(3)
+        if self.preprocessingVol.get() != PREPROCESS_VOL_NONE:
+            # CONVERT PDB TO SITUS VOLUME USING EMMAP GENERATOR
+            fnTmpVol = self._getExtraPath("tmp")
+            s ="\n[INPUT] \n"
+            s +="pdbfile = %s\n" % fnPDB
+            s +="\n[OUTPUT] \n"
+            s +="mapfile = %s.sit\n" % fnTmpVol
+            s +="\n[OPTION] \n"
+            s +="map_format = SITUS \n"
+            s +="voxel_size = %f \n" % self.voxel_size.get()
+            s +="sigma = %f  \n" % self.emfit_sigma.get()
+            s +="tolerance = %f  \n"% self.emfit_tolerance.get()
+            s +="auto_margin    = NO\n"
+            s +="x0             = %f \n" % origin[0]
+            s +="y0             = %f \n" % origin[1]
+            s +="z0             = %f \n" % origin[2]
+            s +="box_size_x     =  %f \n" % (inputMRCShape[0]*self.voxel_size.get())
+            s +="box_size_y     =  %f \n" % (inputMRCShape[1]*self.voxel_size.get())
+            s +="box_size_z     =  %f \n" % (inputMRCShape[2]*self.voxel_size.get())
+            with open("%s_INP_emmap" % fnTmpVol, "w") as f:
+                f.write(s)
 
-        # CONVERT PDB TO SITUS VOLUME USING EMMAP GENERATOR
-        fnTmpVol = self._getExtraPath("tmp")
-        s ="\n[INPUT] \n"
-        s +="pdbfile = %s\n" % fnPDB
-        s +="\n[OUTPUT] \n"
-        s +="mapfile = %s.sit\n" % fnTmpVol
-        s +="\n[OPTION] \n"
-        s +="map_format = SITUS \n"
-        s +="voxel_size = %f \n" % self.voxel_size.get()
-        s +="sigma = %f  \n" % self.emfit_sigma.get()
-        s +="tolerance = %f  \n"% self.emfit_tolerance.get()
-        s +="auto_margin    = NO\n"
-        s +="x0             = %f \n" % origin[0]
-        s +="y0             = %f \n" % origin[1]
-        s +="z0             = %f \n" % origin[2]
-        s +="box_size_x     =  %f \n" % (inputMRCShape[0]*self.voxel_size.get())
-        s +="box_size_y     =  %f \n" % (inputMRCShape[1]*self.voxel_size.get())
-        s +="box_size_z     =  %f \n" % (inputMRCShape[2]*self.voxel_size.get())
-        with open("%s_INP_emmap" % fnTmpVol, "w") as f:
-            f.write(s)
-        runProgram("%s/bin/emmap_generator" % self.genesisDir.get(), "%s_INP_emmap" % fnTmpVol)
+            runCommand("emmap_generator %s_INP_emmap"% fnTmpVol, env=self.getGenesisEnv())
 
-        # CONVERT SITUS TMP FILE TO MRC
-        with open(self._getExtraPath("runconvert.sh"), "w") as f:
-            f.write("#!/bin/bash \n")
-            f.write("%s/bin/map2map %s %s <<< \'1\'\n" % (self.situs_dir.get(), fnTmpVol+".sit", fnTmpVol+".mrc"))
-            f.write("exit")
-        os.system("/bin/bash "+self._getExtraPath("runconvert.sh"))
+            # CONVERT SITUS TMP FILE TO MRC
+            with open(self._getExtraPath("runconvert.sh"), "w") as f:
+                f.write("#!/bin/bash \n")
+                f.write("echo $PATH \n")
+                f.write("map2map %s.sit %s.mrc <<< \'1\'\n" % (fnTmpVol, fnTmpVol))
+                f.write("exit")
+            runCommand("/bin/bash %s" %self._getExtraPath("runconvert.sh"), env=self.getGenesisEnv())
 
-        # READ GENERATED MRC
-        with mrcfile.open(fnTmpVol+".mrc") as tmp_mrc:
-            tmpMRCData = tmp_mrc.data
+            # READ GENERATED MRC
+            with mrcfile.open(fnTmpVol+".mrc") as tmp_mrc:
+                tmpMRCData = tmp_mrc.data
 
-        # PREPROCESS VOLUME
-        if self.preprocessingVol.get() == PREPROCESS_VOL_NORM:
-            mrc_data =  ((inputMRCData-inputMRCData.mean())/inputMRCData.std())\
-                        *tmpMRCData.std() + tmpMRCData.mean()
-        elif self.preprocessingVol.get() == PREPROCESS_VOL_OPT:
-            min1 = tmpMRCData.min()
-            min2 = inputMRCData.min()
-            max1 = tmpMRCData.max()
-            max2 = inputMRCData.max()
-            mrc_data = ((inputMRCData - (min2 + min1))*(max1 - min1) )/ (max2 - min2)
-        elif self.preprocessingVol.get() == PREPROCESS_VOL_MATCH:
-            mrc_data = match_histograms(inputMRCData, tmpMRCData)
+            # PREPROCESS VOLUME
+            if self.preprocessingVol.get() == PREPROCESS_VOL_NORM:
+                mrc_data =  ((inputMRCData-inputMRCData.mean())/inputMRCData.std())\
+                            *tmpMRCData.std() + tmpMRCData.mean()
+            elif self.preprocessingVol.get() == PREPROCESS_VOL_OPT:
+                min1 = tmpMRCData.min()
+                min2 = inputMRCData.min()
+                max1 = tmpMRCData.max()
+                max2 = inputMRCData.max()
+                mrc_data = ((inputMRCData - (min2 + min1))*(max1 - min1) )/ (max2 - min2)
+            elif self.preprocessingVol.get() == PREPROCESS_VOL_MATCH:
+                mrc_data = match_histograms(inputMRCData, tmpMRCData)
+        else:
+            mrc_data = inputMRCData
 
         # SAVE TO MRC
         with mrcfile.new("%sConv.mrc"%volPrefix, overwrite=True) as mrc:
@@ -381,10 +477,9 @@ class ProtGenesis(EMProtocol):
         # CONVERT MRC TO SITUS
         with open(self._getExtraPath("runconvert.sh"), "w") as f:
             f.write("#!/bin/bash \n")
-            f.write("%s/bin/map2map %s %s <<< \'1\'\n" % (self.situs_dir.get(),
-                                                          "%sConv.mrc"%volPrefix, "%s.sit"%volPrefix))
+            f.write("map2map %sConv.mrc %s.sit <<< \'1\'\n" % (volPrefix,volPrefix))
             f.write("exit")
-        os.system("/bin/bash " + self._getExtraPath("runconvert.sh"))
+        runCommand( "/bin/bash %s " %self._getExtraPath("runconvert.sh"), env=self.getGenesisEnv())
 
         # CLEANING
         runProgram("rm","-f %s.sit"%fnTmpVol)
@@ -546,32 +641,32 @@ class ProtGenesis(EMProtocol):
 
 
     def runParallelJobs(self, cmds):
-
         # Set env
-        env = os.environ.copy()
+        env = self.getGenesisEnv()
         env["OMP_NUM_THREADS"] = str(self.numberOfThreads)
 
         # run process
         processes = []
         for cmd in cmds:
             print("Running command : %s" %cmd)
-            processes.append(Popen(cmd, shell=True, env=env))
+            processes.append(Popen(cmd, shell=True, env=env, stdout=sys.stdout, stderr = sys.stderr))
 
         # Wait for processes
         for p in processes:
             exitcode = p.wait()
             print("Process done %s" %str(exitcode))
             if exitcode != 0:
-                raise RuntimeError("GENESIS exit with errors, check .log file ")
-                # print("Warning : GENESIS exit with errors, check .log file ")
-
+                raise RuntimeError("Command returned with errors : %s" %str(cmds))
 
     def getGenesisCmd(self, prefix,n_mpi):
         cmd=""
         if (n_mpi != 1):
             cmd += "mpirun -np %s " % n_mpi
-        cmd +=  "%s/bin/atdyn %s " % (self.genesisDir.get(),"%s_INP" % prefix)
-        cmd += " > %s.log" % prefix
+        if self.md_program.get() == PROGRAM_ATDYN:
+            cmd +=  "atdyn %s " % ("%s_INP" % prefix)
+        else:
+            cmd += "spdyn %s " % ("%s_INP" % prefix)
+        cmd += "  > %s.log" % prefix
         return cmd
 
     def createINP(self,inputPDB, outputPrefix, indexFit):
@@ -586,10 +681,12 @@ class ProtGenesis(EMProtocol):
             s += "topfile = %s\n" % self.inputRTF.get()
             s += "parfile = %s\n" % self.inputPRM.get()
             s += "psffile = %s.psf\n" % inputPDBprefix
+            if self.inputSTR.get() != "":
+                s += "strfile = %s\n" % self.inputSTR.get()
         elif self.forcefield.get() == FORCEFIELD_AAGO\
                 or self.forcefield.get() == FORCEFIELD_CAGO:
             s += "grotopfile = %s.top\n" % inputPDBprefix
-        if self.restartchoice.get():
+        if self.inputRST.get() != "":
             s += "rstfile = %s\n" % self.inputRST.get()
 
         s += "\n[OUTPUT] \n" #-----------------------------------------------------------
@@ -611,19 +708,22 @@ class ProtGenesis(EMProtocol):
             s += "forcefield = AAGO  \n"
         elif self.forcefield.get() == FORCEFIELD_CAGO:
             s += "forcefield = CAGO  \n"
-        s += "electrostatic = CUTOFF  \n"
+
+        if self.electrostatics.get() == ELECTROSTATICS_CUTOFF :
+            s += "electrostatic = CUTOFF  \n"
+        else:
+            s += "electrostatic = PME  \n"
         s += "switchdist   = %.2f \n" % self.switch_dist.get()
         s += "cutoffdist   = %.2f \n" % self.cutoff_dist.get()
         s += "pairlistdist = %.2f \n" % self.pairlist_dist.get()
-        s += "vdw_force_switch = YES \n"
+        if self.vdw_force_switch.get():
+            s += "vdw_force_switch = YES \n"
         if self.implicitSolvent.get() == IMPLICIT_SOLVENT_GBSA:
             s += "implicit_solvent = GBSA \n"
             s += "gbsa_eps_solvent = 78.5 \n"
             s += "gbsa_eps_solute  = 1.0 \n"
             s += "gbsa_salt_cons   = 0.2 \n"
             s += "gbsa_surf_tens   = 0.005 \n"
-        else:
-            s += "implicit_solvent = NONE  \n"
 
         if self.simulationType.get() == SIMULATION_MIN:
             s += "\n[MINIMIZE]\n" #-----------------------------------------------------------
@@ -655,23 +755,42 @@ class ProtGenesis(EMProtocol):
                 s+= "nm_prefix = %s_remd{} \n" % outputPrefix
             else:
                 s += "nm_prefix = %s \n" % outputPrefix
-            s+="\n"
 
         s += "\n[CONSTRAINTS] \n" #-----------------------------------------------------------
-        s += "rigid_bond = NO \n"
+        if self.rigid_bond.get()        : s += "rigid_bond = YES \n"
+        else                            : s += "rigid_bond = NO \n"
+        if self.fast_water.get()      :
+            s += "fast_water = YES \n"
+            s += "water_model = %s \n" %self.water_model.get()
+        else                            : s += "fast_water = NO \n"
+
+        s += "\n[BOUNDARY] \n" #-----------------------------------------------------------
+        if self.boundary.get() == BOUNDARY_PBC:
+            s += "type = PBC \n"
+            s += "box_size_x = %f \n" % self.box_size_x.get()
+            s += "box_size_y = %f \n" % self.box_size_y.get()
+            s += "box_size_z = %f \n" % self.box_size_z.get()
+        else :
+            s += "type = NOBC \n"
 
         s += "\n[ENSEMBLE] \n" #-----------------------------------------------------------
-        s += "ensemble = NVT \n"
+        if self.ensemble.get() == ENSEMBLE_NVE:
+            s += "ensemble = NVE  \n"
+        elif self.ensemble.get() == ENSEMBLE_NPT:
+            s += "ensemble = NPT  \n"
+        else:
+            s += "ensemble = NVT  \n"
         if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
             s += "tpcontrol = LANGEVIN  \n"
         elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
             s += "tpcontrol = BERENDSEN  \n"
+        elif self.tpcontrol.get() == TPCONTROL_BUSSI:
+            s += "tpcontrol = BUSSI  \n"
         else:
             s += "tpcontrol = NO  \n"
         s += "temperature = %.2f \n" % self.temperature.get()
-
-        s += "\n[BOUNDARY] \n" #-----------------------------------------------------------
-        s += "type = NOBC  \n"
+        if self.ensemble.get() == ENSEMBLE_NPT:
+            s += "pressure = %.2f \n" % self.pressure.get()
 
         if (self.EMfitChoice.get()==EMFIT_VOLUMES or self.EMfitChoice.get()==EMFIT_IMAGES)\
                 and self.simulationType.get() == SIMULATION_MD:
@@ -695,6 +814,7 @@ class ProtGenesis(EMProtocol):
             if self.EMfitChoice.get() == EMFIT_VOLUMES:
                 s += "emfit_target = %s.sit \n" % inputEMprefix
             elif self.EMfitChoice.get()==EMFIT_IMAGES :
+                s += "emfit_type = IMAGE \n"
                 s += "emfit_target = %s.spi \n" % inputEMprefix
                 s += "emfit_pixel_size =  %f\n" % self.pixel_size.get()
                 rigid_body_params = self.getRigidBodyParams(indexFit)
@@ -771,7 +891,7 @@ class ProtGenesis(EMProtocol):
         pdbset = self._createSetOfPDBs("outputPDBs")
 
         for i in range(self.getNumberOfFitting()):
-            outputPrefix =self.getOutputPrefix(i, alloutput=True)
+            outputPrefix =self.getOutputPrefixAll(i)
             for j in outputPrefix:
                 pdbset.append(AtomStruct(j + ".pdb"))
         self._defineOutputs(outputPDBs=pdbset)
@@ -784,6 +904,15 @@ class ProtGenesis(EMProtocol):
 
     def _validate(self):
         errors = []
+        print(self.getGenesisEnv()["PATH"])
+        if not os.path.exists(os.path.join(
+                Plugin.getVar("GENESIS_HOME"), 'bin/atdyn')):
+            errors.append("Missing GENESIS program : atdyn ")
+
+        if not os.path.exists(os.path.join(
+                Plugin.getVar("GENESIS_HOME"), 'bin/spdyn')):
+            errors.append("Missing GENESIS program : spdyn ")
+
         return errors
 
     def _citations(self):
@@ -847,14 +976,14 @@ class ProtGenesis(EMProtocol):
                 inputEMfn.append(self.inputImage.get().getFileName())
         return inputEMfn
 
-    def getInputPDBprefix(self, index):
+    def getInputPDBprefix(self, index=0):
         prefix = self._getExtraPath("%s_inputPDB")
         if self.getNumberOfInputPDB() == 1:
             return prefix % str(1).zfill(5)
         else:
             return prefix % str(index + 1).zfill(5)
 
-    def getInputEMprefix(self, index):
+    def getInputEMprefix(self, index=0):
         prefix = self._getExtraPath("%s_inputEM")
         if self.getNumberOfInputEM() == 0:
             return ""
@@ -864,18 +993,18 @@ class ProtGenesis(EMProtocol):
             return prefix % str(index + 1).zfill(5)
 
 
-    def getOutputPrefix(self, index, alloutput=False):
-        if alloutput :
-            outputPrefix=[]
-            if self.replica_exchange.get() :
-                for i in range(self.nreplica.get()):
-                    outputPrefix.append(self._getExtraPath("%s_output_remd%i" %
-                                    (str(index + 1).zfill(5), i + 1)))
-            else:
-                outputPrefix.append(self._getExtraPath("%s_output" % str(index + 1).zfill(5)))
-            return outputPrefix
+    def getOutputPrefix(self, index=0):
+        return self._getExtraPath("%s_output" % str(index + 1).zfill(5))
+
+    def getOutputPrefixAll(self, index=0):
+        outputPrefix=[]
+        if self.replica_exchange.get() :
+            for i in range(self.nreplica.get()):
+                outputPrefix.append(self._getExtraPath("%s_output_remd%i" %
+                                (str(index + 1).zfill(5), i + 1)))
         else:
-            return self._getExtraPath("%s_output" % str(index + 1).zfill(5))
+            outputPrefix.append(self._getExtraPath("%s_output" % str(index + 1).zfill(5)))
+        return outputPrefix
 
     def getMPIParams(self):
         """
@@ -887,7 +1016,7 @@ class ProtGenesis(EMProtocol):
         else:
             return 1, n_fit//self.numberOfMpi.get(),  self.numberOfMpi.get(), n_fit % self.numberOfMpi.get()
 
-    def getRigidBodyParams(self, index):
+    def getRigidBodyParams(self, index=0):
         if not self.estimateAngleShift.get():
             mdImg = md.MetaData(self.imageAngleShift.get())
             idx = int(index + 1)
@@ -902,3 +1031,10 @@ class ProtGenesis(EMProtocol):
             mdImg.getValue(md.MDL_SHIFT_Y, idx),
         ]
 
+    def getGenesisEnv(self):
+        environ = pwutils.Environ(os.environ)
+        environ.set('PATH', os.path.join(Plugin.getVar("GENESIS_HOME"), 'bin'),
+                    position=pwutils.Environ.BEGIN)
+        environ.set('PATH', os.path.join(Plugin.getVar("SITUS_HOME"), 'bin'),
+                    position=pwutils.Environ.BEGIN)
+        return environ

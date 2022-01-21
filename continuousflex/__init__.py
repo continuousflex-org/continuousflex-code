@@ -43,6 +43,8 @@ class Plugin(pwem.Plugin):
     def _defineVariables(cls):
         cls._defineEmVar(CONTINUOUSFLEX_HOME, 'xmipp')
         cls._defineEmVar(NMA_HOME,'nma')
+        cls._defineEmVar(GENESIS_HOME, 'genesis-1.4.0')
+        cls._defineEmVar(SITUS_HOME, 'situs-3.1')
         cls._defineVar(VMD_HOME,'/usr/local/lib/vmd')
 
     #   @classmethod
@@ -118,6 +120,36 @@ class Plugin(pwem.Plugin):
                                   % env.getLibFolder(), 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
+        if os.path.exists(env.getEmFolder() + '/situs.tgz'):
+            os.system('rm ' + env.getEmFolder() + '/situs.tgz')
+
+        situs = env.addPackage('situs', version='3.1',
+                       url='http://situs.biomachina.org/disseminate/Situs_3.1.tar.gz',
+                       tar='situs.tgz',
+                       createBuildDir=False,
+                       buildDir='Situs_3.1',
+                       commands=[('cd src;'
+                                  'make;'
+                                  'make install;', "bin/map2map")],
+                       target="Situs_3.1", default=True)
+
+
+        if os.path.exists(env.getEmFolder() + '/genesis.tgz'):
+            os.system('rm ' + env.getEmFolder() + '/genesis.tgz')
+
+        env.addPackage('genesis', version='1.4.0', deps=[lapack, situs],
+                       url='https://github.com/mms29/nmmd/archive/master.tar.gz',
+                       tar='genesis.tgz',
+                       createBuildDir=True,
+                       buildDir='genesis',
+                       commands=[('tar -xf ../genesis.tgz -C .;'
+                                  'mv nmmd-master/* .;'
+                                  'rm -r nmmd-master;'
+                                  './configure;'
+                                  'make install;', "bin/atdyn")],
+                       neededProgs=['mpif90'],
+                       target="genesis", default=True)
+
 
 files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol': 'volumes/AK_LP10.vol',
                     'precomputed_atomic': 'gold/images_WS_atoms.xmd',
@@ -125,7 +157,15 @@ files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol'
                     'small_stk': 'test_alignment_10images/particles/smallstack_img.stk',
                     'subtomograms':'HEMNMA_3D/subtomograms/*.vol',
                     'precomputed_HEMNMA3D_atoms':'HEMNMA_3D/gold/precomputed_atomic.xmd',
-                    'precomputed_HEMNMA3D_pseudo':'HEMNMA_3D/gold/precomputed_pseudo.xmd'}
+                    'precomputed_HEMNMA3D_pseudo':'HEMNMA_3D/gold/precomputed_pseudo.xmd',
+                    'charmm_prm':'genesis/par_all36_prot.prm',
+                    'charmm_top':'genesis/top_all36_prot.rtf',
+                    'charmm_str':'genesis/toppar_water_ions.str',
+                    '1ake':'genesis/1ake.pdb',
+                    '4ake':'genesis/4ake.pdb',
+                    'ionize_pdb':'genesis/ionize.pdb',
+                    'ionize_psf':'genesis/ionize.psf',
+                    }
 DataSet(name='nma_V2.0', folder='nma_V2.0', files=files_dictionary,
         url='https://raw.githubusercontent.com/MohamadHarastani/nma_V2.0/main/')
 
