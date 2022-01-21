@@ -219,21 +219,6 @@ class TestGENESIS_1(TestWorkflow):
         # Launch minimisation
         self.launchProtocol(protGenesisMin)
 
-        # Get GENESIS log file
-        output_prefix = protGenesisMin.getOutputPrefix()
-        log_file = output_prefix+".log"
-
-        # Get the potential energy from the log file
-        potential_ene = readLogFile(log_file)["POTENTIAL_ENE"]
-
-        # Assert that the potential energy is decreasing
-        print("\n\n//////////////////////////////////////////////")
-        print("Initial potential energy : %.2f kcal/mol"%potential_ene[0])
-        print("Final potential energy : %.2f kcal/mol"%potential_ene[-1])
-        print("//////////////////////////////////////////////\n\n")
-
-        assert(potential_ene[0] > potential_ene[-1])
-
         protGenesisFit = self.newProtocol(ProtGenesis,
 
             inputPDB = protGenesisMin.outputPDBs,
@@ -259,7 +244,7 @@ class TestGENESIS_1(TestWorkflow):
 
             ensemble = ENSEMBLE_NVT,
             tpcontrol = TPCONTROL_LANGEVIN,
-            temperature = 300.0,
+            temperature = 100.0,
 
             boundary = BOUNDARY_NOBC,
             EMfitChoice = EMFIT_VOLUMES,
