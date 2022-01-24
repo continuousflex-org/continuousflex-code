@@ -26,7 +26,7 @@
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 import pyworkflow.protocol.params as params
 from continuousflex.protocols.protocol_genesis import ProtGenesis
-from continuousflex.protocols.utilities.genesis_utilities import traj_viewer, alignMol
+from continuousflex.protocols.utilities.genesis_utilities import traj_viewer, alignMol, rmsdFromDCD, readLogFile
 from .plotter import FlexPlotter
 from pyworkflow.utils import getListFromRangeString
 import numpy as np
@@ -316,66 +316,3 @@ class GenesisViewer(ProtocolViewer):
         else:
             return targetPDBlist[0]
 
-
-
-
-def readLogFile(log_file):
-    with open(log_file,"r") as file:
-        header = None
-        dic = {}
-        for line in file:
-            if line.startswith("INFO:"):
-                if header is None:
-                    header = line.split()
-                    for i in range(1,len(header)):
-                        dic[header[i]] = []
-                else:
-                    splitline = line.split()
-                    if len(splitline) == len(header):
-                        for i in range(1,len(header)):
-                            try :
-                                dic[header[i]].append(float(splitline[i]))
-                            except ValueError:
-                                pass
-
-    return dic
-
-def rmsdFromDCD(outputPrefix, inputPDB, targetPDB, align=False):
-
-    # EXTRACT PDBs from dcd file
-    with open("%s_tmp_dcd2pdb.tcl" % outputPrefix, "w") as f:
-        s = ""
-        s += "mol load pdb %s dcd %s.dcd\n" % (inputPDB, outputPrefix)
-        s += "set nf [molinfo top get numframes]\n"
-        s += "for {set i 0 } {$i < $nf} {incr i} {\n"
-        s += "[atomselect top all frame $i] writepdb %stmp$i.pdb\n" % outputPrefix
-        s += "}\n"
-        s += "exit\n"
-        f.write(s)
-    os.system("vmd -dispdev text -e %s_tmp_dcd2pdb.tcl > /dev/null" % outputPrefix)
-
-    # DEF RMSD
-    def RMSD(c1, c2):
-        return np.sqrt(np.mean(np.square(np.linalg.norm(c1 - c2, axis=1))))
-
-    # COMPUTE RMSD
-    rmsd = []
-    inputPDBmol = PDBMol(inputPDB)
-    targetPDBmol = PDBMol(targetPDB)
-
-    idx = matchPDBatoms([targetPDBmol, inputPDBmol], ca_only=True)
-    if align:
-        alignMol(targetPDBmol, inputPDBmol, idx=idx)
-    rmsd.append(RMSD(inputPDBmol.coords[idx[:, 1]], targetPDBmol.coords[idx[:, 0]]))
-    i=0
-    while(os.path.exists("%stmp%i.pdb"%(outputPrefix,i+1))):
-        f = "%stmp%i.pdb"%(outputPrefix,i+1)
-        mol = PDBMol(f)
-        if align:
-            alignMol(targetPDBmol, mol, idx=idx)
-        rmsd.append(RMSD(mol.coords[idx[:, 1]], targetPDBmol.coords[idx[:, 0]]))
-        i+=1
-
-    # CLEAN TMP FILES AND SAVE
-    os.system("rm -f %stmp*" % (outputPrefix))
-    return rmsd

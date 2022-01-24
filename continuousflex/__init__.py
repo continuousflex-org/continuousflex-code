@@ -161,10 +161,13 @@ files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol'
                     'charmm_prm':'genesis/par_all36_prot.prm',
                     'charmm_top':'genesis/top_all36_prot.rtf',
                     'charmm_str':'genesis/toppar_water_ions.str',
-                    '1ake':'genesis/1ake.pdb',
-                    '4ake':'genesis/4ake.pdb',
+                    '1ake_pdb':'genesis/1ake.pdb',
+                    '1ake_vol':'genesis/1ake.vol',
+                    '4ake_pdb':'genesis/4ake.pdb',
                     'ionize_pdb':'genesis/ionize.pdb',
                     'ionize_psf':'genesis/ionize.psf',
+                    '4ake_ca_pdb':'genesis/4ake_cago.pdb',
+                    '4ake_ca_top':'genesis/4ake_cago.top',
                     }
 DataSet(name='nma_V2.0', folder='nma_V2.0', files=files_dictionary,
         url='https://raw.githubusercontent.com/MohamadHarastani/nma_V2.0/main/')

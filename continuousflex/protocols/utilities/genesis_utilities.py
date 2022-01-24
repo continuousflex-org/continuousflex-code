@@ -4,6 +4,7 @@ import copy
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 from Bio.SVDSuperimposer import SVDSuperimposer
+from pyworkflow.utils import runCommand
 
 class PDBMol:
     def __init__(self, pdb_file):
@@ -353,7 +354,7 @@ def generatePSF(inputPDB, inputTopo, outputPrefix, nucleicChoice):
         psfgen.write("exit\n")
 
     #Run VMD PSFGEN
-    os.system("vmd -dispdev text -e " + fnPSFgen)
+    runCommand("vmd -dispdev text -e %s > %s.log " %(fnPSFgen,outputPrefix))
 
     #Clean
     os.system("rm -f " + fnPSFgen)
@@ -400,10 +401,10 @@ def generateGROTOP(inputPDB, outputPrefix, forcefield, smog_dir, nucleicChoice):
     moltmp.save(inputPDB)
 
     # Run Smog2
-    os.system("%s/bin/smog2" % smog_dir+\
-               " -i %s -dname %s -%s -limitbondlength -limitcontactlength" %
+    runCommand("%s/bin/smog2" % smog_dir+\
+               " -i %s -dname %s -%s -limitbondlength -limitcontactlength > %s.log" %
                (inputPDB, outputPrefix,
-                "CA" if forcefield == FORCEFIELD_CAGO else "AA"))
+                "CA" if forcefield == FORCEFIELD_CAGO else "AA", outputPrefix))
 
 
     if forcefield == FORCEFIELD_CAGO:
@@ -455,12 +456,12 @@ def save_dcd(mol, coords_list, prefix):
         f.write('exit\n')
 
     # Running VMD
-    os.system("vmd -dispdev text -e %s_cmd.tcl" % prefix)
+    runCommand("vmd -dispdev text -e %s_cmd.tcl" % prefix)
 
     # Cleaning
     for i in range(n_frames):
-        os.system("rm -f %s_frame%i.pdb\n" % (prefix, i))
-    os.system("rm -f %s_cmd.tcl" % prefix)
+        runCommand("rm -f %s_frame%i.pdb\n" % (prefix, i))
+    runCommand("rm -f %s_cmd.tcl" % prefix)
     print("\t Done \n")
 
 
@@ -567,7 +568,7 @@ def compute_pca(data, length=None, labels=None, n_components=2, figsize=(5,5), c
     return fig, ax
 
 def traj_viewer(pdb_file, dcd_file):
-    os.system("vmd %s %s" %(pdb_file,dcd_file))
+    runCommand("vmd %s %s" %(pdb_file,dcd_file))
 
 def alignMol(mol1, mol2, idx=None):
     print("> Aligning PDB ...")
@@ -584,3 +585,175 @@ def alignMol(mol1, mol2, idx=None):
     rot, tran = sup.get_rotran()
     mol2.coords = np.dot(mol2.coords, rot) + tran
     print("\t Done \n")
+
+
+
+
+def readLogFile(log_file):
+    with open(log_file,"r") as file:
+        header = None
+        dic = {}
+        for line in file:
+            if line.startswith("INFO:"):
+                if header is None:
+                    header = line.split()
+                    for i in range(1,len(header)):
+                        dic[header[i]] = []
+                else:
+                    splitline = line.split()
+                    if len(splitline) == len(header):
+                        for i in range(1,len(header)):
+                            try :
+                                dic[header[i]].append(float(splitline[i]))
+                            except ValueError:
+                                pass
+
+    return dic
+
+def rmsdFromDCD(outputPrefix, inputPDB, targetPDB, align=False):
+
+    # EXTRACT PDBs from dcd file
+    with open("%s_tmp_dcd2pdb.tcl" % outputPrefix, "w") as f:
+        s = ""
+        s += "mol load pdb %s dcd %s.dcd\n" % (inputPDB, outputPrefix)
+        s += "set nf [molinfo top get numframes]\n"
+        s += "for {set i 0 } {$i < $nf} {incr i} {\n"
+        s += "[atomselect top all frame $i] writepdb %stmp$i.pdb\n" % outputPrefix
+        s += "}\n"
+        s += "exit\n"
+        f.write(s)
+    runCommand("vmd -dispdev text -e %s_tmp_dcd2pdb.tcl > /dev/null" % outputPrefix)
+
+    # DEF RMSD
+    def RMSD(c1, c2):
+        return np.sqrt(np.mean(np.square(np.linalg.norm(c1 - c2, axis=1))))
+
+    # COMPUTE RMSD
+    rmsd = []
+    inputPDBmol = PDBMol(inputPDB)
+    targetPDBmol = PDBMol(targetPDB)
+
+    idx = matchPDBatoms([targetPDBmol, inputPDBmol], ca_only=True)
+    if align:
+        alignMol(targetPDBmol, inputPDBmol, idx=idx)
+    rmsd.append(RMSD(inputPDBmol.coords[idx[:, 1]], targetPDBmol.coords[idx[:, 0]]))
+    i=0
+    while(os.path.exists("%stmp%i.pdb"%(outputPrefix,i+1))):
+        f = "%stmp%i.pdb"%(outputPrefix,i+1)
+        mol = PDBMol(f)
+        if align:
+            alignMol(targetPDBmol, mol, idx=idx)
+        rmsd.append(RMSD(mol.coords[idx[:, 1]], targetPDBmol.coords[idx[:, 0]]))
+        i+=1
+
+    # CLEAN TMP FILES AND SAVE
+    runCommand("rm -f %stmp*" % (outputPrefix))
+    return rmsd
+
+def lastPDBFromDCD(inputPDB,inputDCD,  outputPDB):
+
+    # EXTRACT PDB from dcd file
+    with open("%s_tmp_dcd2pdb.tcl" % outputPDB, "w") as f:
+        s = ""
+        s += "mol load pdb %s dcd %s\n" % (inputPDB, inputDCD)
+        s += "set nf [molinfo top get numframes]\n"
+        s += "[atomselect top all frame [expr $nf - 1]] writepdb %s\n" % outputPDB
+        s += "exit\n"
+        f.write(s)
+    runCommand("vmd -dispdev text -e %s_tmp_dcd2pdb.tcl" % outputPDB)
+
+    # CLEAN TMP FILES
+    runCommand("rm -f %stmp*" % (outputPDB))
+
+
+
+def pdb2vol(inputPDB, outputVol, sampling_rate, image_size):
+    """
+    Create a density volume from a pdb
+    :param str inputPDB: input pdb file name
+    :param str outputVol: output vol file name
+    :param float sampling_rate: Sampling rate
+    :param int image_size: Size of the output volume
+    :return str: the Xmipp command to run
+    """
+    cmd = "xmipp_volume_from_pdb"
+    args = "-i %s  -o %s --sampling %f --size %i %i %i --centerPDB"%\
+           (inputPDB, outputVol,sampling_rate,image_size,image_size,image_size)
+    return cmd+ " "+ args
+
+def projectVol(inputVol, outputProj, expImage, sampling_rate=5.0, angular_distance=-1, compute_neighbors=True):
+    """
+    Create a set of projections from an input volume
+    :param str inputVol: Input volume file name
+    :param str outputProj: Output set of proj file name
+    :param str expImage: Experimental image to project in the neighborhood
+    :param float sampling_rate: Samplign rate
+    :param float angular_distance: Do not search a distance larger than...
+    :param bool compute_neighbors: Compute projection nearby the experimental image
+    :return str: the Xmipp command to run
+    """
+    cmd = "xmipp_angular_project_library"
+    args = "-i %s.vol -o %s.stk --sampling_rate %f " % (inputVol, outputProj, sampling_rate)
+    if compute_neighbors :
+        args +="--compute_neighbors --angular_distance %f " % angular_distance
+        args += "--experimental_images %s "%expImage
+        if angular_distance != -1 :
+            args += "--near_exp_data"
+    return cmd+ " "+ args
+
+def projectMatch(inputImage, inputProj, outputMeta):
+    """
+    Projection matching of an input experimental image with a set of projections
+    :param str inputImage: File name of the input experimental image
+    :param str inputProj: File name of the input set of projections
+    :param str outputMeta: File name of the output Xmipp metadata file with the angles of the matching
+    :return str: the Xmipp command to run
+    """
+    cmd = "xmipp_angular_projection_matching "
+    args= "-i %s -o %s --ref %s.stk "%(inputImage, outputMeta, inputProj)
+    args +="--search5d_shift 7.0 --search5d_step 1.0"
+    return cmd + " "+ args
+
+def waveletAssignement(inputImage, inputProj, outputMeta):
+    """
+    Make a discrete angular assignment of angles from a set of projections
+    :param str inputImage: File name of input experimental image
+    :param str inputProj: File name of the input set of projections
+    :param str outputMeta: File name of the output Xmipp metadata file with the angles assigned
+    :return str: the Xmipp command to run
+    """
+    cmd = "xmipp_angular_discrete_assign "
+    args= "-i %s -o %s --ref %s.doc "%(inputImage, outputMeta, inputProj)
+    args +="--psi_step 5.0 --max_shift_change 7.0 --search5D"
+    return cmd + " "+ args
+
+def continuousAssign(inputMeta, inputVol, outputMeta):
+    """
+    Make a continuous angular assignment of angles from a volume
+    :param str inputMeta: File name of input Xmipp metadata file with angles to assign
+    :param str inputVol: File name of the input Volume
+    :param str outputMeta: File name of the output Xmipp metadata file with the angles
+    :return str: the Xmipp command to run
+    """
+    cmd = "xmipp_angular_continuous_assign "
+    args= "-i %s -o %s --ref %s.vol "%(inputMeta, outputMeta, inputVol)
+    return cmd + " "+ args
+
+def flipAngles(inputMeta, outputMeta):
+    """
+    Flip angles from Xmipp representation to Euler angles
+    :param str inputMeta : File name of input Xmipp metadata file containing the angles to flip
+    :param str outputMeta: file name of the output Xmipp matadata file
+    :return None:
+    """
+    Md1 = md.MetaData(inputMeta)
+    flip = Md1.getValue(md.MDL_FLIP, 1)
+    tilt1 = Md1.getValue(md.MDL_ANGLE_TILT, 1)
+    psi1 = Md1.getValue(md.MDL_ANGLE_PSI, 1)
+    x1 = Md1.getValue(md.MDL_SHIFT_X, 1)
+    if flip:
+        Md1.setValue(md.MDL_SHIFT_X, -x1, 1)
+        Md1.setValue(md.MDL_ANGLE_TILT, tilt1 + 180, 1)
+        Md1.setValue(md.MDL_ANGLE_PSI, -psi1, 1)
+    Md1.write(outputMeta)
+

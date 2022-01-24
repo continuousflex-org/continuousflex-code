@@ -37,7 +37,7 @@ from pwem.utils import runProgram
 from subprocess import Popen
 from xmippLib import Euler_angles2matrix
 
-from .utilities.genesis_utilities import generatePSF, generateGROTOP
+from .utilities.genesis_utilities import *
 from xmipp3 import Plugin
 import pyworkflow.utils as pwutils
 from pyworkflow.utils import runCommand
@@ -52,6 +52,7 @@ FORCEFIELD_CAGO = 2
 
 SIMULATION_MD = 0
 SIMULATION_MIN = 1
+SIMULATION_REMD = 2
 
 PROGRAM_ATDYN = 0
 PROGRAM_SPDYN= 1
@@ -91,7 +92,7 @@ RB_PROJMATCH = 0
 RB_WAVELET = 1
 
 class ProtGenesis(EMProtocol):
-    """ Protocol for the molecular dynamics software GENESIS. """
+    """ Protocol to perform MD simulation using GENESIS. """
     _label = 'Genesis'
 
     # --------------------------- DEFINE param functions --------------------------------------------
@@ -148,13 +149,13 @@ class ProtGenesis(EMProtocol):
                     " is introduced for simplicity. The performance of ATDYN is not comparable to SPDYN due to the"
                     " simple parallelization scheme but contains new methods and features.", important=True)
         form.addParam('simulationType', params.EnumParam, label="Simulation type", default=0,
-                      choices=['Molecular Dynamics', 'Minimization'],
+                      choices=['Molecular Dynamics', 'Minimization', 'Replica-Exchange Molecular Dynamics'],
                       help="Type of simulation to be performed by GENESIS", important=True)
         form.addParam('integrator', params.EnumParam, label="Integrator", default=0,
                       choices=['Velocity Verlet', 'Leapfrog', 'NMMD'],
-                      help="Type of integrator for the MD simulation", condition="simulationType==0")
+                      help="Type of integrator for the MD simulation", condition="simulationType!=1")
         form.addParam('time_step', params.FloatParam, default=0.002, label='Time step (ps)',
-                      help="Time step in the MD run", condition="simulationType==0")
+                      help="Time step in the MD run", condition="simulationType!=1")
         form.addParam('n_steps', params.IntParam, default=10000, label='Number of steps',
                       help="Total number of steps in one MD run")
         form.addParam('eneout_period', params.IntParam, default=100, label='Energy output period',
@@ -162,22 +163,30 @@ class ProtGenesis(EMProtocol):
         form.addParam('crdout_period', params.IntParam, default=100, label='Coordinate output period',
                       help="Output frequency for the coordinates data")
         form.addParam('nbupdate_period', params.IntParam, default=10, label='Non-bonded update period',
-                      help="Update frequency of the non-bonded pairlist")
+                      help="Update frequency of the non-bonded pairlist",
+                      expertLevel=params.LEVEL_ADVANCED)
 
-        form.addParam('nm_number', params.IntParam, default=10, label='Number of normal modes',
-                      help="Number of normal modes for NMMD", condition="integrator==2 and simulationType==0")
-        form.addParam('nm_mass', params.FloatParam, default=10.0, label='Normal modes amplitude mass',
-                      help="Mass value for NMMD", condition="integrator==2 and simulationType==0")
-        form.addParam('nm_limit', params.FloatParam, default=1000.0, label='Normal modes amplitude limit',
+        form.addParam('nm_number', params.IntParam, default=10, label='[NMMD] Number of normal modes',
+                      help="Number of normal modes for NMMD. 10 should work in most cases. Avoid "
+                           "using too much NM (>50).",
+                      condition="integrator==2 and simulationType!=1")
+        form.addParam('nm_mass', params.FloatParam, default=10.0, label='[NMMD] NM mass',
+                      help="Mass value of Normal modes for NMMD", condition="integrator==2 and simulationType!=1",
+                      expertLevel=params.LEVEL_ADVANCED)
+        form.addParam('nm_limit', params.FloatParam, default=1000.0, label='[NMMD] NM amplitude threshold',
                       help="Threshold of normal mode amplitude above which the normal modes are updated",
-                      condition="integrator==2 and simulationType==0")
-        form.addParam('elnemo_cutoff', params.FloatParam, default=8.0, label='NMA cutoff (A)',
-                      help="Cutoff distance for elastic network model", condition="integrator==2 and simulationType==0")
-        form.addParam('elnemo_rtb_block', params.IntParam, default=10, label='NMA number of residue per RTB block',
-                      help="Number of residue per RTB block", condition="integrator==2 and simulationType==0")
-        form.addParam('elnemo_path', params.FileParam, label="Elnemo Path",
-                       help='Path to ElNemo directory '
-                      , condition="integrator==2 and simulationType==0")
+                      condition="integrator==2 and simulationType!=1",expertLevel=params.LEVEL_ADVANCED)
+        form.addParam('elnemo_cutoff', params.FloatParam, default=8.0, label='[NMMD] NMA cutoff (A)',
+                      help="Cutoff distance for elastic network model", condition="integrator==2 and simulationType!=1",
+                      expertLevel=params.LEVEL_ADVANCED)
+        form.addParam('elnemo_rtb_block', params.IntParam, default=10, label='[NMMD] NMA Number of residue RTB',
+                      help="Number of residue per RTB block in the NMA computation",
+                      condition="integrator==2 and simulationType!=1",expertLevel=params.LEVEL_ADVANCED)
+
+        form.addParam('exchange_period', params.IntParam, default=1000, label='[REMD] Exchange Period',
+                      help="Number of MD steps between replica exchanges", condition="simulationType==2")
+        form.addParam('nreplica', params.IntParam, default=1, label='[REMD] Number of replicas',
+                      help="Number of replicas for REMD", condition="simulationType==2")
         # ENERGY =================================================================================================
         form.addSection(label='Energy')
         form.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,
@@ -196,7 +205,7 @@ class ProtGenesis(EMProtocol):
                       help="This paramter determines whether the force switch function for van der Waals interactions is"
                         " employed or not. The users must take care about this parameter, when the CHARMM"
                         " force field is used. Typically, vdw_force_switch=YES should be specified in the case of"
-                        " CHARMM36")
+                        " CHARMM36",expertLevel=params.LEVEL_ADVANCED)
         form.addParam('switch_dist', params.FloatParam, default=10.0, label='Switch Distance',
                       help="Switch-on distance for nonbonded interaction energy/force quenching")
         form.addParam('cutoff_dist', params.FloatParam, default=12.0, label='Cutoff Distance',
@@ -237,17 +246,20 @@ class ProtGenesis(EMProtocol):
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
                       choices=['None', 'Volume (s)', 'Image (s)'], important=True,
                       help="Type of cryo-EM data to be processed")
-        form.addParam('constantK', params.IntParam, default=10000, label='Force constant K',
-                      help="TODO", condition="EMfitChoice!=0")
+        form.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
+                      help="Force constant in Eem = k*(1 - c.c.). Note that in the case of REUS, the number of "
+                           "force constant value must be equal to the number of replicas, for example for 4 replicas,"
+                           " a valid force constant is \"1000 2000 3000 4000\" "
+                      , condition="EMfitChoice!=0")
         form.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EMfit Sigma",
                       help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
                         "of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
-                      condition="EMfitChoice!=0")
+                      condition="EMfitChoice!=0",expertLevel=params.LEVEL_ADVANCED)
         form.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EMfit Tolerance',
                       help="This variable determines the tail length of the Gaussian function. For example, if em-"
                         "fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
                         "than 0.1% of the maximum value. Smaller value requires large computational cost",
-                      condition="EMfitChoice!=0")
+                      condition="EMfitChoice!=0",expertLevel=params.LEVEL_ADVANCED)
 
         # Volumes
         form.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
@@ -278,7 +290,7 @@ class ProtGenesis(EMProtocol):
                       help="Number of rigid body alignement during the simulation. If 1 is set, the rigid body alignement "
                            "will be performed once at the begining of the simulation",
                       condition="EMfitChoice==2 and estimateAngleShift")
-        form.addParam('rb_method', params.EnumParam, label="Rigid body alignement method", default=0,
+        form.addParam('rb_method', params.EnumParam, label="Rigid body alignement method", default=1,
                       choices=['Projection Matching', 'Wavelet'], help="Type of rigid body alignement. "
                                                                        "Wavelet method is recommended",
                       condition="EMfitChoice==2 and estimateAngleShift")
@@ -298,24 +310,12 @@ class ProtGenesis(EMProtocol):
         form.addParam('water_model', params.StringParam, label='Water model', default="TIP3",
                       help="Residue name of the water molecule to be rigidified in the SETTLE algorithm", condition="fast_water")
 
-        # Replica-exchange umbrella-sampling =================================================================================================
-        form.addSection(label='Replica-exchange umbrella-sampling')
-        form.addParam('replica_exchange', params.BooleanParam, label="Replica-exchange umbrella-sampling",
-                      default=False, important=True,
-                      help="Replica-exchange umbrella-sampling is available for emfit force constant fitting only")
-        form.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
-                      help="Number of MD steps between replica exchanges", condition="replica_exchange")
-        form.addParam('nreplica', params.IntParam, default=1, label='Number of replicas',
-                      help="Number of replicas", condition="replica_exchange")
-        form.addParam('constantKREMD', params.StringParam, label='K values ',
-                      help="Force constant values ", condition="replica_exchange")
-
         form.addParallelSection(threads=1, mpi=1)
         # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
         self._insertFunctionStep("convertInputPDBStep")
-        if self.EMfitChoice.get() == EMFIT_VOLUMES or self.EMfitChoice.get() == EMFIT_IMAGES:
+        if self.EMfitChoice.get() != EMFIT_NONE:
             self._insertFunctionStep("convertInputEMStep")
         self._insertFunctionStep("fittingStep")
         self._insertFunctionStep("createOutputStep")
@@ -331,7 +331,7 @@ class ProtGenesis(EMProtocol):
 
         # Copy PDBs :
         for i in range(n_pdb):
-            os.system("cp %s %s.pdb"%(inputPDBfn[i],self.getInputPDBprefix(i)))
+            runCommand("cp %s %s.pdb"%(inputPDBfn[i],self.getInputPDBprefix(i)))
 
         # GENERATE TOPOLOGY FILES
         if self.generateTop.get():
@@ -358,12 +358,12 @@ class ProtGenesis(EMProtocol):
             # CHARMM
             if self.forcefield.get() == FORCEFIELD_CHARMM:
                 for i in range(n_pdb):
-                    os.system("cp %s %s.psf" % (self.inputPSF.get(), self.getInputPDBprefix(i)))
+                    runCommand("cp %s %s.psf" % (self.inputPSF.get(), self.getInputPDBprefix(i)))
 
             # GROMACS
             elif self.forcefield.get() == FORCEFIELD_AAGO\
                     or self.forcefield.get() == FORCEFIELD_CAGO:
-                os.system("cp %s %s.top" % (self.inputTOP.get(), self.getInputPDBprefix(i)))
+                runCommand("cp %s %s.top" % (self.inputTOP.get(), self.getInputPDBprefix(i)))
 
     ################################################################################
     ##                 CONVERT INPUT VOLUME/IMAGE
@@ -384,7 +384,7 @@ class ProtGenesis(EMProtocol):
         # Initialize rigid body fitting parameters
         elif self.EMfitChoice.get() == EMFIT_IMAGES:
             for i in range(n_em):
-                os.system("cp %s %s.spi"%(inputEMfn[i], self.getInputEMprefix(i)))
+                runCommand("cp %s %s.spi"%(inputEMfn[i], self.getInputEMprefix(i)))
                 if self.estimateAngleShift.get():
                     currentAngles = md.MetaData()
                     currentAngles.setValue(md.MDL_IMAGE, self.getInputEMprefix(i), currentAngles.addObject())
@@ -536,7 +536,8 @@ class ProtGenesis(EMProtocol):
                             else  self.getOutputPrefix(indexFit)+".pdb"
 
                         tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        cmds_pdb2vol.append(self.pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix))
+                        cmds_pdb2vol.append(pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix,
+                                        sampling_rate=self.pixel_size.get(), image_size=self.image_size.get()))
                     self.runParallelJobs(cmds_pdb2vol)
 
                     # Loop 4 times to refine the angles
@@ -556,19 +557,19 @@ class ProtGenesis(EMProtocol):
 
                             # get commands
                             if self.rb_method.get() == RB_PROJMATCH:
-                                cmds_projectVol.append(self.projectVol(inputVol=tmpPrefix,
+                                cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
                                                     outputProj=tmpPrefix, expImage=inputImage,
                                                     sampling_rate=sampling_rate[i_align],
                                                     angular_distance=angular_distance[i_align]))
-                                cmds_alignement.append(self.projectMatch(inputImage= inputImage,
+                                cmds_alignement.append(projectMatch(inputImage= inputImage,
                                                     inputProj=tmpPrefix, outputMeta=tmpMeta))
                             else:
-                                cmds_projectVol.append(self.projectVol(inputVol=tmpPrefix,
+                                cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
                                                     outputProj=tmpPrefix, expImage=inputImage,
                                                     sampling_rate=sampling_rate[i_align],
                                                     angular_distance=angular_distance[i_align],
                                                                        compute_neighbors=False))
-                                cmds_alignement.append(self.waveletAssignement(inputImage= inputImage,
+                                cmds_alignement.append(waveletAssignement(inputImage= inputImage,
                                                     inputProj=tmpPrefix, outputMeta=tmpMeta))
                         # run parallel jobs
                         self.runParallelJobs(cmds_projectVol)
@@ -581,8 +582,8 @@ class ProtGenesis(EMProtocol):
                             tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
                             currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
                             if self.rb_method.get() == RB_PROJMATCH:
-                                self.flipAngles(inputMeta=tmpMeta, outputMeta=tmpMeta)
-                            cmds_continuousAssign.append(self.continuousAssign(inputMeta=tmpMeta,
+                                flipAngles(inputMeta=tmpMeta, outputMeta=tmpMeta)
+                            cmds_continuousAssign.append(continuousAssign(inputMeta=tmpMeta,
                                                                                inputVol=tmpPrefix,
                                                                                outputMeta=currentAngles))
                         self.runParallelJobs(cmds_continuousAssign)
@@ -591,7 +592,7 @@ class ProtGenesis(EMProtocol):
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numParallelFit
                         tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        os.system("rm -f %s*"%tmpPrefix)
+                        runCommand("rm -f %s*"%tmpPrefix)
 
 
                 # ------   Run Genesis ---------
@@ -628,17 +629,14 @@ class ProtGenesis(EMProtocol):
                             with open("%s.tcl"%tmpPrefix, "w") as f:
                                 f.write(tcl_cmd)
                             cp_cmd = "cp %s.pdb %s.pdb" %(tmpPrefix, newPrefix)
-                            os.system(cat_cmd)
-                            os.system(cp_cmd)
-                            os.system("vmd -dispdev text -e %s.tcl"%tmpPrefix)
+                            runCommand(cat_cmd)
+                            runCommand(cp_cmd)
+                            runCommand("vmd -dispdev text -e %s.tcl"%tmpPrefix)
 
                 for i2 in range(n_parallel):
                     idx = str(i2 + i1 * numParallelFit+ 1).zfill(5)
-                    os.system("cp %s %s" % (self._getExtraPath("%s_iter%i_output.pdb" % (idx, self.rb_n_iter.get()-1)),
+                    runCommand("cp %s %s" % (self._getExtraPath("%s_iter%i_output.pdb" % (idx, self.rb_n_iter.get()-1)),
                                             self._getExtraPath("%s_output.pdb" % idx)))
-
-
-
 
     def runParallelJobs(self, cmds):
         # Set env
@@ -658,19 +656,14 @@ class ProtGenesis(EMProtocol):
             if exitcode != 0:
                 raise RuntimeError("Command returned with errors : %s" %str(cmds))
 
-    def getGenesisCmd(self, prefix,n_mpi):
-        cmd=""
-        if (n_mpi != 1):
-            cmd += "mpirun -np %s " % n_mpi
-        if self.md_program.get() == PROGRAM_ATDYN:
-            cmd +=  "atdyn %s " % ("%s_INP" % prefix)
-        else:
-            cmd += "spdyn %s " % ("%s_INP" % prefix)
-        cmd += "  > %s.log" % prefix
-        return cmd
-
     def createINP(self,inputPDB, outputPrefix, indexFit):
-        # CREATE INPUT FILE FOR GENESIS
+        """
+        Create INP input file for GENESIS
+        :param str inputPDB: input PDB file name
+        :param str outputPrefix: output prefix
+        :param int indexFit: index of the simulation
+        :return None:
+        """
         inputPDBprefix = self.getInputPDBprefix(indexFit)
         inputEMprefix = self.getInputEMprefix(indexFit)
         inp_file = "%s_INP"% outputPrefix
@@ -690,7 +683,7 @@ class ProtGenesis(EMProtocol):
             s += "rstfile = %s\n" % self.inputRST.get()
 
         s += "\n[OUTPUT] \n" #-----------------------------------------------------------
-        if self.replica_exchange.get():
+        if self.simulationType.get() == SIMULATION_REMD:
             s += "remfile = %s_remd{}.rem\n" %outputPrefix
             s += "logfile = %s_remd{}.log\n" %outputPrefix
             s += "dcdfile = %s_remd{}.dcd\n" %outputPrefix
@@ -750,8 +743,8 @@ class ProtGenesis(EMProtocol):
             s+= "nm_limit = %f \n" % self.nm_limit.get()
             s+= "elnemo_cutoff = %f \n" % self.elnemo_cutoff.get()
             s+= "elnemo_rtb_block = %i \n" % self.elnemo_rtb_block.get()
-            s+= "elnemo_path = %s \n" %  self.elnemo_path.get()
-            if self.replica_exchange.get():
+            s+= "elnemo_path = %s \n" %  Plugin.getVar("NMA_HOME")
+            if self.simulationType.get() == SIMULATION_REMD:
                 s+= "nm_prefix = %s_remd{} \n" % outputPrefix
             else:
                 s += "nm_prefix = %s \n" % outputPrefix
@@ -793,17 +786,14 @@ class ProtGenesis(EMProtocol):
             s += "pressure = %.2f \n" % self.pressure.get()
 
         if (self.EMfitChoice.get()==EMFIT_VOLUMES or self.EMfitChoice.get()==EMFIT_IMAGES)\
-                and self.simulationType.get() == SIMULATION_MD:
+                and self.simulationType.get() != SIMULATION_MIN:
             s += "\n[SELECTION] \n" #-----------------------------------------------------------
             s += "group1 = all and not hydrogen\n"
 
             s += "\n[RESTRAINTS] \n" #-----------------------------------------------------------
             s += "nfunctions = 1 \n"
             s += "function1 = EM \n"
-            if self.replica_exchange.get():
-                s += "constant1 = %s \n" % self.constantKREMD.get()
-            else:
-                s += "constant1 = %.2f \n" % self.constantK.get()
+            s += "constant1 = %s \n" % self.constantK.get()
             s += "select_index1 = 1 \n"
 
             s += "\n[EXPERIMENTS] \n" #-----------------------------------------------------------
@@ -824,7 +814,7 @@ class ProtGenesis(EMProtocol):
                 s += "emfit_shift_x = %f\n" % rigid_body_params[3]
                 s += "emfit_shift_y =  %f\n" % rigid_body_params[4]
 
-            if self.replica_exchange.get():
+            if self.simulationType.get() == SIMULATION_REMD:
                 s += "\n[REMD] \n" #-----------------------------------------------------------
                 s += "dimension = 1 \n"
                 s += "exchange_period = %i \n" % self.exchange_period.get()
@@ -835,62 +825,28 @@ class ProtGenesis(EMProtocol):
         with open(inp_file, "w") as f:
             f.write(s)
 
-
-    def pdb2vol(self, inputPDB, outputVol):
-        cmd = "xmipp_volume_from_pdb"
-        args = "-i %s  -o %s --sampling %f --size %i %i %i --centerPDB"%\
-               (inputPDB, outputVol,self.pixel_size.get(),
-                self.image_size.get(),self.image_size.get(),self.image_size.get())
-        return cmd+ " "+ args
-
-    def projectVol(self, inputVol, outputProj, expImage, sampling_rate=5.0, angular_distance=-1, compute_neighbors=True):
-        cmd = "xmipp_angular_project_library"
-        args = "-i %s.vol -o %s.stk --sampling_rate %f " % (inputVol, outputProj, sampling_rate)
-        if compute_neighbors :
-            args +="--compute_neighbors --angular_distance %f " % angular_distance
-            args += "--experimental_images %s "%expImage
-            if angular_distance != -1 :
-                args += "--near_exp_data"
-        return cmd+ " "+ args
-
-    def projectMatch(self, inputImage, inputProj, outputMeta):
-        cmd = "xmipp_angular_projection_matching "
-        args= "-i %s -o %s --ref %s.stk "%(inputImage, outputMeta, inputProj)
-        args +="--search5d_shift 7.0 --search5d_step 1.0"
-        return cmd + " "+ args
-
-    def waveletAssignement(self, inputImage, inputProj, outputMeta):
-        cmd = "xmipp_angular_discrete_assign "
-        args= "-i %s -o %s --ref %s.doc "%(inputImage, outputMeta, inputProj)
-        args +="--psi_step 5.0 --max_shift_change 7.0 --search5D"
-        return cmd + " "+ args
-
-    def continuousAssign(self, inputMeta, inputVol, outputMeta):
-        cmd = "xmipp_angular_continuous_assign "
-        args= "-i %s -o %s --ref %s.vol "%(inputMeta, outputMeta, inputVol)
-        return cmd + " "+ args
-
-    def flipAngles(self, inputMeta, outputMeta):
-        Md1 = md.MetaData(inputMeta)
-        flip = Md1.getValue(md.MDL_FLIP, 1)
-        tilt1 = Md1.getValue(md.MDL_ANGLE_TILT, 1)
-        psi1 = Md1.getValue(md.MDL_ANGLE_PSI, 1)
-        x1 = Md1.getValue(md.MDL_SHIFT_X, 1)
-        if flip:
-            Md1.setValue(md.MDL_SHIFT_X, -x1, 1)
-            Md1.setValue(md.MDL_ANGLE_TILT, tilt1 + 180, 1)
-            Md1.setValue(md.MDL_ANGLE_PSI, -psi1, 1)
-        Md1.write(outputMeta)
-
     ################################################################################
     ##                 CREATE OUTPUT STEP
     ################################################################################
 
     def createOutputStep(self):
+        """
+        Create output set of PDBs
+        :return None:
+        """
         # CREATE SET OF PDBs
         pdbset = self._createSetOfPDBs("outputPDBs")
 
+        # Add each output PDB to the Set
         for i in range(self.getNumberOfFitting()):
+
+            # Extract the pdb from the DCD file in case of SPDYN
+            if self.md_program.get() == PROGRAM_SPDYN:
+                lastPDBFromDCD(
+                    inputDCD=self.getOutputPrefix(i)+ ".dcd",
+                    outputPDB=self.getOutputPrefix(i)+ ".pdb",
+                    inputPDB=self.getInputPDBprefix(i)+".pdb")
+
             outputPrefix =self.getOutputPrefixAll(i)
             for j in outputPrefix:
                 pdbset.append(AtomStruct(j + ".pdb"))
@@ -925,12 +881,20 @@ class ProtGenesis(EMProtocol):
 
 
     def getNumberOfInputPDB(self):
+        """
+        Get the number of input PDBs
+        :return int: number of input PDBs
+        """
         if isinstance(self.inputPDB.get(), SetOfAtomStructs) or \
                 isinstance(self.inputPDB.get(), SetOfPDBs):
             return self.inputPDB.get().getSize()
         else: return 1
 
     def getNumberOfInputEM(self):
+        """
+        Get the number of input EM data to analyze
+        :return int : number of input EM data
+        """
         if self.EMfitChoice.get() == EMFIT_VOLUMES:
             if isinstance(self.inputVolume.get(), SetOfVolumes): return self.inputVolume.get().getSize()
             else: return 1
@@ -940,6 +904,10 @@ class ProtGenesis(EMProtocol):
         else: return 0
 
     def getNumberOfFitting(self):
+        """
+        Get the number of simulations to perform
+        :return int: Number of simulations
+        """
         numberOfInputPDB = self.getNumberOfInputPDB()
         numberOfInputEM = self.getNumberOfInputEM()
 
@@ -950,6 +918,10 @@ class ProtGenesis(EMProtocol):
         return np.max([numberOfInputEM, numberOfInputPDB])
 
     def getInputPDBfn(self):
+        """
+        Get the input PDB file names
+        :return list : list of input PDB file names
+        """
         initFn = []
         if isinstance(self.inputPDB.get(), SetOfAtomStructs) or \
                 isinstance(self.inputPDB.get(), SetOfPDBs):
@@ -961,6 +933,10 @@ class ProtGenesis(EMProtocol):
         return initFn
 
     def getInputEMfn(self):
+        """
+        Get the input EM data file names
+        :return list: list of input EM data file names
+        """
         inputEMfn = []
         if self.EMfitChoice.get() == EMFIT_VOLUMES:
             if isinstance(self.inputVolume.get(), SetOfVolumes) :
@@ -977,6 +953,11 @@ class ProtGenesis(EMProtocol):
         return inputEMfn
 
     def getInputPDBprefix(self, index=0):
+        """
+        Get the input PDB prefix of the specified index
+        :param int index: index of input PDB
+        :return str: Input PDB prefix
+        """
         prefix = self._getExtraPath("%s_inputPDB")
         if self.getNumberOfInputPDB() == 1:
             return prefix % str(1).zfill(5)
@@ -984,6 +965,11 @@ class ProtGenesis(EMProtocol):
             return prefix % str(index + 1).zfill(5)
 
     def getInputEMprefix(self, index=0):
+        """
+        Get the input EM data prefix of the specified index
+        :param int index: index of the EM data
+        :return str: Input EM data prefix
+        """
         prefix = self._getExtraPath("%s_inputEM")
         if self.getNumberOfInputEM() == 0:
             return ""
@@ -994,11 +980,21 @@ class ProtGenesis(EMProtocol):
 
 
     def getOutputPrefix(self, index=0):
+        """
+        Output prefix of the specified index
+        :param int index: index of the simulation to get
+        :return string : Output prefix of the specified index
+        """
         return self._getExtraPath("%s_output" % str(index + 1).zfill(5))
 
     def getOutputPrefixAll(self, index=0):
+        """
+        All output prefix of the specified index including multiple replicas in case of REUS
+        :param int index: index of the simulation to get
+        :return list: list of all output prefix of the specified index
+        """
         outputPrefix=[]
-        if self.replica_exchange.get() :
+        if self.simulationType.get() == SIMULATION_REMD:
             for i in range(self.nreplica.get()):
                 outputPrefix.append(self._getExtraPath("%s_output_remd%i" %
                                 (str(index + 1).zfill(5), i + 1)))
@@ -1008,7 +1004,8 @@ class ProtGenesis(EMProtocol):
 
     def getMPIParams(self):
         """
-        return numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
+        Get mpi parameters for the simulation
+        :return tuple: numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
         """
         n_fit = self.getNumberOfFitting()
         if n_fit <= self.numberOfMpi.get():
@@ -1017,6 +1014,11 @@ class ProtGenesis(EMProtocol):
             return 1, n_fit//self.numberOfMpi.get(),  self.numberOfMpi.get(), n_fit % self.numberOfMpi.get()
 
     def getRigidBodyParams(self, index=0):
+        """
+        Get the current rigid body parameters for the specified index in case of EMFIT with iamges
+        :param int index: Index of the simulation
+        :return list: angle_rot, angle_tilt, angle_psi, shift_x, shift_y
+        """
         if not self.estimateAngleShift.get():
             mdImg = md.MetaData(self.imageAngleShift.get())
             idx = int(index + 1)
@@ -1032,9 +1034,30 @@ class ProtGenesis(EMProtocol):
         ]
 
     def getGenesisEnv(self):
+        """
+        Get environnement for running GENESIS
+        :return Environ: environnement
+        """
         environ = pwutils.Environ(os.environ)
         environ.set('PATH', os.path.join(Plugin.getVar("GENESIS_HOME"), 'bin'),
                     position=pwutils.Environ.BEGIN)
         environ.set('PATH', os.path.join(Plugin.getVar("SITUS_HOME"), 'bin'),
                     position=pwutils.Environ.BEGIN)
         return environ
+
+    def getGenesisCmd(self, prefix,n_mpi):
+        """
+        Get GENESIS cmd to run
+        :param str prefix: prefix of the simulation
+        :param int n_mpi: number of MPI processes
+        :return str : GENESIS commadn to run
+        """
+        cmd=""
+        if (n_mpi != 1):
+            cmd += "mpirun -np %s " % n_mpi
+        if self.md_program.get() == PROGRAM_ATDYN:
+            cmd +=  "atdyn %s " % ("%s_INP" % prefix)
+        else:
+            cmd += "spdyn %s " % ("%s_INP" % prefix)
+        cmd += "  > %s.log" % prefix
+        return cmd
