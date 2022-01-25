@@ -43,7 +43,7 @@ class TestSubtomogramSynthesize(TestWorkflow):
     def setUpClass(cls):    
         # Create a new project
         setupTestProject(cls)
-        cls.ds = DataSet.getDataSet('nma')
+        cls.ds = DataSet.getDataSet('nma_V2.0')
     
     def test_synthesize_all(self):
         """ Run NMA then synthesize sybtomograms"""
