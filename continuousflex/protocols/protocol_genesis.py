@@ -106,9 +106,10 @@ class ProtGenesis(EMProtocol):
         form.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0,
                       choices=['CHARMM', 'AAGO', 'CAGO'], help="Type of the force field used for energy and force calculation")
         form.addParam('generateTop', params.BooleanParam, label="Generate topology files ?",
-                      default=False, help="Use the GUI to generate topology files for you. Requires VMD psfgen for CHARMM forcefields"
-                                          "and SMOG2 for GO models. Note that the generated topology files will not include"
-                                          "solvation in the case of CHARMM forcefield.")
+                      default=False, help="Use the GUI to generate topology files for you (PSF file for CHARMM and TOP file for AAGO/CAGO)."
+                                          " Requires VMD psfgen for CHARMM forcefields "
+                                          " and SMOG2 for GO models. Note that the generated topology files will not include"
+                                          " solvent.")
         form.addParam('nucleicChoice', params.EnumParam, label="Contains nucleic acids ?", default=0,
                       choices=['NO', 'RNA', 'DNA'], condition ="generateTop",help="TODo")
         form.addParam('smog_dir', params.FileParam, label="SMOG2 directory",
@@ -116,26 +117,27 @@ class ProtGenesis(EMProtocol):
         form.addParam('inputTOP', params.FileParam, label="GROMACS Topology File",
                       condition="(forcefield==1 or forcefield==2) and not generateTop",
                       help='Gromacs ‘top’ file containing information of the system such as atomic masses, charges,'
-                           'atom connectivities. For details about this format, see the Gromacs web site')
+                           ' atom connectivities. For details about this format, see the Gromacs web site')
         form.addParam('inputPRM', params.FileParam, label="CHARMM parameter file",
                       condition = "forcefield==0",
                       help='CHARMM parameter file containing force field parameters, e.g. force constants and librium'
-                            'librium geometries' )
+                            ' geometries' )
         form.addParam('inputRTF', params.FileParam, label="CHARMM topology file",
                       condition="forcefield==0 or ((forcefield==1 or forcefield==2) and generateTop)",
                       help='CHARMM topology file containing information about atom connectivity of residues and'
-                           'other molecules. For details on the format, see the CHARMM web site')
+                           ' other molecules. For details on the format, see the CHARMM web site')
         form.addParam('inputPSF', params.FileParam, label="CHARMM Structure File",
                       condition="forcefield==0 and not generateTop",
                       help='CHARMM/X-PLOR psf file containing information of the system such as atomic masses,'
-                            'charges, and atom connectivities')
+                            ' charges, and atom connectivities. To generate this file, you can either use the option'
+                           '\" generate topology files\", VMD psfgen, or online CHARMM GUI.')
         form.addParam('inputSTR', params.FileParam, label="CHARMM stream file (optional)",
                       condition="forcefield==0", default="",
                       help='CHARMM stream file containing both topology information and parameters')
 
 
         form.addParam('inputRST', params.FileParam, label="GENESIS Restart File (optional)",
-                       help='Restart .rst file from previous minimisation or MD run ', default="")
+                       help='Restart a previous GENESIS run with a .rst file', default="")
 
 
         # Simulation =================================================================================================
@@ -168,7 +170,7 @@ class ProtGenesis(EMProtocol):
 
         form.addParam('nm_number', params.IntParam, default=10, label='[NMMD] Number of normal modes',
                       help="Number of normal modes for NMMD. 10 should work in most cases. Avoid "
-                           "using too much NM (>50).",
+                           " using too much NM (>50).",
                       condition="integrator==2 and simulationType!=1")
         form.addParam('nm_mass', params.FloatParam, default=10.0, label='[NMMD] NM mass',
                       help="Mass value of Normal modes for NMMD", condition="integrator==2 and simulationType!=1",
@@ -192,15 +194,15 @@ class ProtGenesis(EMProtocol):
         form.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,
                       choices=['GBSA', 'NONE'],
                       help="Turn on Generalized Born/Solvent accessible surface area model. Boundary condition must be NO."
-                           "ATDYN only.")
+                           " ATDYN only.")
 
         form.addParam('electrostatics', params.EnumParam, label="Non-bonded interactions", default=1,
                       choices=['PME', 'Cutoff'],
                       help="Type of Non-bonded interactions. "
-                           "CUTOFF: Non-bonded interactions including the van der Waals interaction are just"
-                           "truncated at cutoffdist; "
-                           "PME : Particle mesh Ewald (PME) method is employed for long-range interactions."
-                            "This option is only availabe in the periodic boundary condition")
+                           " CUTOFF: Non-bonded interactions including the van der Waals interaction are just"
+                           " truncated at cutoffdist; "
+                           " PME : Particle mesh Ewald (PME) method is employed for long-range interactions."
+                            " This option is only availabe in the periodic boundary condition")
         form.addParam('vdw_force_switch', params.BooleanParam, label="Switch function Van der Waals", default=True,
                       help="This paramter determines whether the force switch function for van der Waals interactions is"
                         " employed or not. The users must take care about this parameter, when the CHARMM"
@@ -210,22 +212,22 @@ class ProtGenesis(EMProtocol):
                       help="Switch-on distance for nonbonded interaction energy/force quenching")
         form.addParam('cutoff_dist', params.FloatParam, default=12.0, label='Cutoff Distance',
                       help="Cut-off distance for the non-bonded interactions. This distance must be larger than"
-                            "switchdist, while smaller than pairlistdist")
+                            " switchdist, while smaller than pairlistdist")
         form.addParam('pairlist_dist', params.FloatParam, default=15.0, label='Pairlist Distance',
                       help="Distance used to make a Verlet pair list for non-bonded interactions . This distance"
-                            "must be larger than cutoffdist")
+                            " must be larger than cutoffdist")
 
         # Ensemble =================================================================================================
         form.addSection(label='Ensemble')
         form.addParam('ensemble', params.EnumParam, label="Ensemble", default=0,
                       choices=['NVT', 'NVE', 'NPT'],
                       help="Type of ensemble, NVE: Microcanonical ensemble, NVT: Canonical ensemble,"
-                           "NPT: Isothermal-isobaric ensemble")
+                           " NPT: Isothermal-isobaric ensemble")
         form.addParam('tpcontrol', params.EnumParam, label="Temperature control", default=1,
                       choices=['NO', 'LANGEVIN', 'BERENDSEN', 'BUSSI'],
                       help="Type of thermostat and barostat. The availabe algorithm depends on the integrator :"
-                           "LEAP : BERENDSEN, LANGEVIN;  VVER : BERENDSEN (NVT only), LANGEVIN, BUSSI; "
-                           "NMMD : LANGEVIN (NVT only)")
+                           " LEAP : BERENDSEN, LANGEVIN;  VVER : BERENDSEN (NVT only), LANGEVIN, BUSSI; "
+                           " NMMD : LANGEVIN (NVT only)")
         form.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
                       help="Initial and target temperature")
         form.addParam('pressure', params.FloatParam, default=1.0, label='Pressure (atm)',
@@ -248,17 +250,17 @@ class ProtGenesis(EMProtocol):
                       help="Type of cryo-EM data to be processed")
         form.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
                       help="Force constant in Eem = k*(1 - c.c.). Note that in the case of REUS, the number of "
-                           "force constant value must be equal to the number of replicas, for example for 4 replicas,"
+                           " force constant value must be equal to the number of replicas, for example for 4 replicas,"
                            " a valid force constant is \"1000 2000 3000 4000\" "
                       , condition="EMfitChoice!=0")
         form.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EMfit Sigma",
                       help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
-                        "of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
+                        " of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
                       condition="EMfitChoice!=0",expertLevel=params.LEVEL_ADVANCED)
         form.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EMfit Tolerance',
                       help="This variable determines the tail length of the Gaussian function. For example, if em-"
-                        "fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
-                        "than 0.1% of the maximum value. Smaller value requires large computational cost",
+                        " fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
+                        " than 0.1% of the maximum value. Smaller value requires large computational cost",
                       condition="EMfitChoice!=0",expertLevel=params.LEVEL_ADVANCED)
 
         # Volumes
@@ -273,9 +275,9 @@ class ProtGenesis(EMProtocol):
                       choices=['None', 'Standard Normal', 'Match values range', 'Match Histograms'],
                       help="Pre-process the input volume to match gray-values of the simulated map"
                            " used in the cryo-EM flexible fitting algorithm. Standard normal will normalize the "
-                           "mean and standard deviation of the gray values to match the simulated map. Match values range"
-                           "will linearly rescale the gray values range to match the simulated map range. Match histograms"
-                           "will match histograms of the target EM and the simulated EM maps", condition="EMfitChoice==1")
+                           " mean and standard deviation of the gray values to match the simulated map. Match values range"
+                           " will linearly rescale the gray values range to match the simulated map range. Match histograms"
+                           " will match histograms of the target EM and the simulated EM maps", condition="EMfitChoice==1")
 
         # Images
         form.addParam('inputImage', params.PointerParam, pointerClass="Particle, SetOfParticles",
@@ -317,7 +319,7 @@ class ProtGenesis(EMProtocol):
         self._insertFunctionStep("convertInputPDBStep")
         if self.EMfitChoice.get() != EMFIT_NONE:
             self._insertFunctionStep("convertInputEMStep")
-        self._insertFunctionStep("fittingStep")
+        self._insertFunctionStep("runGenesisStep")
         self._insertFunctionStep("createOutputStep")
 
     ################################################################################
@@ -491,152 +493,158 @@ class ProtGenesis(EMProtocol):
 
 
     ################################################################################
-    ##                 FITTING STEP
+    ##                 GENESIS STEP
     ################################################################################
 
-    def fittingStep(self):
+    def runGenesisStep(self):
+
+        rb_condition = self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get()
+
+        # Parallel Genesis simulation
+        if not(rb_condition):
+            self.runParallelGenesis()
+
+        # Parallel rigid body fitting for EMFIT images
+        else:
+            self.runParallelGenesisRBFitting()
+
+    def runParallelGenesis(self):
 
         # SETUP MPI parameters
         numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
 
-        # RUN PARALLEL FITTING
-        if not(self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get()):
-            for i1 in range(numLinearFit+1):
-                cmds= []
-                n_parallel = numParallelFit if i1<numLinearFit else numLastIter
-                for i2 in range(n_parallel):
-                    indexFit = i2 + i1*numParallelFit
-                    prefix = self.getOutputPrefix(indexFit)
+        for i1 in range(numLinearFit + 1):
+            cmds = []
+            n_parallel = numParallelFit if i1 < numLinearFit else numLastIter
+            for i2 in range(n_parallel):
+                indexFit = i2 + i1 * numParallelFit
+                prefix = self.getOutputPrefix(indexFit)
 
-                    # Create INP file
-                    self.createINP(inputPDB=self.getInputPDBprefix(indexFit)+".pdb",
-                                   outputPrefix=prefix, indexFit=indexFit)
+                # Create INP file
+                self.createINP(inputPDB=self.getInputPDBprefix(indexFit) + ".pdb",
+                               outputPrefix=prefix, indexFit=indexFit)
 
-                    # Create Genesis command
-                    cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
+                # Create Genesis command
+                cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
 
-                # Run Genesis
-                self.runParallelJobs(cmds)
+            # Run Genesis
+            self.runParallelJobs(cmds)
 
+    def runParallelGenesisRBFitting(self):
 
-        # RUN PARALLEL FITTING FOR IMAGES
-        else:
-            for i1 in range(numLinearFit + 1):
-                n_parallel = numParallelFit if i1 < numLinearFit else numLastIter
+        # SETUP MPI parameters
+        numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
 
-                # Loop rigidbody align / GENESIS fitting
-                for iterFit in range(self.rb_n_iter.get()):
+        for i1 in range(numLinearFit + 1):
+            n_parallel = numParallelFit if i1 < numLinearFit else numLastIter
+
+            # Loop rigidbody align / GENESIS fitting
+            for iterFit in range(self.rb_n_iter.get()):
 
                 # ------   ALIGN PDBs---------
-                    # Transform PDBs to volume
-                    cmds_pdb2vol = []
-                    for i2 in range(n_parallel):
-                        indexFit = i2 + i1 * numParallelFit
-                        inputPDB = self.getInputPDBprefix(indexFit)+".pdb" if iterFit ==0 \
-                            else  self.getOutputPrefix(indexFit)+".pdb"
+                # Transform PDBs to volume
+                cmds_pdb2vol = []
+                for i2 in range(n_parallel):
+                    indexFit = i2 + i1 * numParallelFit
+                    inputPDB = self.getInputPDBprefix(indexFit) + ".pdb" if iterFit == 0 \
+                        else self.getOutputPrefix(indexFit) + ".pdb"
 
-                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        cmds_pdb2vol.append(pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix,
-                                        sampling_rate=self.pixel_size.get(), image_size=self.image_size.get()))
-                    self.runParallelJobs(cmds_pdb2vol)
+                    tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                    cmds_pdb2vol.append(pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix,
+                                                sampling_rate=self.pixel_size.get(),
+                                                image_size=self.image_size.get()))
+                self.runParallelJobs(cmds_pdb2vol)
 
-                    # Loop 4 times to refine the angles
-                    # sampling_rate = [10.0, 5.0, 3.0, 2.0]
-                    # angular_distance = [-1, 20, 10, 5]
-                    sampling_rate = [10.0]
-                    angular_distance = [-1]
-                    for i_align in range(len(sampling_rate)):
-                        cmds_projectVol = []
-                        cmds_alignement = []
-                        for i2 in range(n_parallel):
-                            indexFit = i2 + i1 * numParallelFit
-                            tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            inputImage = self.getInputEMprefix(indexFit)+".spi"
-                            tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
-                            currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
-
-                            # get commands
-                            if self.rb_method.get() == RB_PROJMATCH:
-                                cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
-                                                    outputProj=tmpPrefix, expImage=inputImage,
-                                                    sampling_rate=sampling_rate[i_align],
-                                                    angular_distance=angular_distance[i_align]))
-                                cmds_alignement.append(projectMatch(inputImage= inputImage,
-                                                    inputProj=tmpPrefix, outputMeta=tmpMeta))
-                            else:
-                                cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
-                                                    outputProj=tmpPrefix, expImage=inputImage,
-                                                    sampling_rate=sampling_rate[i_align],
-                                                    angular_distance=angular_distance[i_align],
-                                                                       compute_neighbors=False))
-                                cmds_alignement.append(waveletAssignement(inputImage= inputImage,
-                                                    inputProj=tmpPrefix, outputMeta=tmpMeta))
-                        # run parallel jobs
-                        self.runParallelJobs(cmds_projectVol)
-                        self.runParallelJobs(cmds_alignement)
-
-                        cmds_continuousAssign = []
-                        for i2 in range(n_parallel):
-                            indexFit = i2 + i1 * numParallelFit
-                            tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
-                            currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
-                            if self.rb_method.get() == RB_PROJMATCH:
-                                flipAngles(inputMeta=tmpMeta, outputMeta=tmpMeta)
-                            cmds_continuousAssign.append(continuousAssign(inputMeta=tmpMeta,
-                                                                               inputVol=tmpPrefix,
-                                                                               outputMeta=currentAngles))
-                        self.runParallelJobs(cmds_continuousAssign)
-
-                    # Cleaning volumes and projections
+                # Loop 4 times to refine the angles
+                # sampling_rate = [10.0, 5.0, 3.0, 2.0]
+                # angular_distance = [-1, 20, 10, 5]
+                sampling_rate = [10.0]
+                angular_distance = [-1]
+                for i_align in range(len(sampling_rate)):
+                    cmds_projectVol = []
+                    cmds_alignement = []
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numParallelFit
                         tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        runCommand("rm -f %s*"%tmpPrefix)
+                        inputImage = self.getInputEMprefix(indexFit) + ".spi"
+                        tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
+                        currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
 
+                        # get commands
+                        if self.rb_method.get() == RB_PROJMATCH:
+                            cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
+                                                              outputProj=tmpPrefix, expImage=inputImage,
+                                                              sampling_rate=sampling_rate[i_align],
+                                                              angular_distance=angular_distance[i_align]))
+                            cmds_alignement.append(projectMatch(inputImage=inputImage,
+                                                                inputProj=tmpPrefix, outputMeta=tmpMeta))
+                        else:
+                            cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
+                                                              outputProj=tmpPrefix, expImage=inputImage,
+                                                              sampling_rate=sampling_rate[i_align],
+                                                              angular_distance=angular_distance[i_align],
+                                                              compute_neighbors=False))
+                            cmds_alignement.append(waveletAssignement(inputImage=inputImage,
+                                                                      inputProj=tmpPrefix, outputMeta=tmpMeta))
+                    # run parallel jobs
+                    self.runParallelJobs(cmds_projectVol)
+                    self.runParallelJobs(cmds_alignement)
+
+                    cmds_continuousAssign = []
+                    for i2 in range(n_parallel):
+                        indexFit = i2 + i1 * numParallelFit
+                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                        tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
+                        currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
+                        if self.rb_method.get() == RB_PROJMATCH:
+                            flipAngles(inputMeta=tmpMeta, outputMeta=tmpMeta)
+                        cmds_continuousAssign.append(continuousAssign(inputMeta=tmpMeta,
+                                                                      inputVol=tmpPrefix,
+                                                                      outputMeta=currentAngles))
+                    self.runParallelJobs(cmds_continuousAssign)
+
+                # Cleaning volumes and projections
+                for i2 in range(n_parallel):
+                    indexFit = i2 + i1 * numParallelFit
+                    tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                    runCommand("rm -f %s*" % tmpPrefix)
 
                 # ------   Run Genesis ---------
-                    cmds = []
-                    for i2 in range(n_parallel):
-                        indexFit = i2 + i1 * numParallelFit
-                        if iterFit == 0:
-                            prefix = self.getOutputPrefix(indexFit)
-                            inputPDB = self.getInputPDBprefix(indexFit)+".pdb"
-                        else:
-                            prefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            inputPDB = self.getOutputPrefix(indexFit)+".pdb"
-
-
-                        # Create INP file
-                        self.createINP(inputPDB=inputPDB,
-                                       outputPrefix=prefix, indexFit=indexFit)
-
-                        # run GENESIS
-                        cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
-                    self.runParallelJobs(cmds)
-
-                    # append files
-                    if iterFit != 0:
-                        for i2 in range(n_parallel):
-                            tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            newPrefix = self.getOutputPrefix(indexFit)
-
-                            indexFit = i2 + i1 * numParallelFit
-                            cat_cmd = "cat %s.log >> %s.log"%(tmpPrefix, newPrefix)
-                            tcl_cmd = "animate read dcd %s.dcd waitfor all\n"%(newPrefix)
-                            tcl_cmd += "animate read dcd %s.dcd waitfor all\n"%(tmpPrefix)
-                            tcl_cmd += "animate write dcd %s.dcd \nexit \n"%newPrefix
-                            with open("%s.tcl"%tmpPrefix, "w") as f:
-                                f.write(tcl_cmd)
-                            cp_cmd = "cp %s.pdb %s.pdb" %(tmpPrefix, newPrefix)
-                            runCommand(cat_cmd)
-                            runCommand(cp_cmd)
-                            runCommand("vmd -dispdev text -e %s.tcl"%tmpPrefix)
-
+                cmds = []
                 for i2 in range(n_parallel):
-                    idx = str(i2 + i1 * numParallelFit+ 1).zfill(5)
-                    runCommand("cp %s %s" % (self._getExtraPath("%s_iter%i_output.pdb" % (idx, self.rb_n_iter.get()-1)),
-                                            self._getExtraPath("%s_output.pdb" % idx)))
+                    indexFit = i2 + i1 * numParallelFit
+                    if iterFit == 0:
+                        prefix = self.getOutputPrefix(indexFit)
+                        inputPDB = self.getInputPDBprefix(indexFit) + ".pdb"
+                    else:
+                        prefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                        inputPDB = self.getOutputPrefix(indexFit) + ".pdb"
+
+                    # Create INP file
+                    self.createINP(inputPDB=inputPDB,
+                                   outputPrefix=prefix, indexFit=indexFit)
+
+                    # run GENESIS
+                    cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
+                self.runParallelJobs(cmds)
+
+                # append files
+                if iterFit != 0:
+                    for i2 in range(n_parallel):
+                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                        newPrefix = self.getOutputPrefix(indexFit)
+
+                        indexFit = i2 + i1 * numParallelFit
+                        cat_cmd = "cat %s.log >> %s.log" % (tmpPrefix, newPrefix)
+                        tcl_cmd = "animate read dcd %s.dcd waitfor all\n" % (newPrefix)
+                        tcl_cmd += "animate read dcd %s.dcd waitfor all\n" % (tmpPrefix)
+                        tcl_cmd += "animate write dcd %s.dcd \nexit \n" % newPrefix
+                        with open("%s.tcl" % tmpPrefix, "w") as f:
+                            f.write(tcl_cmd)
+                        cp_cmd = "cp %s.pdb %s.pdb" % (tmpPrefix, newPrefix)
+                        runCommand(cat_cmd)
+                        runCommand(cp_cmd)
+                        runCommand("vmd -dispdev text -e %s.tcl" % tmpPrefix)
 
     def runParallelJobs(self, cmds):
         # Set env
@@ -674,12 +682,12 @@ class ProtGenesis(EMProtocol):
             s += "topfile = %s\n" % self.inputRTF.get()
             s += "parfile = %s\n" % self.inputPRM.get()
             s += "psffile = %s.psf\n" % inputPDBprefix
-            if self.inputSTR.get() != "":
+            if self.inputSTR.get() != "" and self.inputSTR.get() is not None:
                 s += "strfile = %s\n" % self.inputSTR.get()
         elif self.forcefield.get() == FORCEFIELD_AAGO\
                 or self.forcefield.get() == FORCEFIELD_CAGO:
             s += "grotopfile = %s.top\n" % inputPDBprefix
-        if self.inputRST.get() != "":
+        if self.inputRST.get() != "" and self.inputRST.get() is not None:
             s += "rstfile = %s\n" % self.inputRST.get()
 
         s += "\n[OUTPUT] \n" #-----------------------------------------------------------

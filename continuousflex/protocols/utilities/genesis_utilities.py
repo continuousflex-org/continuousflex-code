@@ -5,6 +5,7 @@ from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 from Bio.SVDSuperimposer import SVDSuperimposer
 from pyworkflow.utils import runCommand
+import pwem.emlib.metadata as md
 
 class PDBMol:
     def __init__(self, pdb_file):
