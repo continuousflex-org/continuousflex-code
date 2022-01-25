@@ -30,7 +30,7 @@ visualization program.
 from pyworkflow.gui.project import ProjectWindow
 from pyworkflow.protocol.params import LabelParam, IntParam
 from pyworkflow.viewer import ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO
-from pwem.viewers import ObjectView, VmdView
+from pwem.viewers import ObjectView, VmdView, DataView
 from pwem.emlib import MDL_NMA_ATOMSHIFT
 from continuousflex.protocols import FlexProtNMA
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
@@ -80,8 +80,12 @@ class FlexNMAViewer(ProtocolViewer):
                         
     def _viewParam(self, paramName):
         if paramName == 'displayModes':
-            modes =  self.protocol.outputModes
-            return [ObjectView(self._project, modes.strId(), modes.getFileName())]
+            # The following two lines display modes.sqlite file
+            # modes =  self.protocol.outputModes
+            # return [ObjectView(self._project, modes.strId(), modes.getFileName())]
+            # The following two lines display modes.xmd file
+            modes =  self.protocol._getPath("modes.xmd")
+            return [DataView(modes)]
         elif paramName == 'displayMaxDistanceProfile':
             fn = self.protocol._getExtraPath("maxAtomShifts.xmd")
             return [createShiftPlot(fn, "Maximum atom shifts", "maximum shift")]
