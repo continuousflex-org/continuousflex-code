@@ -231,8 +231,10 @@ class FlexProtNMABase(EMProtocol):
                 mdOut.setValue(MDL_ENABLED, 1, objId)
             else:
                 mdOut.setValue(MDL_ENABLED, -1, objId)
-
-            mdOut.setValue(MDL_NMA_EIGENVAL, eigvals[n] , objId)
+            try:
+                mdOut.setValue(MDL_NMA_EIGENVAL, eigvals[n] , objId)
+            except:
+                pass
             mdOut.setValue(MDL_NMA_COLLECTIVITY, collectivity, objId)
             if collectivity < collectivityThreshold:
                 mdOut.setValue(MDL_ENABLED, -1, objId)
