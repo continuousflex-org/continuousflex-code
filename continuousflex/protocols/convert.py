@@ -41,7 +41,7 @@ MODE_DICT = OrderedDict([
        ("_modeFile", MDL_NMA_MODEFILE),
        ("_collectivity", MDL_NMA_COLLECTIVITY),
        ("_score", MDL_NMA_SCORE),
-       ("_eigenvalue", MDL_NMA_EIGENVAL),
+       #("_eigenvalue", MDL_NMA_EIGENVAL),
 ])
 
 
