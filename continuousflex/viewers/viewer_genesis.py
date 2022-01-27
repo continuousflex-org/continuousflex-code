@@ -33,7 +33,6 @@ from pyworkflow.utils import getListFromRangeString
 import numpy as np
 import os
 import glob
-from xmippLib import SymList
 import pwem.emlib.metadata as md
 
 import pickle
@@ -81,6 +80,10 @@ class GenesisViewer(ProtocolViewer):
                       label='Display Angular distance',
                       help='TODO')
 
+        form.addParam('displayAngularDistanceTs', params.LabelParam,
+                      label='Display Angular distance Time series',
+                      help='TODO')
+
         form.addParam('rigidBodyParams', params.FileParam, default=None,
                         label="Target Rigid Body Parameters",
                         help='TODO')
@@ -101,6 +104,7 @@ class GenesisViewer(ProtocolViewer):
             'displayRMSDts': self._plotRMSDts,
             'displayRMSD': self._plotRMSD,
             'displayAngularDistance': self._plotAngularDistance,
+            'displayAngularDistanceTs': self._plotAngularDistanceTs,
             'displayPCA': self._plotPCA,
             'displayTraj': self._plotTraj,
                 }
@@ -275,25 +279,12 @@ class GenesisViewer(ProtocolViewer):
         mdImgGT = md.MetaData(self.rigidBodyParams.get())
         fitlist = self.getFitlist()
         for i in fitlist:
-            rot0 = mdImgGT.getValue(md.MDL_ANGLE_ROT, int(i))
-            tilt0 = mdImgGT.getValue(md.MDL_ANGLE_TILT, int(i))
-            psi0 = mdImgGT.getValue(md.MDL_ANGLE_PSI, int(i))
-            shiftx0 = mdImgGT.getValue(md.MDL_SHIFT_X, int(i))
-            shifty0 = mdImgGT.getValue(md.MDL_SHIFT_Y, int(i))
+            imgfn = self.protocol._getExtraPath("%s_current_angles.xmd" % (str(i).zfill(5)))
+            if os.path.exists(imgfn):
+                mdImgFn = md.MetaData(imgfn)
 
-            mdImgFn = self.protocol._getExtraPath("%s_current_angles.xmd" % (str(i).zfill(5)))
-            mdImg = md.MetaData(mdImgFn)
-            rot = mdImg.getValue(md.MDL_ANGLE_ROT, 1)
-            tilt = mdImg.getValue(md.MDL_ANGLE_TILT, 1)
-            psi = mdImg.getValue(md.MDL_ANGLE_PSI, 1)
-            shiftx = mdImg.getValue(md.MDL_SHIFT_X, 1)
-            shifty = mdImg.getValue(md.MDL_SHIFT_Y, 1)
-
-            angular_dist.append(SymList.computeDistanceAngles(SymList(),
-                    rot, tilt, psi, rot0, tilt0, psi0, False, True, False))
-
-            shift_dist.append(np.linalg.norm(np.array([shiftx, shifty, 0.0])
-                                             - np.array([shiftx0, shifty0, 0.0])))
+                angular_dist.append(getAngularDist(md1=mdImgGT, md2=mdImgFn, idx1=i,idx2=1))
+                shift_dist.append(getShiftDist(md1=mdImgGT, md2=mdImgFn, idx1=i,idx2=1))
 
         plotter1 = FlexPlotter()
         ax1 = plotter1.createSubPlot("Angular Distance (°)", "# Image", "Angular Distance (°)")
@@ -310,6 +301,29 @@ class GenesisViewer(ProtocolViewer):
 
         print("Shift distance mean %f:"%np.mean(shift_dist))
         print("Shift distance std %f:"%np.std(shift_dist))
+
+    def _plotAngularDistanceTs(self, paramName):
+        mdImgGT = md.MetaData(self.rigidBodyParams.get())
+        fitlist = self.getFitlist()
+        niter= self.protocol.rb_n_iter.get()
+        angular_dist = np.zeros((len(fitlist),niter))
+
+        for i in range(len(fitlist)):
+            for j in range(niter):
+                imgfn = self.protocol._getExtraPath("%s_iter%i_angles.xmd" % (str(fitlist[i]).zfill(5), j))
+                if os.path.exists(imgfn):
+                    mdImgFn = md.MetaData(imgfn)
+                    angular_dist[i,j] = getAngularDist(md1=mdImgGT, md2=mdImgFn, idx1=fitlist[i], idx2=1)
+
+                else:
+                    print("%s not found" %imgfn)
+
+        plotter1 = FlexPlotter()
+        ax1 = plotter1.createSubPlot("Angular Distance (°)", "Number of iterations", "Angular Distance (°)")
+        for i in range(len(fitlist)):
+            ax1.plot(angular_dist[i,:])
+        plotter1.show()
+
 
     def _plotPCA(self, paramName):
 

@@ -7,6 +7,9 @@ from Bio.SVDSuperimposer import SVDSuperimposer
 from pyworkflow.utils import runCommand
 import pwem.emlib.metadata as md
 
+from xmippLib import SymList
+import pwem.emlib.metadata as md
+
 class PDBMol:
     def __init__(self, pdb_file):
         """
@@ -764,3 +767,19 @@ def flipAngles(inputMeta, outputMeta):
         Md1.setValue(md.MDL_ANGLE_PSI, -psi1, 1)
     Md1.write(outputMeta)
 
+def getAngularDist(md1, md2, idx1=1, idx2=1):
+    rot1        = md1.getValue(md.MDL_ANGLE_ROT, int(idx1))
+    tilt1       = md1.getValue(md.MDL_ANGLE_TILT, int(idx1))
+    psi1        = md1.getValue(md.MDL_ANGLE_PSI, int(idx1))
+    rot2        = md2.getValue(md.MDL_ANGLE_ROT, int(idx2))
+    tilt2       = md2.getValue(md.MDL_ANGLE_TILT, int(idx2))
+    psi2        = md2.getValue(md.MDL_ANGLE_PSI, int(idx2))
+
+    return  SymList.computeDistanceAngles(SymList(), rot1, tilt1, psi1, rot2, tilt2, psi2, False, True, False)
+
+def getShiftDist(md1, md2, idx1=1, idx2=1):
+    shiftx1 = md1.getValue(md.MDL_SHIFT_X, int(idx1))
+    shifty1 = md1.getValue(md.MDL_SHIFT_Y, int(idx1))
+    shiftx2 = md2.getValue(md.MDL_SHIFT_X, int(idx2))
+    shifty2 = md2.getValue(md.MDL_SHIFT_Y, int(idx2))
+    return np.linalg.norm(np.array([shiftx1, shifty1, 0.0]) - np.array([shiftx2, shifty2, 0.0]))
