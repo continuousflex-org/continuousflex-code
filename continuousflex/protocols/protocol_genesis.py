@@ -367,6 +367,13 @@ class ProtGenesis(EMProtocol):
                     or self.forcefield.get() == FORCEFIELD_CAGO:
                 runCommand("cp %s %s.top" % (self.inputTOP.get(), self.getInputPDBprefix(i)))
 
+        # Center PDB in case of images
+        if self.EMfitChoice.get() ==  EMFIT_IMAGES:
+            for i in range(n_pdb):
+                mol = PDBMol(self.getInputPDBprefix(i)+".pdb")
+                mol.center()
+                mol.save(self.getInputPDBprefix(i)+".pdb")
+
     ################################################################################
     ##                 CONVERT INPUT VOLUME/IMAGE
     ################################################################################
@@ -631,10 +638,10 @@ class ProtGenesis(EMProtocol):
                 # append files
                 if iterFit != 0:
                     for i2 in range(n_parallel):
+                        indexFit = i2 + i1 * numParallelFit
                         tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
                         newPrefix = self.getOutputPrefix(indexFit)
 
-                        indexFit = i2 + i1 * numParallelFit
                         cat_cmd = "cat %s.log >> %s.log" % (tmpPrefix, newPrefix)
                         tcl_cmd = "animate read dcd %s.dcd waitfor all\n" % (newPrefix)
                         tcl_cmd += "animate read dcd %s.dcd waitfor all\n" % (tmpPrefix)
@@ -645,6 +652,29 @@ class ProtGenesis(EMProtocol):
                         runCommand(cat_cmd)
                         runCommand(cp_cmd)
                         runCommand("vmd -dispdev text -e %s.tcl" % tmpPrefix)
+
+                rstfile = ""
+                for i2 in range(n_parallel):
+                    indexFit = i2 + i1 * numParallelFit
+                    newPrefix = self.getOutputPrefix(indexFit)
+                    if iterFit != 0:
+                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                    else:
+                        tmpPrefix = self.getOutputPrefix(indexFit)
+
+                    runCommand("cp %s.rst %s.tmp.rst" % (tmpPrefix, newPrefix))
+                    rstfile += "%s.tmp.rst "%newPrefix
+                    #save angles
+                    angles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
+                    saved_angles = self._getExtraPath("%s_iter%i_angles.xmd" % (str(indexFit + 1).zfill(5), iterFit))
+                    runCommand("cp %s %s" % (angles, saved_angles))
+
+                    #cleaning
+                    runCommand("rm -rf %s" %self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5)))
+                self.inputRST.set(rstfile)
+
+
+
 
     def runParallelJobs(self, cmds):
         # Set env
@@ -688,7 +718,7 @@ class ProtGenesis(EMProtocol):
                 or self.forcefield.get() == FORCEFIELD_CAGO:
             s += "grotopfile = %s.top\n" % inputPDBprefix
         if self.inputRST.get() != "" and self.inputRST.get() is not None:
-            s += "rstfile = %s\n" % self.inputRST.get()
+            s += "rstfile = %s\n" % self.getRestartFile(indexFit)
 
         s += "\n[OUTPUT] \n" #-----------------------------------------------------------
         if self.simulationType.get() == SIMULATION_REMD:
@@ -1069,3 +1099,11 @@ class ProtGenesis(EMProtocol):
             cmd += "spdyn %s " % ("%s_INP" % prefix)
         cmd += "  > %s.log" % prefix
         return cmd
+
+    def getRestartFile(self, index=0):
+        rstfile = self.inputRST.get()
+        rstList = rstfile.split(" ")
+        if len(rstList) >1:
+            return rstList[index]
+        else:
+            rstList[0]

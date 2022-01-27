@@ -35,6 +35,7 @@ import glob
 from xmippLib import SymList
 import pwem.emlib.metadata as md
 
+import pickle
 
 
 from continuousflex.protocols.utilities.genesis_utilities import PDBMol, matchPDBatoms,compute_pca
@@ -179,11 +180,17 @@ class GenesisViewer(ProtocolViewer):
         # Plot CC
         for i in range(len(cc)):
             x = self.getStep(log_file["STEP"], len(cc[i]))
-            if len(cc) <= 10:
+            if len(cc) <= 50:
                 ax.plot(x, cc[i], color="tab:blue", alpha=0.3)
-        ax.errorbar(x = x, y=np.mean(cc, axis=0), yerr=np.std(cc, axis=0),
-                    capthick=1.7, capsize=5,elinewidth=1.7, color="tab:blue",
-                    errorevery=np.max([len(log_file["STEP"]) //10,1]))
+
+        try :
+            cc_mean = np.mean(cc, axis=0)
+            cc_std = np.std(cc, axis=0)
+            ax.errorbar(x = x, y=cc_mean, yerr=cc_std,
+                        capthick=1.7, capsize=5,elinewidth=1.7, color="tab:blue",
+                        errorevery=np.max([len(log_file["STEP"]) //10,1]))
+        except TypeError:
+            ax.plot(cc[0], color="tab:blue")
 
         plotter.show()
 
@@ -204,12 +211,17 @@ class GenesisViewer(ProtocolViewer):
         # Plot RMSD
         for i in range(len(rmsd)):
             x = self.getStep(log_file["STEP"], len(rmsd[i]))
-            if len(rmsd) <=10:
+            if len(rmsd) <=50:
                 ax.plot(x, rmsd[i], color="tab:blue", alpha=0.3)
 
-        ax.errorbar(x = x, y=np.mean(rmsd, axis=0), yerr=np.std(rmsd, axis=0),
-                    capthick=1.7, capsize=5,elinewidth=1.7,
-                    color="tab:blue", errorevery=np.max([len(log_file["STEP"]) //10,1]))
+        try :
+            rmsd_mean = np.mean(rmsd, axis=0)
+            rmsd_std = np.std(rmsd, axis=0)
+            ax.errorbar(x = x, y=rmsd_mean, yerr=rmsd_std,
+                        capthick=1.7, capsize=5,elinewidth=1.7, color="tab:blue",
+                        errorevery=np.max([len(log_file["STEP"]) //10,1]))
+        except TypeError:
+            ax.plot(rmsd[0], color="tab:blue")
 
         plotter.show()
 
@@ -303,6 +315,12 @@ class GenesisViewer(ProtocolViewer):
         fig, ax=compute_pca(data=data, length=length, labels=labels,
                     n_components=2, figsize=(5, 5), initdcd=initPDB)
         fig.show()
+
+        np.save(file = self.protocol._getExtraPath("PCA_data.npy"), arr= data)
+        np.save(file = self.protocol._getExtraPath("PCA_length.npy"), arr= length)
+        np.save(file = self.protocol._getExtraPath("PCA_labels.npy"), arr= labels)
+
+
 
     def getStep(self, step, length):
         time_step = float( self.protocol.time_step.get())

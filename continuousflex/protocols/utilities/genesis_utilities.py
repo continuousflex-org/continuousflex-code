@@ -247,6 +247,10 @@ class PDBMol:
                 new_idx.append(i)
         return np.array(new_idx)
 
+    def center(self):
+        self.coords -= np.mean(self.coords, axis=0)
+
+
 def matchPDBatoms(mols, ca_only=False):
     print("> Matching PDBs atoms ...")
     n_mols = len(mols)
