@@ -26,7 +26,8 @@
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 import pyworkflow.protocol.params as params
 from continuousflex.protocols.protocol_genesis import ProtGenesis
-from continuousflex.protocols.utilities.genesis_utilities import traj_viewer, alignMol, rmsdFromDCD, readLogFile
+from continuousflex.protocols.utilities.genesis_utilities import *
+
 from .plotter import FlexPlotter
 from pyworkflow.utils import getListFromRangeString
 import numpy as np
@@ -36,9 +37,6 @@ from xmippLib import SymList
 import pwem.emlib.metadata as md
 
 import pickle
-
-
-from continuousflex.protocols.utilities.genesis_utilities import PDBMol, matchPDBatoms,compute_pca
 
 class GenesisViewer(ProtocolViewer):
     """ Visualization of results from the GENESIS protocol
@@ -61,6 +59,10 @@ class GenesisViewer(ProtocolViewer):
 
         form.addParam('displayCC', params.LabelParam,
                       label='Display correlation coefficient',
+                      help='TODO')
+
+        form.addParam('displayRMSDts', params.LabelParam,
+                      label='Display RMSD time series',
                       help='TODO')
 
         form.addParam('displayRMSD', params.LabelParam,
@@ -96,6 +98,7 @@ class GenesisViewer(ProtocolViewer):
         return {
             'displayEnergy': self._plotEnergy,
             'displayCC': self._plotCC,
+            'displayRMSDts': self._plotRMSDts,
             'displayRMSD': self._plotRMSD,
             'displayAngularDistance': self._plotAngularDistance,
             'displayPCA': self._plotPCA,
@@ -194,7 +197,7 @@ class GenesisViewer(ProtocolViewer):
 
         plotter.show()
 
-    def _plotRMSD(self, paramName):
+    def _plotRMSDts(self, paramName):
         plotter = FlexPlotter()
         ax = plotter.createSubPlot("RMSD ($\AA$)", "Time (ps)", "RMSD ($\AA$)")
 
@@ -224,6 +227,43 @@ class GenesisViewer(ProtocolViewer):
             ax.plot(rmsd[0], color="tab:blue")
 
         plotter.show()
+
+    def _plotRMSD(self, paramName):
+        plotter = FlexPlotter()
+        ax = plotter.createSubPlot("RMSD ($\AA$)", "# Simulation", "RMSD ($\AA$)")
+
+        # Get RMSD list
+        fitlist = self.getFitlist()
+        initial_mols = []
+        final_mols = []
+        target_mols = []
+        for i in fitlist:
+            inputPDB = self.protocol.getInputPDBprefix(i-1)+".pdb"
+            targetPDB = self.getTargetPDB(i)
+            outputPrefix = self.protocol.getOutputPrefix(i-1)
+            outputPDB = outputPrefix +".pdb"
+            # if not os.path.exists(outputPDB):
+            #     lastPDBFromDCD(inputPDB=self.protocol.getInputPDBprefix(i-1)+".pdb",
+            #             inputDCD=outputPrefix+".dcd", outputPDB=outputPrefix+"tmp.pdb")
+            #     outputPDB = outputPrefix+"tmp.pdb"
+
+            initial_mols.append(PDBMol(inputPDB))
+            final_mols.append(PDBMol(outputPDB))
+            target_mols.append(PDBMol(targetPDB))
+
+        idx = matchPDBatoms(mols=[initial_mols[0], target_mols[0]],ca_only=True)
+        rmsdi=[]
+        rmsdf=[]
+        for i in range(len(fitlist)):
+            rmsdi.append(getRMSD(mol1=initial_mols[i],mol2=target_mols[i], idx=idx, align=self.alignTarget.get()))
+            rmsdf.append(getRMSD(mol1=final_mols[i]  ,mol2=target_mols[i], idx=idx, align=self.alignTarget.get()))
+
+        ax.plot(rmsdf, "o", color="tab:blue", label="RMSDf")
+        ax.plot(rmsdi, "o", color="tab:green", label="RMSDi")
+
+        plotter.legend()
+        plotter.show()
+
 
 
     def getFitlist(self):

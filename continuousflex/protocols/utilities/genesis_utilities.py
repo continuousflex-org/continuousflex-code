@@ -615,6 +615,17 @@ def readLogFile(log_file):
 
     return dic
 
+def getRMSD(mol1,mol2, align = False, idx=None):
+    if align:
+        alignMol(mol1, mol2, idx=idx)
+    if idx is not None:
+        coord1 = mol1.coords[idx[:, 0]]
+        coord2 = mol2.coords[idx[:, 1]]
+    else:
+        coord1 = mol1.coords
+        coord2 = mol2.coords
+    return np.sqrt(np.mean(np.square(np.linalg.norm(coord1 - coord2, axis=1))))
+
 def rmsdFromDCD(outputPrefix, inputPDB, targetPDB, align=False):
 
     # EXTRACT PDBs from dcd file
@@ -629,26 +640,17 @@ def rmsdFromDCD(outputPrefix, inputPDB, targetPDB, align=False):
         f.write(s)
     runCommand("vmd -dispdev text -e %s_tmp_dcd2pdb.tcl > /dev/null" % outputPrefix)
 
-    # DEF RMSD
-    def RMSD(c1, c2):
-        return np.sqrt(np.mean(np.square(np.linalg.norm(c1 - c2, axis=1))))
-
     # COMPUTE RMSD
     rmsd = []
     inputPDBmol = PDBMol(inputPDB)
     targetPDBmol = PDBMol(targetPDB)
 
-    idx = matchPDBatoms([targetPDBmol, inputPDBmol], ca_only=True)
-    if align:
-        alignMol(targetPDBmol, inputPDBmol, idx=idx)
-    rmsd.append(RMSD(inputPDBmol.coords[idx[:, 1]], targetPDBmol.coords[idx[:, 0]]))
+    idx = matchPDBatoms([inputPDBmol,targetPDBmol], ca_only=True)
+    rmsd.append(getRMSD(mol1 = inputPDBmol, mol2=targetPDBmol, align=align, idx=idx))
     i=0
     while(os.path.exists("%stmp%i.pdb"%(outputPrefix,i+1))):
         f = "%stmp%i.pdb"%(outputPrefix,i+1)
-        mol = PDBMol(f)
-        if align:
-            alignMol(targetPDBmol, mol, idx=idx)
-        rmsd.append(RMSD(mol.coords[idx[:, 1]], targetPDBmol.coords[idx[:, 0]]))
+        rmsd.append(getRMSD(mol1 = PDBMol(f), mol2=targetPDBmol, align=align, idx=idx))
         i+=1
 
     # CLEAN TMP FILES AND SAVE
@@ -668,7 +670,7 @@ def lastPDBFromDCD(inputPDB,inputDCD,  outputPDB):
     runCommand("vmd -dispdev text -e %s_tmp_dcd2pdb.tcl" % outputPDB)
 
     # CLEAN TMP FILES
-    runCommand("rm -f %stmp*" % (outputPDB))
+    runCommand("rm -f %s_tmp_dcd2pdb.tcl" % (outputPDB))
 
 
 
