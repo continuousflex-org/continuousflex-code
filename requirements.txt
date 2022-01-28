@@ -1,4 +1,3 @@
 matplotlib
 mrcfile
 biopython
-scikit-image

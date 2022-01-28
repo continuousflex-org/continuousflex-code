@@ -31,7 +31,6 @@ import numpy as np
 import mrcfile
 import os
 import sys
-from skimage.exposure import match_histograms
 import pwem.emlib.metadata as md
 from pwem.utils import runProgram
 from subprocess import Popen
@@ -272,7 +271,7 @@ class ProtGenesis(EMProtocol):
         form.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=False,
                       help="Center the volume to the origin", condition="EMfitChoice==1")
         form.addParam('preprocessingVol', params.EnumParam, label="Volume preprocessing", default=0,
-                      choices=['None', 'Standard Normal', 'Match values range', 'Match Histograms'],
+                      choices=['None', 'Standard Normal', 'Match values range'],#, 'Match Histograms'],
                       help="Pre-process the input volume to match gray-values of the simulated map"
                            " used in the cryo-EM flexible fitting algorithm. Standard normal will normalize the "
                            " mean and standard deviation of the gray values to match the simulated map. Match values range"
@@ -468,8 +467,8 @@ class ProtGenesis(EMProtocol):
                 max1 = tmpMRCData.max()
                 max2 = inputMRCData.max()
                 mrc_data = ((inputMRCData - (min2 + min1))*(max1 - min1) )/ (max2 - min2)
-            elif self.preprocessingVol.get() == PREPROCESS_VOL_MATCH:
-                mrc_data = match_histograms(inputMRCData, tmpMRCData)
+            # elif self.preprocessingVol.get() == PREPROCESS_VOL_MATCH:
+            #     mrc_data = match_histograms(inputMRCData, tmpMRCData)
         else:
             mrc_data = inputMRCData
 
