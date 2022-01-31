@@ -71,6 +71,9 @@ class GenesisViewer(ProtocolViewer):
         form.addParam('targetPDB', params.PathParam, default=None,
                         label="List of Target PDBs",
                         help='Use the file pattern as file location with /*.pdb')
+        form.addParam('referencePDB', params.PathParam, default="",
+                        label="Reference PDB (optional)",
+                        help='TODO')
 
         form.addParam('alignTarget', params.BooleanParam, default=False,
                         label="Align Target PDB",
@@ -194,22 +197,29 @@ class GenesisViewer(ProtocolViewer):
                 (int(self.protocol.eneout_period.get())) * \
                 float(self.protocol.time_step.get())
             if len(cc) <= 50:
-                ax.plot(x, cc[i], color="tab:blue", alpha=0.3)
+                ax.plot(x, cc[i], alpha=0.3, label="#%i"%i)
 
         try :
             cc_mean = np.mean(cc, axis=0)
             cc_std = np.std(cc, axis=0)
             ax.errorbar(x = x, y=cc_mean, yerr=cc_std,
-                        capthick=1.7, capsize=5,elinewidth=1.7, color="tab:blue",
-                        errorevery=np.max([len(log_file["STEP"]) //10,1]))
+                        capthick=1.7, capsize=5,elinewidth=1.7, color="black",
+                        errorevery=np.max([len(log_file["STEP"]) //10,1]), label="Avergae")
         except TypeError:
-            ax.plot(cc[0], color="tab:blue")
-
+            pass
         plotter.show()
 
     def _plotRMSDts(self, paramName):
         plotter = FlexPlotter()
         ax = plotter.createSubPlot("RMSD ($\AA$)", "Time (ps)", "RMSD ($\AA$)")
+
+        # Get matching atoms
+        if self.referencePDB.get() != "":
+            ref_pdb = PDBMol(self.referencePDB.get())
+        else:
+            ref_pdb = PDBMol(self.protocol.getInputPDBprefix()+".pdb")
+        target_pdb = PDBMol(self.getTargetPDB(1))
+        idx = matchPDBatoms([ref_pdb, target_pdb], ca_only=True)
 
         # Get RMSD list
         fitlist = self.getFitlist()
@@ -219,7 +229,7 @@ class GenesisViewer(ProtocolViewer):
             for j in outputPrefix:
                 log_file = readLogFile(j + ".log")
                 rmsd.append(rmsdFromDCD(outputPrefix=j, inputPDB=self.protocol.getInputPDBprefix(i-1)+".pdb",
-                    targetPDB=self.getTargetPDB(i), align = self.alignTarget.get()))
+                    targetPDB=self.getTargetPDB(i),idx=idx, align = self.alignTarget.get()))
 
         # Plot RMSD
         for i in range(len(rmsd)):
@@ -227,17 +237,17 @@ class GenesisViewer(ProtocolViewer):
                 (int(self.protocol.crdout_period.get())) * \
                 float(self.protocol.time_step.get())
             if len(rmsd) <=50:
-                ax.plot(x, rmsd[i], color="tab:blue", alpha=0.3)
+                ax.plot(x, rmsd[i], alpha=0.3, label="#%i"%i)
 
         try :
             rmsd_mean = np.mean(rmsd, axis=0)
             rmsd_std = np.std(rmsd, axis=0)
             ax.errorbar(x = x, y=rmsd_mean, yerr=rmsd_std,
-                        capthick=1.7, capsize=5,elinewidth=1.7, color="tab:blue",
-                        errorevery=np.max([len(log_file["STEP"]) //10,1]))
+                        capthick=1.7, capsize=5,elinewidth=1.7, color="black",
+                        errorevery=np.max([len(log_file["STEP"]) //10,1]), label="Average")
         except TypeError:
-            ax.plot(rmsd[0], color="tab:blue")
-
+            pass
+        plotter.legend()
         plotter.show()
 
     def _plotRMSD(self, paramName):
@@ -264,7 +274,11 @@ class GenesisViewer(ProtocolViewer):
                 final_mols.append(PDBMol(outputPDB))
                 target_mols.append(PDBMol(targetPDB))
 
-        idx = matchPDBatoms(mols=[initial_mols[0], target_mols[0]],ca_only=True)
+        if self.referencePDB.get() != "":
+            ref_mol = PDBMol(self.referencePDB.get())
+        else:
+            ref_mol = initial_mols[0]
+        idx = matchPDBatoms(mols=[ref_mol, target_mols[0]],ca_only=True)
         rmsdi=[]
         rmsdf=[]
         for i in range(len(fitlist)):

@@ -281,8 +281,6 @@ def matchPDBatoms(mols, ca_only=False):
                 id_tmp.append("%s_%i_%s_%s"%(m.chainName[i] if chaintype == 0 else m.chainID[i],
                                              m.resNum[i], m.resName[i] , m.atomName[i]))
                 id_idx_tmp.append(i)
-                print(id_tmp[-1])
-        print("/////////////////////////\n\n")
         ids.append(np.array(id_tmp))
         ids_idx.append(np.array(id_idx_tmp))
 
@@ -636,7 +634,7 @@ def getRMSD(mol1,mol2, align = False, idx=None):
         coord2 = mol2.coords
     return np.sqrt(np.mean(np.square(np.linalg.norm(coord1 - coord2, axis=1))))
 
-def rmsdFromDCD(outputPrefix, inputPDB, targetPDB, align=False):
+def rmsdFromDCD(outputPrefix, inputPDB, targetPDB, idx, align=False):
 
     # EXTRACT PDBs from dcd file
     with open("%s_tmp_dcd2pdb.tcl" % outputPrefix, "w") as f:
@@ -655,7 +653,6 @@ def rmsdFromDCD(outputPrefix, inputPDB, targetPDB, align=False):
     inputPDBmol = PDBMol(inputPDB)
     targetPDBmol = PDBMol(targetPDB)
 
-    idx = matchPDBatoms([inputPDBmol,targetPDBmol], ca_only=True)
     rmsd.append(getRMSD(mol1 = inputPDBmol, mol2=targetPDBmol, align=align, idx=idx))
     i=0
     while(os.path.exists("%stmp%i.pdb"%(outputPrefix,i+1))):
