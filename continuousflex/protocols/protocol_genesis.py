@@ -469,6 +469,11 @@ class ProtGenesis(EMProtocol):
                 mrc_data = ((inputMRCData - (min2 + min1))*(max1 - min1) )/ (max2 - min2)
             # elif self.preprocessingVol.get() == PREPROCESS_VOL_MATCH:
             #     mrc_data = match_histograms(inputMRCData, tmpMRCData)
+
+            # CLEANING
+            runProgram("rm", "-f %s.sit" % fnTmpVol)
+            runProgram("rm", "-f %s.mrc" % fnTmpVol)
+            runProgram("rm", "-f %s_INP_emmap" % fnTmpVol)
         else:
             mrc_data = inputMRCData
 
@@ -489,11 +494,8 @@ class ProtGenesis(EMProtocol):
             f.write("exit")
         runCommand( "/bin/bash %s " %self._getExtraPath("runconvert.sh"), env=self.getGenesisEnv())
 
-        # CLEANING
-        runProgram("rm","-f %s.sit"%fnTmpVol)
-        runProgram("rm","-f %s.mrc"%fnTmpVol)
+
         runProgram("rm","-f %s"%self._getExtraPath("runconvert.sh"))
-        runProgram("rm","-f %s_INP_emmap" % fnTmpVol)
         runProgram("rm","-f %sConv.mrc"%volPrefix)
         runProgram("rm","-f %s.mrc" % volPrefix)
 
@@ -503,7 +505,6 @@ class ProtGenesis(EMProtocol):
     ################################################################################
 
     def runGenesisStep(self):
-
         rb_condition = self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get()
 
         # Parallel Genesis simulation
@@ -671,6 +672,7 @@ class ProtGenesis(EMProtocol):
                     #cleaning
                     runCommand("rm -rf %s" %self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5)))
                 self.inputRST.set(rstfile)
+        self.inputRST.set("")
 
 
 
@@ -1105,4 +1107,4 @@ class ProtGenesis(EMProtocol):
         if len(rstList) >1:
             return rstList[index]
         else:
-            rstList[0]
+            return rstList[0]

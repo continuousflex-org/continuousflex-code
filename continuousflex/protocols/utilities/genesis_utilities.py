@@ -34,7 +34,7 @@ class PDBMol:
                 spl = line.split()
                 if len(spl) > 0:
                     if (spl[0] == 'ATOM'):  # or (hetatm and spl[0] == 'HETATM'):
-                        l = [line[:6], line[6:11], line[12:16], line[16], line[17:20], line[21], line[22:26],
+                        l = [line[:6], line[6:11], line[12:16], line[16], line[17:21], line[21], line[22:26],
                              line[30:38],
                              line[38:46], line[46:54], line[54:60], line[60:66], line[72:76], line[76:78]]
                         l = [i.strip() for i in l]
@@ -238,9 +238,11 @@ class PDBMol:
             resNum = 1
             for i in range(len(chain_idx)):
                 if self.resNum[chain_idx[i]] != past_resNum:
-                    past_resNum = self.resNum[chain_idx[i]]
-                    resNum += 1
-                self.resNum[chain_idx[i]] = resNum
+                    if self.resNum[chain_idx[i]] != past_resNum+1:
+                        print("ERROR : non sequential residue number in one segment")
+                    # past_resNum = self.resNum[chain_idx[i]]
+                    # resNum += 1
+                # self.resNum[chain_idx[i]] = resNum
                 self.atomNum[chain_idx[i]] = i + 1
 
     def allatoms2ca(self):
@@ -261,8 +263,11 @@ def matchPDBatoms(mols, ca_only=False):
 
     if mols[0].chainID[0] in mols[1].chainID:
         chaintype = 1
+        print("\t Matching segments %s %s ... "% (str(mols[0].chainID), str(mols[1].chainID)))
     elif mols[0].chainName[0] in mols[1].chainName:
         chaintype = 0
+        print("\t Matching chains %s %s ... "% (str(mols[0].chainName), str(mols[1].chainName)))
+
     else:
         raise RuntimeError("\t Warning : No matching chains")
 
@@ -273,11 +278,11 @@ def matchPDBatoms(mols, ca_only=False):
         id_idx_tmp=[]
         for i in range(m.n_atoms):
             if (not ca_only) or m.atomName[i] == "CA" or m.atomName[i] == "P":
-                if chaintype == 0 :
-                    id_tmp.append("%s_%i_%s_%s"%(m.chainName[i], m.resNum[i], m.resName[i] , m.atomName[i]))
-                else:
-                    id_tmp.append("%s_%i_%s_%s"%(m.chainID[i], m.resNum[i], m.resName[i] , m.atomName[i]))
+                id_tmp.append("%s_%i_%s_%s"%(m.chainName[i] if chaintype == 0 else m.chainID[i],
+                                             m.resNum[i], m.resName[i] , m.atomName[i]))
                 id_idx_tmp.append(i)
+                print(id_tmp[-1])
+        print("/////////////////////////\n\n")
         ids.append(np.array(id_tmp))
         ids_idx.append(np.array(id_idx_tmp))
 
@@ -296,6 +301,8 @@ def matchPDBatoms(mols, ca_only=False):
 
     if len(idx)==0:
         print("\t Warning : No matching coordinates")
+
+    print("\t %i matching atoms "%len(np.array(idx)))
     print("\t Done")
 
     return np.array(idx)
@@ -405,7 +412,7 @@ def generateGROTOP(inputPDB, outputPrefix, forcefield, smog_dir, nucleicChoice):
     moltmp.alias_atom("C5'", "C5*")
     moltmp.alias_atom("C5M", "C7")
     moltmp.add_terminal_res()
-    moltmp.atom_res_reorder()
+    # moltmp.atom_res_reorder()
     moltmp.save(inputPDB)
 
     # Run Smog2

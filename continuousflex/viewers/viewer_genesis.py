@@ -136,7 +136,9 @@ class GenesisViewer(ProtocolViewer):
                         else:
                             ene[e] = [log_file[e]]
 
-        x = self.getStep(log_file["STEP"], len(log_file["STEP"]))
+        x = np.arange(len(log_file["TOTAL_ENE"]))*\
+            (int(self.protocol.eneout_period.get()) )*\
+            float( self.protocol.time_step.get())
         for e in ene:
             ax.errorbar(x = x, y=np.mean(ene[e], axis=0), yerr=np.std(ene[e], axis=0), label=e,
                         capthick=1.7, capsize=5,elinewidth=1.7,
@@ -163,7 +165,9 @@ class GenesisViewer(ProtocolViewer):
                         else:
                             ene[e] = [log_file[e]]
 
-        x = self.getStep(log_file["STEP"], len(log_file["STEP"]))
+        x = np.arange(len(log_file["BOND"])) * \
+            (int(self.protocol.eneout_period.get())) * \
+            float(self.protocol.time_step.get())
         for e in ene:
             ax.errorbar(x = x, y=np.mean(ene[e], axis=0), yerr=np.std(ene[e], axis=0), label=e,
                         capthick=1.7, capsize=5,elinewidth=1.7,
@@ -186,7 +190,9 @@ class GenesisViewer(ProtocolViewer):
 
         # Plot CC
         for i in range(len(cc)):
-            x = self.getStep(log_file["STEP"], len(cc[i]))
+            x = np.arange(len(cc[i])) * \
+                (int(self.protocol.eneout_period.get())) * \
+                float(self.protocol.time_step.get())
             if len(cc) <= 50:
                 ax.plot(x, cc[i], color="tab:blue", alpha=0.3)
 
@@ -217,7 +223,9 @@ class GenesisViewer(ProtocolViewer):
 
         # Plot RMSD
         for i in range(len(rmsd)):
-            x = self.getStep(log_file["STEP"], len(rmsd[i]))
+            x = np.arange(len(rmsd[i])) * \
+                (int(self.protocol.crdout_period.get())) * \
+                float(self.protocol.time_step.get())
             if len(rmsd) <=50:
                 ax.plot(x, rmsd[i], color="tab:blue", alpha=0.3)
 
@@ -244,23 +252,25 @@ class GenesisViewer(ProtocolViewer):
         for i in fitlist:
             inputPDB = self.protocol.getInputPDBprefix(i-1)+".pdb"
             targetPDB = self.getTargetPDB(i)
-            outputPrefix = self.protocol.getOutputPrefix(i-1)
-            outputPDB = outputPrefix +".pdb"
-            # if not os.path.exists(outputPDB):
-            #     lastPDBFromDCD(inputPDB=self.protocol.getInputPDBprefix(i-1)+".pdb",
-            #             inputDCD=outputPrefix+".dcd", outputPDB=outputPrefix+"tmp.pdb")
-            #     outputPDB = outputPrefix+"tmp.pdb"
+            outputPrefs = self.protocol.getOutputPrefixAll(i-1)
+            for outputPrefix in outputPrefs:
+                outputPDB = outputPrefix +".pdb"
+                # if not os.path.exists(outputPDB):
+                #     lastPDBFromDCD(inputPDB=self.protocol.getInputPDBprefix(i-1)+".pdb",
+                #             inputDCD=outputPrefix+".dcd", outputPDB=outputPrefix+"tmp.pdb")
+                #     outputPDB = outputPrefix+"tmp.pdb"
 
-            initial_mols.append(PDBMol(inputPDB))
-            final_mols.append(PDBMol(outputPDB))
-            target_mols.append(PDBMol(targetPDB))
+                initial_mols.append(PDBMol(inputPDB))
+                final_mols.append(PDBMol(outputPDB))
+                target_mols.append(PDBMol(targetPDB))
 
         idx = matchPDBatoms(mols=[initial_mols[0], target_mols[0]],ca_only=True)
         rmsdi=[]
         rmsdf=[]
         for i in range(len(fitlist)):
-            rmsdi.append(getRMSD(mol1=initial_mols[i],mol2=target_mols[i], idx=idx, align=self.alignTarget.get()))
-            rmsdf.append(getRMSD(mol1=final_mols[i]  ,mol2=target_mols[i], idx=idx, align=self.alignTarget.get()))
+            for outputPrefix in outputPrefs:
+                rmsdi.append(getRMSD(mol1=initial_mols[i],mol2=target_mols[i], idx=idx, align=self.alignTarget.get()))
+                rmsdf.append(getRMSD(mol1=final_mols[i]  ,mol2=target_mols[i], idx=idx, align=self.alignTarget.get()))
 
         ax.plot(rmsdf, "o", color="tab:blue", label="RMSDf")
         ax.plot(rmsdi, "o", color="tab:green", label="RMSDi")
@@ -373,12 +383,6 @@ class GenesisViewer(ProtocolViewer):
         np.save(file = self.protocol._getExtraPath("PCA_data.npy"), arr= data)
         np.save(file = self.protocol._getExtraPath("PCA_length.npy"), arr= length)
         np.save(file = self.protocol._getExtraPath("PCA_labels.npy"), arr= labels)
-
-
-
-    def getStep(self, step, length):
-        time_step = float( self.protocol.time_step.get())
-        return np.arange(length)*(step[1]-step[0]) * time_step
 
     def getTargetPDB(self, index):
         targetPDBlist = [f for f in glob.glob(self.targetPDB.get())]
