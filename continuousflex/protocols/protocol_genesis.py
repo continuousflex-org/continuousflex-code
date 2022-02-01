@@ -545,6 +545,8 @@ class ProtGenesis(EMProtocol):
         for i1 in range(numLinearFit + 1):
             n_parallel = numParallelFit if i1 < numLinearFit else numLastIter
 
+            initrst = self.inputRST.get()
+
             # Loop rigidbody align / GENESIS fitting
             for iterFit in range(self.rb_n_iter.get()):
 
@@ -672,7 +674,7 @@ class ProtGenesis(EMProtocol):
                     #cleaning
                     runCommand("rm -rf %s" %self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5)))
                 self.inputRST.set(rstfile)
-        self.inputRST.set("")
+            self.inputRST.set(initrst)
 
 
 
@@ -689,11 +691,11 @@ class ProtGenesis(EMProtocol):
             processes.append(Popen(cmd, shell=True, env=env, stdout=sys.stdout, stderr = sys.stderr))
 
         # Wait for processes
-        for p in processes:
-            exitcode = p.wait()
+        for i in range(len(processes)):
+            exitcode = processes[i].wait()
             print("Process done %s" %str(exitcode))
             if exitcode != 0:
-                raise RuntimeError("Command returned with errors : %s" %str(cmds))
+                raise RuntimeError("Command returned with errors : %s" %str(cmds[i]))
 
     def createINP(self,inputPDB, outputPrefix, indexFit):
         """
