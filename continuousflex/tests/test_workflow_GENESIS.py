@@ -134,7 +134,7 @@ class testGENESIS(TestWorkflow):
             inputVolume = protImportVol.outputVolume,
             voxel_size = 2.0,
             centerOrigin = True,
-            preprocessingVol = PREPROCESS_VOL_MATCH,
+            preprocessingVol = PREPROCESS_VOL_NORM,
 
             numberOfThreads = multiprocessing.cpu_count(),
         )
@@ -207,7 +207,7 @@ class testGENESIS(TestWorkflow):
           inputVolume=protImportVol.outputVolume,
           voxel_size=2.0,
           centerOrigin=True,
-          preprocessingVol=PREPROCESS_VOL_MATCH,
+          preprocessingVol=PREPROCESS_VOL_NORM,
 
           numberOfThreads=multiprocessing.cpu_count(),
           )
@@ -283,7 +283,7 @@ class testGENESIS(TestWorkflow):
                                               inputVolume=protImportVol.outputVolume,
                                               voxel_size=2.0,
                                               centerOrigin=True,
-                                              preprocessingVol=PREPROCESS_VOL_MATCH,
+                                              preprocessingVol=PREPROCESS_VOL_NORM,
 
                                               numberOfThreads=multiprocessing.cpu_count()//2,
                                               numberOfMpi=2,
@@ -402,7 +402,7 @@ class testGENESIS(TestWorkflow):
             inputVolume = protImportVol.outputVolume,
             voxel_size = 2.0,
             centerOrigin = True,
-            preprocessingVol = PREPROCESS_VOL_MATCH,
+            preprocessingVol = PREPROCESS_VOL_NORM,
 
             numberOfThreads = multiprocessing.cpu_count(),
         )
