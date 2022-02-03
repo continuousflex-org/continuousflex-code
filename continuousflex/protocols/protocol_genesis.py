@@ -421,7 +421,7 @@ class ProtGenesis(EMProtocol):
                 origin = -self.voxel_size.get() * (np.array(inputMRCData.shape)) / 2
             else:
                 origin = np.zeros(3)
-        if self.preprocessingVol.get() != PREPROCESS_VOL_NONE:
+        if self.preprocessingVol.get() == PREPROCESS_VOL_NORM or self.preprocessingVol.get() == PREPROCESS_VOL_OPT:
             # CONVERT PDB TO SITUS VOLUME USING EMMAP GENERATOR
             fnTmpVol = self._getExtraPath("tmp")
             s ="\n[INPUT] \n"

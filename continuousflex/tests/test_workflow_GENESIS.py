@@ -134,7 +134,7 @@ class testGENESIS(TestWorkflow):
             inputVolume = protImportVol.outputVolume,
             voxel_size = 2.0,
             centerOrigin = True,
-            preprocessingVol = PREPROCESS_VOL_MATCH,
+            preprocessingVol = PREPROCESS_VOL_NORM,
 
             numberOfThreads = multiprocessing.cpu_count(),
         )
@@ -149,10 +149,15 @@ class testGENESIS(TestWorkflow):
         # Get the CC from the log file
         cc = readLogFile(log_file)["RESTR_CVS001"]
 
+
+
         # Get the RMSD from the dcd file
+        matchingAtoms = matchPDBatoms([PDBMol(protGenesisFit.getInputPDBprefix() + ".pdb")
+                                          , PDBMol(self.ds.getFile('1ake_pdb'))])
         rmsd = rmsdFromDCD(outputPrefix = protGenesisFit.getOutputPrefix(),
                            inputPDB = protGenesisFit.getInputPDBprefix()+".pdb",
                            targetPDB=self.ds.getFile('1ake_pdb'),
+                           idx=matchingAtoms,
                            align=False)
 
         # Assert that the CC is increasing and  the RMSD is decreasing
@@ -207,7 +212,7 @@ class testGENESIS(TestWorkflow):
           inputVolume=protImportVol.outputVolume,
           voxel_size=2.0,
           centerOrigin=True,
-          preprocessingVol=PREPROCESS_VOL_MATCH,
+          preprocessingVol=PREPROCESS_VOL_NORM,
 
           numberOfThreads=multiprocessing.cpu_count(),
           )
@@ -223,9 +228,12 @@ class testGENESIS(TestWorkflow):
         cc = readLogFile(log_file)["RESTR_CVS001"]
 
         # Get the RMSD from the dcd file
+        matchingAtoms = matchPDBatoms([PDBMol(protGenesisFit.getInputPDBprefix() + ".pdb")
+                                          , PDBMol(self.ds.getFile('1ake_pdb'))])
         rmsd = rmsdFromDCD(outputPrefix = protGenesisFitNMMD.getOutputPrefix(),
                            inputPDB = protGenesisFitNMMD.getInputPDBprefix()+".pdb",
                            targetPDB=self.ds.getFile('1ake_pdb'),
+                           idx=matchingAtoms,
                            align=False)
 
         # Assert that the CC is increasing and  the RMSD is decreasing
@@ -283,7 +291,7 @@ class testGENESIS(TestWorkflow):
                                               inputVolume=protImportVol.outputVolume,
                                               voxel_size=2.0,
                                               centerOrigin=True,
-                                              preprocessingVol=PREPROCESS_VOL_MATCH,
+                                              preprocessingVol=PREPROCESS_VOL_NORM,
 
                                               numberOfThreads=multiprocessing.cpu_count()//2,
                                               numberOfMpi=2,
@@ -302,15 +310,18 @@ class testGENESIS(TestWorkflow):
             cc1 = readLogFile(log_file1)["RESTR_CVS001"]
             cc2 = readLogFile(log_file2)["RESTR_CVS001"]
 
+
             # Get the RMSD from the dcd file
+            matchingAtoms = matchPDBatoms([PDBMol(protGenesisFitREUS.getInputPDBprefix() + ".pdb")
+                                                  ,PDBMol(self.ds.getFile('1ake_pdb'))])
             rmsd1 = rmsdFromDCD(outputPrefix=outPref[0],
                                inputPDB=protGenesisFitREUS.getInputPDBprefix() + ".pdb",
                                targetPDB=self.ds.getFile('1ake_pdb'),
-                               align=False)
+                               align=False, idx=matchingAtoms)
             rmsd2 = rmsdFromDCD(outputPrefix=outPref[0],
                                 inputPDB=protGenesisFitREUS.getInputPDBprefix() + ".pdb",
                                 targetPDB=self.ds.getFile('1ake_pdb'),
-                                align=False)
+                                align=False, idx=matchingAtoms)
 
             # Assert that the CCs are increasing
             print("\n\n//////////////////////////////////////////////")
@@ -402,7 +413,7 @@ class testGENESIS(TestWorkflow):
             inputVolume = protImportVol.outputVolume,
             voxel_size = 2.0,
             centerOrigin = True,
-            preprocessingVol = PREPROCESS_VOL_MATCH,
+            preprocessingVol = PREPROCESS_VOL_NORM,
 
             numberOfThreads = multiprocessing.cpu_count(),
         )
@@ -418,9 +429,13 @@ class testGENESIS(TestWorkflow):
         cc = readLogFile(log_file)["RESTR_CVS001"]
 
         # Get the RMSD from the dcd file
+        matchingAtoms = matchPDBatoms([PDBMol(protGenesisMin.getInputPDBprefix() + ".pdb")
+                                          , PDBMol(self.ds.getFile('1ake_pdb'))])
+
         rmsd = rmsdFromDCD(outputPrefix = protGenesisFit.getOutputPrefix(),
                            inputPDB = protGenesisFit.getInputPDBprefix()+".pdb",
                            targetPDB= self.ds.getFile('1ake_pdb'),
+                           idx=matchingAtoms,
                            align=False)
 
         # Assert that the CC is increasing
