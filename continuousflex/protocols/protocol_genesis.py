@@ -30,10 +30,8 @@ from pwem.objects.data import AtomStruct, SetOfAtomStructs, SetOfPDBs, SetOfVolu
 import numpy as np
 import mrcfile
 import os
-import sys
 import pwem.emlib.metadata as md
 from pwem.utils import runProgram
-from subprocess import Popen
 from xmippLib import Euler_angles2matrix
 
 from .utilities.genesis_utilities import *
@@ -99,56 +97,62 @@ class ProtGenesis(EMProtocol):
 
         # Inputs ============================================================================================
         form.addSection(label='Inputs')
-        form.addParam('inputPDB', params.PointerParam,
-                      pointerClass='AtomStruct, SetOfPDBs, SetOfAtomStructs', label="Input PDB (s)",
-                      help='Select the input PDB or set of PDBs.')
-        form.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0,
-                      choices=['CHARMM', 'AAGO', 'CAGO'], help="Type of the force field used for energy and force calculation")
-        form.addParam('generateTop', params.BooleanParam, label="Generate topology files ?",
-                      default=False, help="Use the GUI to generate topology files for you (PSF file for CHARMM and TOP file for AAGO/CAGO)."
-                                          " Requires VMD psfgen for CHARMM forcefields "
-                                          " and SMOG2 for GO models. Note that the generated topology files will not include"
-                                          " solvent.")
-        form.addParam('nucleicChoice', params.EnumParam, label="Contains nucleic acids ?", default=0,
-                      choices=['NO', 'RNA', 'DNA'], condition ="generateTop",help="TODo")
-        form.addParam('smog_dir', params.FileParam, label="SMOG2 directory",
-                      help='Path to SMOG2 directory', condition="(forcefield==1 or forcefield==2) and generateTop")
-        form.addParam('inputTOP', params.FileParam, label="GROMACS Topology File",
-                      condition="(forcefield==1 or forcefield==2) and not generateTop",
-                      help='Gromacs ‘top’ file containing information of the system such as atomic masses, charges,'
-                           ' atom connectivities. For details about this format, see the Gromacs web site')
-        form.addParam('inputPRM', params.FileParam, label="CHARMM parameter file",
-                      condition = "forcefield==0",
-                      help='CHARMM parameter file containing force field parameters, e.g. force constants and librium'
-                            ' geometries' )
-        form.addParam('inputRTF', params.FileParam, label="CHARMM topology file",
-                      condition="forcefield==0 or ((forcefield==1 or forcefield==2) and generateTop)",
-                      help='CHARMM topology file containing information about atom connectivity of residues and'
-                           ' other molecules. For details on the format, see the CHARMM web site')
-        form.addParam('inputPSF', params.FileParam, label="CHARMM Structure File",
-                      condition="forcefield==0 and not generateTop",
-                      help='CHARMM/X-PLOR psf file containing information of the system such as atomic masses,'
-                            ' charges, and atom connectivities. To generate this file, you can either use the option'
-                           '\" generate topology files\", VMD psfgen, or online CHARMM GUI.')
-        form.addParam('inputSTR', params.FileParam, label="CHARMM stream file (optional)",
-                      condition="forcefield==0", default="",
-                      help='CHARMM stream file containing both topology information and parameters')
-
-
-        form.addParam('inputRST', params.FileParam, label="GENESIS Restart File (optional)",
-                       help='Restart a previous GENESIS run with a .rst file', default="")
-
-
-        # Simulation =================================================================================================
-        form.addSection(label='Simulation')
-        form.addParam('md_program', params.EnumParam, label="MD program", default=0,
+        form.addParam('md_program', params.EnumParam, label="MD program", default=PROGRAM_ATDYN,
                       choices=['ATDYN', 'SPDYN'],
                       help="SPDYN (Spatial decomposition dynamics) and ATDYN (Atomic decomposition dynamics)"
                     " share almost the same data structures, subroutines, and modules, but differ in"
                     " their parallelization schemes. In SPDYN, the spatial decomposition scheme is implemented with new"
                     " parallel algorithms and GPGPU calculation. In ATDYN, the atomic decomposition scheme"
                     " is introduced for simplicity. The performance of ATDYN is not comparable to SPDYN due to the"
-                    " simple parallelization scheme but contains new methods and features.", important=True)
+                    " simple parallelization scheme but contains new methods and features.", important=True,
+                      expertLevel=params.LEVEL_ADVANCED)
+
+        form.addParam('inputPDB', params.PointerParam,
+                      pointerClass='AtomStruct, SetOfPDBs, SetOfAtomStructs', label="Input PDB (s)",
+                      help='Select the input PDB or set of PDBs.', important=True)
+
+        form.addParam('inputRST', params.FileParam, label="GENESIS Restart File (optional)",
+                       help='Restart a previous GENESIS run with a .rst file', default="")
+
+        group = form.addGroup('Forcefield Inputs')
+        group.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0, important=True,
+                      choices=['CHARMM', 'AAGO', 'CAGO'], help="Type of the force field used for energy and force calculation")
+        group.addParam('generateTop', params.BooleanParam, label="Generate topology files ?",
+                      default=False, help="Use the GUI to generate topology files for you (PSF file for CHARMM and TOP file for AAGO/CAGO)."
+                                          " Requires VMD psfgen for CHARMM forcefields "
+                                          " and SMOG2 for GO models. Note that the generated topology files will not include"
+                                          " solvent.")
+        group.addParam('nucleicChoice', params.EnumParam, label="Contains nucleic acids ?", default=0,
+                      choices=['NO', 'RNA', 'DNA'], condition ="generateTop",help="TODo")
+        group.addParam('smog_dir', params.FileParam, label="SMOG2 directory",
+                      help='Path to SMOG2 directory', condition="(forcefield==1 or forcefield==2) and generateTop")
+        group.addParam('inputTOP', params.FileParam, label="GROMACS Topology File",
+                      condition="(forcefield==1 or forcefield==2) and not generateTop",
+                      help='Gromacs ‘top’ file containing information of the system such as atomic masses, charges,'
+                           ' atom connectivities. For details about this format, see the Gromacs web site')
+        group.addParam('inputPRM', params.FileParam, label="CHARMM parameter file",
+                      condition = "forcefield==0",
+                      help='CHARMM parameter file containing force field parameters, e.g. force constants and librium'
+                            ' geometries' )
+        group.addParam('inputRTF', params.FileParam, label="CHARMM topology file",
+                      condition="forcefield==0 or ((forcefield==1 or forcefield==2) and generateTop)",
+                      help='CHARMM topology file containing information about atom connectivity of residues and'
+                           ' other molecules. For details on the format, see the CHARMM web site.'
+                           ' In the case of generating topology files for GO models, '
+                           ' the CHARMM topology file and VMD psfgen are used to fill missing atoms/residues.')
+        group.addParam('inputPSF', params.FileParam, label="CHARMM Structure File",
+                      condition="forcefield==0 and not generateTop",
+                      help='CHARMM/X-PLOR psf file containing information of the system such as atomic masses,'
+                            ' charges, and atom connectivities. To generate this file, you can either use the option'
+                           '\" generate topology files\", VMD psfgen, or online CHARMM GUI.')
+        group.addParam('inputSTR', params.FileParam, label="CHARMM stream file (optional)",
+                      condition="forcefield==0", default="",
+                      help='CHARMM stream file containing both topology information and parameters')
+
+
+
+        # Simulation =================================================================================================
+        form.addSection(label='Simulation')
         form.addParam('simulationType', params.EnumParam, label="Simulation type", default=0,
                       choices=['Molecular Dynamics', 'Minimization', 'Replica-Exchange Molecular Dynamics'],
                       help="Type of simulation to be performed by GENESIS", important=True)
@@ -167,26 +171,28 @@ class ProtGenesis(EMProtocol):
                       help="Update frequency of the non-bonded pairlist",
                       expertLevel=params.LEVEL_ADVANCED)
 
-        form.addParam('nm_number', params.IntParam, default=10, label='[NMMD] Number of normal modes',
+        group = form.addGroup('NMMD parameters', condition="integrator==2 and simulationType!=1")
+        group.addParam('nm_number', params.IntParam, default=10, label='Number of normal modes',
                       help="Number of normal modes for NMMD. 10 should work in most cases. Avoid "
                            " using too much NM (>50).",
                       condition="integrator==2 and simulationType!=1")
-        form.addParam('nm_mass', params.FloatParam, default=10.0, label='[NMMD] NM mass',
+        group.addParam('nm_mass', params.FloatParam, default=10.0, label='NM mass',
                       help="Mass value of Normal modes for NMMD", condition="integrator==2 and simulationType!=1",
                       expertLevel=params.LEVEL_ADVANCED)
-        form.addParam('nm_limit', params.FloatParam, default=1000.0, label='[NMMD] NM amplitude threshold',
+        group.addParam('nm_limit', params.FloatParam, default=1000.0, label='NM amplitude threshold',
                       help="Threshold of normal mode amplitude above which the normal modes are updated",
                       condition="integrator==2 and simulationType!=1",expertLevel=params.LEVEL_ADVANCED)
-        form.addParam('elnemo_cutoff', params.FloatParam, default=8.0, label='[NMMD] NMA cutoff (A)',
+        group.addParam('elnemo_cutoff', params.FloatParam, default=8.0, label='NMA cutoff (A)',
                       help="Cutoff distance for elastic network model", condition="integrator==2 and simulationType!=1",
                       expertLevel=params.LEVEL_ADVANCED)
-        form.addParam('elnemo_rtb_block', params.IntParam, default=10, label='[NMMD] NMA Number of residue RTB',
+        group.addParam('elnemo_rtb_block', params.IntParam, default=10, label='NMA Number of residue RTB',
                       help="Number of residue per RTB block in the NMA computation",
                       condition="integrator==2 and simulationType!=1",expertLevel=params.LEVEL_ADVANCED)
 
-        form.addParam('exchange_period', params.IntParam, default=1000, label='[REMD] Exchange Period',
+        group = form.addGroup('REMD parameters', condition="simulationType==2")
+        group.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
                       help="Number of MD steps between replica exchanges", condition="simulationType==2")
-        form.addParam('nreplica', params.IntParam, default=1, label='[REMD] Number of replicas',
+        group.addParam('nreplica', params.IntParam, default=1, label='Number of replicas',
                       help="Number of replicas for REMD", condition="simulationType==2")
         # ENERGY =================================================================================================
         form.addSection(label='Energy')
@@ -222,7 +228,7 @@ class ProtGenesis(EMProtocol):
                       choices=['NVT', 'NVE', 'NPT'],
                       help="Type of ensemble, NVE: Microcanonical ensemble, NVT: Canonical ensemble,"
                            " NPT: Isothermal-isobaric ensemble")
-        form.addParam('tpcontrol', params.EnumParam, label="Temperature control", default=1,
+        form.addParam('tpcontrol', params.EnumParam, label="Thermostat/Barostat", default=1,
                       choices=['NO', 'LANGEVIN', 'BERENDSEN', 'BUSSI'],
                       help="Type of thermostat and barostat. The availabe algorithm depends on the integrator :"
                            " LEAP : BERENDSEN, LANGEVIN;  VVER : BERENDSEN (NVT only), LANGEVIN, BUSSI; "
@@ -234,7 +240,7 @@ class ProtGenesis(EMProtocol):
         # Boundary =================================================================================================
         form.addSection(label='Boundary')
         form.addParam('boundary', params.EnumParam, label="Boundary", default=0,
-                      choices=['No boundary', 'Periodic Boundary Condition'], important=True,
+                      choices=['No boundary', 'Periodic Boundary Condition'],
                       help="Type of boundary condition")
         form.addParam('box_size_x', params.FloatParam, label='Box size X',
                       help="Box size along the x dimension", condition="boundary==1")
@@ -247,6 +253,8 @@ class ProtGenesis(EMProtocol):
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
                       choices=['None', 'Volume (s)', 'Image (s)'], important=True,
                       help="Type of cryo-EM data to be processed")
+        form.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
+                      default=False, help="Center the input PDBs with the center of mass")
         form.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
                       help="Force constant in Eem = k*(1 - c.c.). Note that in the case of REUS, the number of "
                            " force constant value must be equal to the number of replicas, for example for 4 replicas,"
@@ -263,49 +271,51 @@ class ProtGenesis(EMProtocol):
                       condition="EMfitChoice!=0",expertLevel=params.LEVEL_ADVANCED)
 
         # Volumes
-        form.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
+        group = form.addGroup('Volume Parameters', condition="EMfitChoice==1")
+        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
                       label="Input volume (s)", help='Select the target EM density volume',
-                      condition="EMfitChoice==1")
-        form.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
+                      condition="EMfitChoice==1", important=True)
+        group.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
                       help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==1")
-        form.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=False,
-                      help="Center the volume to the origin", condition="EMfitChoice==1")
-        form.addParam('preprocessingVol', params.EnumParam, label="Volume preprocessing", default=0,
+        group.addParam('preprocessingVol', params.EnumParam, label="Volume preprocessing", default=PREPROCESS_VOL_NONE,
                       choices=['None', 'Standard Normal', 'Match values range'],#, 'Match Histograms'],
                       help="Pre-process the input volume to match gray-values of the simulated map"
                            " used in the cryo-EM flexible fitting algorithm. Standard normal will normalize the "
                            " mean and standard deviation of the gray values to match the simulated map. Match values range"
                            " will linearly rescale the gray values range to match the simulated map range. Match histograms"
                            " will match histograms of the target EM and the simulated EM maps", condition="EMfitChoice==1")
+        group.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=False,
+                      help="Center the volume to the origin", condition="EMfitChoice==1")
 
         # Images
-        form.addParam('inputImage', params.PointerParam, pointerClass="Particle, SetOfParticles",
+        group = form.addGroup('Image Parameters', condition="EMfitChoice==2")
+        group.addParam('inputImage', params.PointerParam, pointerClass="Particle, SetOfParticles",
                       label="Input image (s)", help='Select the target EM density map',
-                      condition="EMfitChoice==2")
-        form.addParam('image_size', params.IntParam, default=64, label='Image Size',
+                      condition="EMfitChoice==2", important=True)
+        group.addParam('image_size', params.IntParam, default=64, label='Image Size',
                       help="TODO", condition="EMfitChoice==2")
-        form.addParam('estimateAngleShift', params.BooleanParam, label="Estimate rigid body ?",
+        group.addParam('estimateAngleShift', params.BooleanParam, label="Estimate rigid body ?",
                       default=False,  condition="EMfitChoice==2", help="If set, the GUI will perform rigid body alignement. "
                             "Otherwise, you must provide a set of alignement parameters for each image")
-        form.addParam('rb_n_iter', params.IntParam, default=1, label='Number of iterations for rigid body fitting',
+        group.addParam('rb_n_iter', params.IntParam, default=1, label='Number of iterations for rigid body fitting',
                       help="Number of rigid body alignement during the simulation. If 1 is set, the rigid body alignement "
                            "will be performed once at the begining of the simulation",
                       condition="EMfitChoice==2 and estimateAngleShift")
-        form.addParam('rb_method', params.EnumParam, label="Rigid body alignement method", default=1,
+        group.addParam('rb_method', params.EnumParam, label="Rigid body alignement method", default=1,
                       choices=['Projection Matching', 'Wavelet'], help="Type of rigid body alignement. "
                                                                        "Wavelet method is recommended",
                       condition="EMfitChoice==2 and estimateAngleShift")
-        form.addParam('imageAngleShift', params.FileParam, label="Rigid body parameters (.xmd)",
+        group.addParam('imageAngleShift', params.FileParam, label="Rigid body parameters (.xmd)",
                       condition="EMfitChoice==2 and not estimateAngleShift",
                       help='Xmipp metadata file of rigid body parameters for each image (3 euler angles, 2 shift)')
-        form.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
+        group.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
                       help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==2")
         # Constraints =================================================================================================
         form.addSection(label='Constraints')
-        form.addParam('rigid_bond', params.BooleanParam, label="Rigid bonds",
+        form.addParam('rigid_bond', params.BooleanParam, label="Rigid bonds (SHAKE/RATTLE)",
                       default=False,
                       help="Turn on or off the SHAKE/RATTLE algorithms for covalent bonds involving hydrogen")
-        form.addParam('fast_water', params.BooleanParam, label="Fast water",
+        form.addParam('fast_water', params.BooleanParam, label="Fast water (SETTLE)",
                       default=False,
                       help="Turn on or off the SETTLE algorithm for the constraints of the water molecules")
         form.addParam('water_model', params.StringParam, label='Water model', default="TIP3",
@@ -366,12 +376,13 @@ class ProtGenesis(EMProtocol):
                     or self.forcefield.get() == FORCEFIELD_CAGO:
                 runCommand("cp %s %s.top" % (self.inputTOP.get(), self.getInputPDBprefix(i)))
 
-        # Center PDB in case of images
-        if self.EMfitChoice.get() ==  EMFIT_IMAGES:
-            for i in range(n_pdb):
-                mol = PDBMol(self.getInputPDBprefix(i)+".pdb")
-                mol.center()
-                mol.save(self.getInputPDBprefix(i)+".pdb")
+        # Center PDBs
+        if self.centerPDB.get():
+            for i in range(self.getNumberOfInputPDB()):
+                cmd = "xmipp_pdb_center -i %s.pdb -o %s.pdb" %\
+                        (self.getInputPDBprefix(i),self.getInputPDBprefix(i))
+                runCommand(cmd)
+
 
     ################################################################################
     ##                 CONVERT INPUT VOLUME/IMAGE
@@ -505,6 +516,11 @@ class ProtGenesis(EMProtocol):
     ################################################################################
 
     def runGenesisStep(self):
+        """
+        Run GENESIS simulations step
+        :return None:
+        """
+
         rb_condition = self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get()
 
         # Parallel Genesis simulation
@@ -516,6 +532,10 @@ class ProtGenesis(EMProtocol):
             self.runParallelGenesisRBFitting()
 
     def runParallelGenesis(self):
+        """
+        Run multiple GENESIS simulations in parallel
+        :return None:
+        """
 
         # SETUP MPI parameters
         numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
@@ -532,10 +552,12 @@ class ProtGenesis(EMProtocol):
                                outputPrefix=prefix, indexFit=indexFit)
 
                 # Create Genesis command
-                cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
+                genesis_cmd = self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit)
+                cmds.append(genesis_cmd)
 
             # Run Genesis
-            self.runParallelJobs(cmds)
+            runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
+                            numberOfThreads=self.numberOfThreads.get())
 
     def runParallelGenesisRBFitting(self):
 
@@ -562,7 +584,7 @@ class ProtGenesis(EMProtocol):
                     cmds_pdb2vol.append(pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix,
                                                 sampling_rate=self.pixel_size.get(),
                                                 image_size=self.image_size.get()))
-                self.runParallelJobs(cmds_pdb2vol)
+                runParallelJobs(cmds_pdb2vol, env=self.getGenesisEnv())
 
                 # Loop 4 times to refine the angles
                 # sampling_rate = [10.0, 5.0, 3.0, 2.0]
@@ -596,8 +618,8 @@ class ProtGenesis(EMProtocol):
                             cmds_alignement.append(waveletAssignement(inputImage=inputImage,
                                                                       inputProj=tmpPrefix, outputMeta=tmpMeta))
                     # run parallel jobs
-                    self.runParallelJobs(cmds_projectVol)
-                    self.runParallelJobs(cmds_alignement)
+                    runParallelJobs(cmds_projectVol, env=self.getGenesisEnv())
+                    runParallelJobs(cmds_alignement, env=self.getGenesisEnv())
 
                     cmds_continuousAssign = []
                     for i2 in range(n_parallel):
@@ -610,7 +632,8 @@ class ProtGenesis(EMProtocol):
                         cmds_continuousAssign.append(continuousAssign(inputMeta=tmpMeta,
                                                                       inputVol=tmpPrefix,
                                                                       outputMeta=currentAngles))
-                    self.runParallelJobs(cmds_continuousAssign)
+                    runParallelJobs(cmds_continuousAssign, env=self.getGenesisEnv())
+
 
                 # Cleaning volumes and projections
                 for i2 in range(n_parallel):
@@ -635,7 +658,8 @@ class ProtGenesis(EMProtocol):
 
                     # run GENESIS
                     cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
-                self.runParallelJobs(cmds)
+                runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
+                                numberOfThreads=self.numberOfThreads.get())
 
                 # append files
                 if iterFit != 0:
@@ -675,27 +699,6 @@ class ProtGenesis(EMProtocol):
                     runCommand("rm -rf %s" %self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5)))
                 self.inputRST.set(rstfile)
             self.inputRST.set(initrst)
-
-
-
-
-    def runParallelJobs(self, cmds):
-        # Set env
-        env = self.getGenesisEnv()
-        env["OMP_NUM_THREADS"] = str(self.numberOfThreads)
-
-        # run process
-        processes = []
-        for cmd in cmds:
-            print("Running command : %s" %cmd)
-            processes.append(Popen(cmd, shell=True, env=env, stdout=sys.stdout, stderr = sys.stderr))
-
-        # Wait for processes
-        for i in range(len(processes)):
-            exitcode = processes[i].wait()
-            print("Process done %s" %str(exitcode))
-            if exitcode != 0:
-                raise RuntimeError("Command returned with errors : %s" %str(cmds[i]))
 
     def createINP(self,inputPDB, outputPrefix, indexFit):
         """
@@ -1048,11 +1051,27 @@ class ProtGenesis(EMProtocol):
         Get mpi parameters for the simulation
         :return tuple: numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
         """
-        n_fit = self.getNumberOfFitting()
+
+        if self.simulationType.get() == SIMULATION_REMD :
+            nreplica = self.nreplica.get()
+            if nreplica < self.numberOfMpi.get():
+                raise RuntimeError("Number of MPI cores should be larger than the number of replicas.")
+        else :
+            nreplica = 1
+        n_fit = self.getNumberOfFitting() * nreplica
+
         if n_fit <= self.numberOfMpi.get():
-            return self.numberOfMpi.get()//n_fit, 1, n_fit, 0
+            numberOfMpiPerFit   = self.numberOfMpi.get()//self.getNumberOfFitting()
+            numberOfLinearFit   = 1
+            numberOfParallelFit = self.getNumberOfFitting()
+            numberOflastIter    = 0
         else:
-            return 1, n_fit//self.numberOfMpi.get(),  self.numberOfMpi.get(), n_fit % self.numberOfMpi.get()
+            numberOfMpiPerFit   = nreplica
+            numberOfLinearFit   = n_fit//self.numberOfMpi.get()
+            numberOfParallelFit = self.numberOfMpi.get()//nreplica
+            numberOflastIter    = n_fit % self.numberOfMpi.get()
+
+        return numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
 
     def getRigidBodyParams(self, index=0):
         """
@@ -1094,8 +1113,6 @@ class ProtGenesis(EMProtocol):
         :return str : GENESIS commadn to run
         """
         cmd=""
-        if (n_mpi != 1):
-            cmd += "mpirun -np %s " % n_mpi
         if self.md_program.get() == PROGRAM_ATDYN:
             cmd +=  "atdyn %s " % ("%s_INP" % prefix)
         else:

@@ -1,14 +1,13 @@
 import numpy as np
 import os
 import copy
-from sklearn.decomposition import PCA
-import matplotlib.pyplot as plt
 from Bio.SVDSuperimposer import SVDSuperimposer
 from pyworkflow.utils import runCommand
-import pwem.emlib.metadata as md
-
 from xmippLib import SymList
 import pwem.emlib.metadata as md
+import sys
+from subprocess import Popen
+
 
 class PDBMol:
     def __init__(self, pdb_file):
@@ -465,7 +464,7 @@ def save_dcd(mol, coords_list, prefix):
         f.write("mol new %s_frame0.pdb\n" % prefix)
         for i in range(1,n_frames):
             f.write("mol addfile %s_frame%i.pdb\n" % (prefix, i))
-        f.write("animate write dcd %s_traj.dcd\n" % prefix)
+        f.write("animate write dcd %s.dcd\n" % prefix)
         f.write('exit\n')
 
     # Running VMD
@@ -476,112 +475,6 @@ def save_dcd(mol, coords_list, prefix):
         runCommand("rm -f %s_frame%i.pdb\n" % (prefix, i))
     runCommand("rm -f %s_cmd.tcl" % prefix)
     print("\t Done \n")
-
-
-
-def compute_pca(data, length=None, labels=None, n_components=2, figsize=(5,5), colors=None, alphas=None,
-                marker=None, traj=None, inv_pca=[], n_inv_pca=10, initdcd=None):
-    print("Computing PCA ...")
-    # plt.style.context("default")
-    if length is None:
-        length = [len(data)]
-    if colors is None:
-        if len(length)<=10:
-            colors = ["tab:red", "tab:blue", "tab:orange", "tab:green",
-                      "tab:brown", "tab:olive", "tab:pink", "tab:gray", "tab:cyan", "tab:purple"]
-        else:
-            colors = np.random.rand(len(length), 3)
-    # Compute PCA
-    arr = np.array(data)
-    pca = PCA(n_components=n_components)
-
-    components = pca.fit_transform(arr).T
-
-    # Prepare plotting data
-    idx = np.concatenate((np.array([0]),np.cumsum(length))).astype(int)
-    if labels is None:
-        pltlabels = ["#"+str(i) for i in range(len(length))]
-    else:
-        pltlabels=labels
-
-    fig = plt.figure(figsize=figsize)
-    if n_components == 3:
-        ax = fig.add_subplot(111, projection='3d')
-        ax.set_zlabel("PCA component 3")
-    else:
-        ax = fig.add_subplot(111)
-    ax.set_xlabel("PCA component 1")
-    ax.set_ylabel("PCA component 2")
-
-    if alphas is None:
-        alphas = [1 for i in range(len(length))]
-    if marker is None:
-        marker = ["o" for i in range(len(length))]
-    if traj is None:
-        traj = [1 for i in range(len(length))]
-
-    for i in range(len(length)):
-        len_traj = length[i]//traj[i]
-        for j in range(traj[i]):
-            args = [
-                components[0, idx[i] + j * len_traj:idx[i] + (j + 1) * len_traj],
-                components[1, idx[i] + j * len_traj:idx[i] + (j + 1) * len_traj]
-            ]
-            if n_components==3:
-                args.append(components[2, idx[i] + j * len_traj:idx[i] + (j + 1) * len_traj])
-
-            ax.plot(*args, marker[i], label=pltlabels[i], markeredgecolor='black',
-                        color = colors[i], alpha=alphas[i])
-    if labels is not None :
-        ax.legend()
-    fig.tight_layout()
-
-    annot = ax.annotate("", xy=(0, 0), xytext=(-40, 40), textcoords="offset points",
-                        bbox=dict(boxstyle='round4', fc='linen', ec='k', lw=1),
-                        arrowprops=dict(arrowstyle='-|>'))
-    annot.set_visible(False)
-    click_coord = []
-
-    def onclick(event):
-        if len(click_coord) < 2:
-            click_coord.append((event.xdata, event.ydata))
-            x = event.xdata
-            y = event.ydata
-
-            # printing the values of the selected point
-            print([x, y])
-            annot.xy = (x, y)
-            text = "({:.2g}, {:.2g})".format(x, y)
-            annot.set_text(text)
-            annot.set_visible(True)
-            fig.canvas.draw()
-
-        if len(click_coord) == 2:
-            click_sel = np.array([np.linspace(click_coord[0][0], click_coord[1][0], n_inv_pca),
-                            np.linspace(click_coord[0][1], click_coord[1][1], n_inv_pca)
-                            ])
-            ax.plot(click_sel[0], click_sel[1], "-o", color="black")
-            inv_pca.insert(0,pca.inverse_transform(click_sel.T))
-            click_coord.clear()
-            fig.canvas.draw()
-
-            initdcdcp = initdcd.copy()
-            coords_list = []
-            for i in range(n_inv_pca):
-                coords_list.append(inv_pca[0][i].reshape((initdcdcp.n_atoms, 3)))
-            save_dcd(mol=initdcdcp, coords_list=coords_list, prefix="tmp")
-            initdcdcp.coords = coords_list[0]
-            initdcdcp.save("tmp.pdb")
-            traj_viewer(pdb_file="tmp.pdb", dcd_file="tmp_traj.dcd")
-
-
-    if n_components == 2:
-        fig.canvas.mpl_connect('button_press_event', onclick)
-
-    return fig, ax
-
-def traj_viewer(pdb_file, dcd_file):
-    runCommand("vmd %s %s" %(pdb_file,dcd_file))
 
 def alignMol(mol1, mol2, idx=None):
     print("> Aligning PDB ...")
@@ -679,7 +572,35 @@ def lastPDBFromDCD(inputPDB,inputDCD,  outputPDB):
     # CLEAN TMP FILES
     runCommand("rm -f %s_tmp_dcd2pdb.tcl" % (outputPDB))
 
+def runParallelJobs(commands, env=None, numberOfThreads=1, numberOfMpi=1):
+    """
+    Run multiple commands in parallel. Wait until all commands returned
+    :param list commands: list of commands to run in parallel
+    :param dict env: Running environement of subprocesses
+    :param numberOfThreads: Number of openMP threads
+    :param numberOfMpi: Number of MPI cores
+    :return None:
+    """
 
+    # Set env
+    if env is None:
+        env = os.environ
+    env["OMP_NUM_THREADS"] = str(numberOfThreads)
+
+    # run process
+    processes = []
+    for cmd in commands:
+        if (numberOfMpi != 1):
+            cmd += "mpirun -np %s " % numberOfMpi
+        print("Running command : %s" %cmd)
+        processes.append(Popen(cmd, shell=True, env=env, stdout=sys.stdout, stderr = sys.stderr))
+
+    # Wait for processes
+    for i in range(len(processes)):
+        exitcode = processes[i].wait()
+        print("Process done %s" %str(exitcode))
+        if exitcode != 0:
+            raise RuntimeError("Command returned with errors : %s" %str(commands[i]))
 
 def pdb2vol(inputPDB, outputVol, sampling_rate, image_size):
     """

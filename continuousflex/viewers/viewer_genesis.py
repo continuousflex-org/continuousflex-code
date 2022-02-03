@@ -25,17 +25,19 @@
 
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 import pyworkflow.protocol.params as params
-from continuousflex.protocols.protocol_genesis import ProtGenesis
+from continuousflex.protocols.protocol_genesis import *
 from continuousflex.protocols.utilities.genesis_utilities import *
 
 from .plotter import FlexPlotter
+from pwem.viewers import VmdView
 from pyworkflow.utils import getListFromRangeString
 import numpy as np
 import os
 import glob
 import pwem.emlib.metadata as md
 
-import pickle
+from sklearn.decomposition import PCA
+
 
 class GenesisViewer(ProtocolViewer):
     """ Visualization of results from the GENESIS protocol
@@ -47,56 +49,61 @@ class GenesisViewer(ProtocolViewer):
     def _defineParams(self, form):
         form.addSection(label='Visualization')
         form.addParam('fitRange', params.NumericRangeParam,
-                      label="List of fitting to display",
-                      default='1',
-                      help=' Examples:\n'
-                           ' "1,3-5" -> [1,3,4,5]\n'
-                           ' "1, 2, 4" -> [1,2,4]\n')
-        form.addParam('displayEnergy', params.LabelParam,
-                      label='Display Energy',
-                      help='TODO')
+                      label="Simulation number",
+                      default='1',important = True,
+                      help=' The simulation numbers to display. Examples:'
+                           ' "1,3-5" -> [1,3,4,5]'
+                           ' "1, 2, 4" -> [1,2,4]')
+        group = form.addGroup('Energy Analysis')
+        group.addParam('displayEnergy', params.LabelParam,
+                      label='Display Potential Energy',
+                      help='Show time series of the potentials used in MD simulation/Minimization')
 
-        form.addParam('displayCC', params.LabelParam,
-                      label='Display correlation coefficient',
-                      help='TODO')
-
-        form.addParam('displayRMSDts', params.LabelParam,
-                      label='Display RMSD time series',
-                      help='TODO')
-
-        form.addParam('displayRMSD', params.LabelParam,
-                      label='Display RMSD',
-                      help='TODO')
-
-        form.addParam('targetPDB', params.PathParam, default=None,
-                        label="List of Target PDBs",
+        group = form.addGroup('RMSD analysis')
+        group.addParam('targetPDB', params.PathParam, default=None,
+                        label="Target PDB (s)", important=True,
                         help='Use the file pattern as file location with /*.pdb')
-        form.addParam('referencePDB', params.PathParam, default="",
+        group.addParam('referencePDB', params.PathParam, default="",
                         label="Reference PDB (optional)",
                         help='TODO')
 
-        form.addParam('alignTarget', params.BooleanParam, default=False,
+        group.addParam('displayRMSDts', params.LabelParam,
+                      label='Display RMSD time series',
+                      help='TODO')
+
+        group.addParam('displayRMSD', params.LabelParam,
+                      label='Display RMSD',
+                      help='TODO')
+
+        group.addParam('alignTarget', params.BooleanParam, default=False,
                         label="Align Target PDB",
                         help='TODO')
 
-        form.addParam('displayAngularDistance', params.LabelParam,
-                      label='Display Angular distance',
-                      help='TODO')
+        if self.protocol.EMfitChoice.get() != EMFIT_NONE:
+            group = form.addGroup('Cryo EM fitting')
+            group.addParam('displayCC', params.LabelParam,
+                          label='Display Correlation Coefficient',
+                          help='Show C.C. time series during the simulation')
+            if self.protocol.EMfitChoice.get() == EMFIT_IMAGES and \
+                    self.protocol.estimateAngleShift.get():
+                group.addParam('rigidBodyParams', params.FileParam, default=None,
+                              label="Target Rigid Body Parameters",
+                              help='Target parameter to compare')
+                group.addParam('displayAngularDistance', params.LabelParam,
+                              label='Display Angular distance',
+                              help='Show angular distance in degrees to the target rigid body params')
+                group.addParam('displayAngularDistanceTs', params.LabelParam,
+                              label='Display Angular distance Time series',
+                              help='Show angular distance time series'
+                                   'in degrees to the target rigid body params')
 
-        form.addParam('displayAngularDistanceTs', params.LabelParam,
-                      label='Display Angular distance Time series',
-                      help='TODO')
-
-        form.addParam('rigidBodyParams', params.FileParam, default=None,
-                        label="Target Rigid Body Parameters",
-                        help='TODO')
-
-
-        form.addParam('displayPCA', params.LabelParam,
+        group = form.addGroup('PCA analysis')
+        group.addParam('displayPCA', params.LabelParam,
                       label='Display PCA',
                       help='TODO')
 
-        form.addParam('displayTraj', params.LabelParam,
+        group = form.addGroup('Simulation trajectory')
+        group.addParam('displayTrajVMD', params.LabelParam,
                       label='Display Trajecory',
                       help='TODO')
 
@@ -109,13 +116,14 @@ class GenesisViewer(ProtocolViewer):
             'displayAngularDistance': self._plotAngularDistance,
             'displayAngularDistanceTs': self._plotAngularDistanceTs,
             'displayPCA': self._plotPCA,
-            'displayTraj': self._plotTraj,
+            'displayTrajVMD': self._plotTrajVMD,
                 }
 
-    def _plotTraj(self, paramName):
+    def _plotTrajVMD(self, paramName):
         fitlist = self.getFitlist()
-        traj_viewer(pdb_file=self.protocol.getInputPDBprefix(fitlist[0] - 1)+".pdb",
-                    dcd_file=self.protocol.getOutputPrefix(fitlist[0] - 1)+".dcd")
+        vmdviewer = VmdView("%s.pdb %s.dcd"%(self.protocol.getInputPDBprefix(fitlist[0] - 1),
+                    self.protocol.getOutputPrefixAll(fitlist[0] - 1)[0]))
+        vmdviewer.show()
 
     def _plotEnergy(self, paramName):
         self._plotEnergyTotal()
@@ -204,9 +212,10 @@ class GenesisViewer(ProtocolViewer):
             cc_std = np.std(cc, axis=0)
             ax.errorbar(x = x, y=cc_mean, yerr=cc_std,
                         capthick=1.7, capsize=5,elinewidth=1.7, color="black",
-                        errorevery=np.max([len(log_file["STEP"]) //10,1]), label="Avergae")
+                        errorevery=np.max([len(cc_mean) //10,1]), label="Average")
         except TypeError:
             pass
+        plotter.legend()
         plotter.show()
 
     def _plotRMSDts(self, paramName):
@@ -227,7 +236,6 @@ class GenesisViewer(ProtocolViewer):
         for i in fitlist:
             outputPrefix = self.protocol.getOutputPrefixAll(i-1)
             for j in outputPrefix:
-                log_file = readLogFile(j + ".log")
                 rmsd.append(rmsdFromDCD(outputPrefix=j, inputPDB=self.protocol.getInputPDBprefix(i-1)+".pdb",
                     targetPDB=self.getTargetPDB(i),idx=idx, align = self.alignTarget.get()))
 
@@ -244,7 +252,7 @@ class GenesisViewer(ProtocolViewer):
             rmsd_std = np.std(rmsd, axis=0)
             ax.errorbar(x = x, y=rmsd_mean, yerr=rmsd_std,
                         capthick=1.7, capsize=5,elinewidth=1.7, color="black",
-                        errorevery=np.max([len(log_file["STEP"]) //10,1]), label="Average")
+                        errorevery=np.max([len(rmsd_mean) //10,1]), label="Average")
         except TypeError:
             pass
         plotter.legend()
@@ -263,16 +271,11 @@ class GenesisViewer(ProtocolViewer):
             inputPDB = self.protocol.getInputPDBprefix(i-1)+".pdb"
             targetPDB = self.getTargetPDB(i)
             outputPrefs = self.protocol.getOutputPrefixAll(i-1)
+            target_mols.append(PDBMol(targetPDB))
+            initial_mols.append(PDBMol(inputPDB))
             for outputPrefix in outputPrefs:
                 outputPDB = outputPrefix +".pdb"
-                # if not os.path.exists(outputPDB):
-                #     lastPDBFromDCD(inputPDB=self.protocol.getInputPDBprefix(i-1)+".pdb",
-                #             inputDCD=outputPrefix+".dcd", outputPDB=outputPrefix+"tmp.pdb")
-                #     outputPDB = outputPrefix+"tmp.pdb"
-
-                initial_mols.append(PDBMol(inputPDB))
                 final_mols.append(PDBMol(outputPDB))
-                target_mols.append(PDBMol(targetPDB))
 
         if self.referencePDB.get() != "":
             ref_mol = PDBMol(self.referencePDB.get())
@@ -282,20 +285,16 @@ class GenesisViewer(ProtocolViewer):
         rmsdi=[]
         rmsdf=[]
         for i in range(len(fitlist)):
-            for outputPrefix in outputPrefs:
+            for j in range(len(outputPrefs)):
                 rmsdi.append(getRMSD(mol1=initial_mols[i],mol2=target_mols[i], idx=idx, align=self.alignTarget.get()))
-                rmsdf.append(getRMSD(mol1=final_mols[i]  ,mol2=target_mols[i], idx=idx, align=self.alignTarget.get()))
+                rmsdf.append(getRMSD(mol1=final_mols[i*len(outputPrefs) + j]  ,
+                                     mol2=target_mols[i], idx=idx, align=self.alignTarget.get()))
 
-        ax.plot(rmsdf, "o", color="tab:blue", label="RMSDf")
-        ax.plot(rmsdi, "o", color="tab:green", label="RMSDi")
+        ax.plot(rmsdf, "o", color="tab:blue", label="Final RMSD", markeredgecolor='black')
+        ax.plot(rmsdi, "o", color="tab:green", label="Initial RMSD", markeredgecolor='black')
 
         plotter.legend()
         plotter.show()
-
-
-
-    def getFitlist(self):
-        return np.array(getListFromRangeString(self.fitRange.get()))
 
     def _plotAngularDistance(self, paramName):
         angular_dist = []
@@ -356,15 +355,19 @@ class GenesisViewer(ProtocolViewer):
         # MAtch atoms with target
         if self.targetPDB.get() is not None:
             targetPDB = PDBMol(self.getTargetPDB(1))
-            idx = matchPDBatoms([initPDB,targetPDB], ca_only=False)
+            if self.referencePDB.get() != "":
+                refPDB = PDBMol(self.referencePDB.get())
+            else:
+                refPDB = initPDB
+            matchingAtoms = matchPDBatoms([refPDB,targetPDB], ca_only=False)
         else:
-            idx = np.array([np.arange(initPDB.n_atoms)]).T
+            matchingAtoms = np.array([np.arange(initPDB.n_atoms)]).T
 
         # Get Init PDB coords
         initPDBs = []
         for i in range(self.protocol.getNumberOfInputPDB()):
             mol = PDBMol(self.protocol.getInputPDBprefix(i)+".pdb")
-            initPDBs.append(mol.coords[idx[:,0]].flatten())
+            initPDBs.append(mol.coords[matchingAtoms[:,0]].flatten())
 
         # Get fitted PDBs coords
         fitlist = self.getFitlist()
@@ -373,7 +376,7 @@ class GenesisViewer(ProtocolViewer):
             outputPrefix = self.protocol.getOutputPrefixAll(i - 1)
             for j in outputPrefix:
                 mol = PDBMol(j+".pdb")
-                fitPDBs.append(mol.coords[idx[:,0]].flatten())
+                fitPDBs.append(mol.coords[matchingAtoms[:,0]].flatten())
 
         data = fitPDBs + initPDBs
         length=[len(fitPDBs), len(initPDBs)]
@@ -383,20 +386,69 @@ class GenesisViewer(ProtocolViewer):
         if self.targetPDB.get() is not None:
             targetPDBs=[]
             for i in fitlist:
-                targetPDBs.append(PDBMol(self.getTargetPDB(i)).coords[idx[:,1]].flatten())
+                targetPDBs.append(PDBMol(self.getTargetPDB(i)).coords[matchingAtoms[:,1]].flatten())
             data = data+targetPDBs
             length.append(len(targetPDBs))
             labels.append("Target PDBs")
 
-        # Display PCA
-        initPDB.select_atoms(idx[:,0])
-        fig, ax=compute_pca(data=data, length=length, labels=labels,
-                    n_components=2, figsize=(5, 5), initdcd=initPDB)
-        fig.show()
+        # Compute PCA
+        pca = PCA(n_components=2)
+        pca_components = pca.fit_transform(np.array(data)).T
+
+        # Plot PCA data
+        idx_cumsum = np.concatenate((np.array([0]), np.cumsum(length))).astype(int)
+        plotter = FlexPlotter()
+        ax = plotter.createSubPlot("PCA", "PCA component 1", "PCA component 2")
+        for i in range(len(length)):
+            plotter.plot(pca_components[0, idx_cumsum[i]:idx_cumsum[i + 1]],
+                         pca_components[1, idx_cumsum[i]:idx_cumsum[i + 1]],
+                         "o", label=labels[i],
+                         markeredgecolor='black')
+        plotter.legend()
+        plotter.show()
+        fig = plotter.getFigure()
+
+        # Prepare onclick event
+        click_coord = []
+        inv_pca = []
+        n_inv_pca = 10
+        initPDB.select_atoms(matchingAtoms[:,0])
+
+        def onclick(event):
+            if len(click_coord) < 2:
+                click_coord.append((event.xdata, event.ydata))
+                x = event.xdata
+                y = event.ydata
+
+            if len(click_coord) == 2:
+                click_sel = np.array([np.linspace(click_coord[0][0], click_coord[1][0], n_inv_pca),
+                                      np.linspace(click_coord[0][1], click_coord[1][1], n_inv_pca)
+                                      ])
+                ax.plot(click_sel[0], click_sel[1], "-o", color="black")
+                inv_pca.insert(0, pca.inverse_transform(click_sel.T))
+                click_coord.clear()
+                fig.canvas.draw()
+
+                initdcdcp = initPDB.copy()
+                coords_list = []
+                for i in range(n_inv_pca):
+                    coords_list.append(inv_pca[0][i].reshape((initdcdcp.n_atoms, 3)))
+                tmpPath = self.protocol._getTmpPath("traj")
+                save_dcd(mol=initdcdcp, coords_list=coords_list, prefix=tmpPath)
+                initdcdcp.coords = coords_list[0]
+                initdcdcp.save(tmpPath+".pdb")
+                vmdviewer = VmdView("%s.pdb %s.dcd"%(tmpPath, tmpPath))
+                vmdviewer.show()
+
+        fig.canvas.mpl_connect('button_press_event', onclick)
 
         np.save(file = self.protocol._getExtraPath("PCA_data.npy"), arr= data)
         np.save(file = self.protocol._getExtraPath("PCA_length.npy"), arr= length)
         np.save(file = self.protocol._getExtraPath("PCA_labels.npy"), arr= labels)
+
+
+    def getFitlist(self):
+        return np.array(getListFromRangeString(self.fitRange.get()))
 
     def getTargetPDB(self, index):
         targetPDBlist = [f for f in glob.glob(self.targetPDB.get())]
