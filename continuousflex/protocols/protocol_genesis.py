@@ -29,64 +29,12 @@ from pwem.objects.data import AtomStruct, SetOfAtomStructs, SetOfPDBs, SetOfVolu
 
 import numpy as np
 import mrcfile
-import os
-import pwem.emlib.metadata as md
 from pwem.utils import runProgram
-from xmippLib import Euler_angles2matrix
 
 from .utilities.genesis_utilities import *
 from xmipp3 import Plugin
 import pyworkflow.utils as pwutils
 from pyworkflow.utils import runCommand
-
-EMFIT_NONE = 0
-EMFIT_VOLUMES = 1
-EMFIT_IMAGES = 2
-
-FORCEFIELD_CHARMM = 0
-FORCEFIELD_AAGO = 1
-FORCEFIELD_CAGO = 2
-
-SIMULATION_MD = 0
-SIMULATION_MIN = 1
-SIMULATION_REMD = 2
-
-PROGRAM_ATDYN = 0
-PROGRAM_SPDYN= 1
-
-INTEGRATOR_VVERLET = 0
-INTEGRATOR_LEAPFROG = 1
-INTEGRATOR_NMMD = 2
-
-IMPLICIT_SOLVENT_GBSA = 0
-IMPLICIT_SOLVENT_NONE = 1
-
-TPCONTROL_NONE = 0
-TPCONTROL_LANGEVIN = 1
-TPCONTROL_BERENDSEN = 2
-TPCONTROL_BUSSI = 3
-
-ENSEMBLE_NVT = 0
-ENSEMBLE_NVE = 1
-ENSEMBLE_NPT = 2
-
-BOUNDARY_NOBC = 0
-BOUNDARY_PBC = 1
-
-ELECTROSTATICS_PME = 0
-ELECTROSTATICS_CUTOFF = 1
-
-NUCLEIC_NO = 0
-NUCLEIC_RNA =1
-NUCLEIC_DNA = 2
-
-PREPROCESS_VOL_NONE = 0
-PREPROCESS_VOL_NORM = 1
-PREPROCESS_VOL_OPT = 2
-PREPROCESS_VOL_MATCH = 3
-
-RB_PROJMATCH = 0
-RB_WAVELET = 1
 
 class ProtGenesis(EMProtocol):
     """ Protocol to perform MD simulation using GENESIS. """
@@ -277,15 +225,17 @@ class ProtGenesis(EMProtocol):
                       condition="EMfitChoice==1", important=True)
         group.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
                       help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==1")
-        group.addParam('preprocessingVol', params.EnumParam, label="Volume preprocessing", default=PREPROCESS_VOL_NONE,
-                      choices=['None', 'Standard Normal', 'Match values range'],#, 'Match Histograms'],
-                      help="Pre-process the input volume to match gray-values of the simulated map"
-                           " used in the cryo-EM flexible fitting algorithm. Standard normal will normalize the "
-                           " mean and standard deviation of the gray values to match the simulated map. Match values range"
-                           " will linearly rescale the gray values range to match the simulated map range. Match histograms"
-                           " will match histograms of the target EM and the simulated EM maps", condition="EMfitChoice==1")
-        group.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=False,
+        group.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=True,
                       help="Center the volume to the origin", condition="EMfitChoice==1")
+        group.addParam('origin_x', params.FloatParam, default=None, label="Origin X",
+                      help="Origin of the first voxel in X direction (in Angstrom) ",
+                      condition="EMfitChoice==1 and not centerOrigin")
+        group.addParam('origin_y', params.FloatParam, default=None, label="Origin X",
+                      help="Origin of the first voxel in X direction (in Angstrom) ",
+                      condition="EMfitChoice==1 and not centerOrigin")
+        group.addParam('origin_z', params.FloatParam, default=None, label="Origin X",
+                      help="Origin of the first voxel in X direction (in Angstrom) ",
+                      condition="EMfitChoice==1 and not centerOrigin")
 
         # Images
         group = form.addGroup('Image Parameters', condition="EMfitChoice==2")
@@ -331,11 +281,13 @@ class ProtGenesis(EMProtocol):
         self._insertFunctionStep("runGenesisStep")
         self._insertFunctionStep("createOutputStep")
 
-    ################################################################################
-    ##                 CONVERT INPUT PDB
-    ################################################################################
+    # --------------------------- Convert Input PDBs --------------------------------------------
 
     def convertInputPDBStep(self):
+        """
+        Convert input PDB step. Generate topology files and copy input PDB files
+        :return None:
+        """
 
         inputPDBfn = self.getInputPDBfn()
         n_pdb = self.getNumberOfInputPDB()
@@ -384,23 +336,21 @@ class ProtGenesis(EMProtocol):
                 runCommand(cmd)
 
 
-    ################################################################################
-    ##                 CONVERT INPUT VOLUME/IMAGE
-    ################################################################################
+    # --------------------------- Convert Input EM data --------------------------------------------
 
     def convertInputEMStep(self):
-        # SETUP INPUT VOLUMES / IMAGES
+        """
+        Convert EM data step
+        :return None:
+        """
 
         inputEMfn = self.getInputEMfn()
         n_em = self.getNumberOfInputEM()
 
-        # CONVERT VOLUMES
         if self.EMfitChoice.get() == EMFIT_VOLUMES:
             for i in range(n_em):
-                self.convertVolum2Situs(fnInput=inputEMfn[i],
-                                   volPrefix = self.getInputEMprefix(i), fnPDB=self.getInputPDBprefix(i)+".pdb")
+                self.convertInputVol(fnInput=inputEMfn[i], volPrefix = self.getInputEMprefix(i))
 
-        # Initialize rigid body fitting parameters
         elif self.EMfitChoice.get() == EMFIT_IMAGES:
             for i in range(n_em):
                 runCommand("cp %s %s.spi"%(inputEMfn[i], self.getInputEMprefix(i)))
@@ -414,9 +364,15 @@ class ProtGenesis(EMProtocol):
                     currentAngles.setValue(md.MDL_SHIFT_Y, 0.0, 1)
                     currentAngles.write(self._getExtraPath("%s_current_angles.xmd" % str(i + 1).zfill(5)))
 
-    def convertVolum2Situs(self,fnInput,volPrefix, fnPDB):
+    def convertInputVol(self,fnInput,volPrefix):
+        """
+        Convert input volume data
+        :param str fnInput: input volume file name
+        :param str volPrefix: ouput volume prefix
+        :return None:
+        """
 
-        # CONVERT TO MRC
+        # Convert data to mrc
         pre, ext = os.path.splitext(os.path.basename(fnInput))
         if ext != ".mrc":
             runProgram("xmipp_image_convert", "-i %s --oext mrc -o %s.mrc" %
@@ -424,96 +380,28 @@ class ProtGenesis(EMProtocol):
         else:
             runProgram("cp","%s %s.mrc" %(fnInput,volPrefix))
 
-        # READ INPUT MRC
-        with mrcfile.open("%s.mrc" % volPrefix) as input_mrc:
-            inputMRCData = input_mrc.data
-            inputMRCShape = inputMRCData.shape
-            if self.centerOrigin.get():
-                origin = -self.voxel_size.get() * (np.array(inputMRCData.shape)) / 2
-            else:
-                origin = np.zeros(3)
-        if self.preprocessingVol.get() == PREPROCESS_VOL_NORM or self.preprocessingVol.get() == PREPROCESS_VOL_OPT:
-            # CONVERT PDB TO SITUS VOLUME USING EMMAP GENERATOR
-            fnTmpVol = self._getExtraPath("tmp")
-            s ="\n[INPUT] \n"
-            s +="pdbfile = %s\n" % fnPDB
-            s +="\n[OUTPUT] \n"
-            s +="mapfile = %s.sit\n" % fnTmpVol
-            s +="\n[OPTION] \n"
-            s +="map_format = SITUS \n"
-            s +="voxel_size = %f \n" % self.voxel_size.get()
-            s +="sigma = %f  \n" % self.emfit_sigma.get()
-            s +="tolerance = %f  \n"% self.emfit_tolerance.get()
-            s +="auto_margin    = NO\n"
-            s +="x0             = %f \n" % origin[0]
-            s +="y0             = %f \n" % origin[1]
-            s +="z0             = %f \n" % origin[2]
-            s +="box_size_x     =  %f \n" % (inputMRCShape[0]*self.voxel_size.get())
-            s +="box_size_y     =  %f \n" % (inputMRCShape[1]*self.voxel_size.get())
-            s +="box_size_z     =  %f \n" % (inputMRCShape[2]*self.voxel_size.get())
-            with open("%s_INP_emmap" % fnTmpVol, "w") as f:
-                f.write(s)
+        # Update mrc header
+        with mrcfile.open("%s.mrc" % volPrefix) as old_mrc:
+            with mrcfile.new("%s.mrc" % volPrefix, overwrite=True) as new_mrc:
+                new_mrc.set_data(old_mrc.data)
+                new_mrc.voxel_size = self.voxel_size.get()
+                new_mrc.header['origin'] = old_mrc.header['origin']
+                if self.centerOrigin.get():
+                    origin = -np.array(old_mrc.data.shape)/2 *self.voxel_size.get()
+                    new_mrc.header['origin']['x'] = origin[0]
+                    new_mrc.header['origin']['y'] = origin[1]
+                    new_mrc.header['origin']['z'] = origin[2]
+                else:
+                    if self.origin_x.get() is not None:
+                        new_mrc.header['origin']['x'] = self.origin_x.get()
+                    if self.origin_y.get() is not None:
+                        new_mrc.header['origin']['y'] = self.origin_y.get()
+                    if self.origin_z.get() is not None:
+                        new_mrc.header['origin']['z'] = self.origin_z.get()
+                new_mrc.update_header_from_data()
+                new_mrc.update_header_stats()
 
-            runCommand("emmap_generator %s_INP_emmap"% fnTmpVol, env=self.getGenesisEnv())
-
-            # CONVERT SITUS TMP FILE TO MRC
-            with open(self._getExtraPath("runconvert.sh"), "w") as f:
-                f.write("#!/bin/bash \n")
-                f.write("echo $PATH \n")
-                f.write("map2map %s.sit %s.mrc <<< \'1\'\n" % (fnTmpVol, fnTmpVol))
-                f.write("exit")
-            runCommand("/bin/bash %s" %self._getExtraPath("runconvert.sh"), env=self.getGenesisEnv())
-
-            # READ GENERATED MRC
-            with mrcfile.open(fnTmpVol+".mrc") as tmp_mrc:
-                tmpMRCData = tmp_mrc.data
-
-            # PREPROCESS VOLUME
-            if self.preprocessingVol.get() == PREPROCESS_VOL_NORM:
-                mrc_data =  ((inputMRCData-inputMRCData.mean())/inputMRCData.std())\
-                            *tmpMRCData.std() + tmpMRCData.mean()
-            elif self.preprocessingVol.get() == PREPROCESS_VOL_OPT:
-                min1 = tmpMRCData.min()
-                min2 = inputMRCData.min()
-                max1 = tmpMRCData.max()
-                max2 = inputMRCData.max()
-                mrc_data = ((inputMRCData - (min2 + min1))*(max1 - min1) )/ (max2 - min2)
-            # elif self.preprocessingVol.get() == PREPROCESS_VOL_MATCH:
-            #     mrc_data = match_histograms(inputMRCData, tmpMRCData)
-
-            # CLEANING
-            runProgram("rm", "-f %s.sit" % fnTmpVol)
-            runProgram("rm", "-f %s.mrc" % fnTmpVol)
-            runProgram("rm", "-f %s_INP_emmap" % fnTmpVol)
-        else:
-            mrc_data = inputMRCData
-
-        # SAVE TO MRC
-        with mrcfile.new("%sConv.mrc"%volPrefix, overwrite=True) as mrc:
-            mrc.set_data(np.float32(mrc_data))
-            mrc.voxel_size = self.voxel_size.get()
-            mrc.header['origin']['x'] = origin[0]
-            mrc.header['origin']['y'] = origin[1]
-            mrc.header['origin']['z'] = origin[2]
-            mrc.update_header_from_data()
-            mrc.update_header_stats()
-
-        # CONVERT MRC TO SITUS
-        with open(self._getExtraPath("runconvert.sh"), "w") as f:
-            f.write("#!/bin/bash \n")
-            f.write("map2map %sConv.mrc %s.sit <<< \'1\'\n" % (volPrefix,volPrefix))
-            f.write("exit")
-        runCommand( "/bin/bash %s " %self._getExtraPath("runconvert.sh"), env=self.getGenesisEnv())
-
-
-        runProgram("rm","-f %s"%self._getExtraPath("runconvert.sh"))
-        runProgram("rm","-f %sConv.mrc"%volPrefix)
-        runProgram("rm","-f %s.mrc" % volPrefix)
-
-
-    ################################################################################
-    ##                 GENESIS STEP
-    ################################################################################
+    # --------------------------- GENESIS step --------------------------------------------
 
     def runGenesisStep(self):
         """
@@ -846,7 +734,7 @@ class ProtGenesis(EMProtocol):
             s += "emfit_tolerance = %.6f \n" % self.emfit_tolerance.get()
             s += "emfit_period = 1  \n"
             if self.EMfitChoice.get() == EMFIT_VOLUMES:
-                s += "emfit_target = %s.sit \n" % inputEMprefix
+                s += "emfit_target = %s.mrc \n" % inputEMprefix
             elif self.EMfitChoice.get()==EMFIT_IMAGES :
                 s += "emfit_type = IMAGE \n"
                 s += "emfit_target = %s.spi \n" % inputEMprefix
@@ -869,9 +757,7 @@ class ProtGenesis(EMProtocol):
         with open(inp_file, "w") as f:
             f.write(s)
 
-    ################################################################################
-    ##                 CREATE OUTPUT STEP
-    ################################################################################
+    # --------------------------- Create output step --------------------------------------------
 
     def createOutputStep(self):
         """
@@ -896,7 +782,6 @@ class ProtGenesis(EMProtocol):
                 pdbset.append(AtomStruct(j + ".pdb"))
         self._defineOutputs(outputPDBs=pdbset)
 
-    # --------------------------- STEPS functions --------------------------------------------
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
         summary = []
@@ -922,7 +807,6 @@ class ProtGenesis(EMProtocol):
         pass
 
     # --------------------------- UTILS functions --------------------------------------------
-
 
     def getNumberOfInputPDB(self):
         """
@@ -1101,8 +985,6 @@ class ProtGenesis(EMProtocol):
         environ = pwutils.Environ(os.environ)
         environ.set('PATH', os.path.join(Plugin.getVar("GENESIS_HOME"), 'bin'),
                     position=pwutils.Environ.BEGIN)
-        environ.set('PATH', os.path.join(Plugin.getVar("SITUS_HOME"), 'bin'),
-                    position=pwutils.Environ.BEGIN)
         return environ
 
     def getGenesisCmd(self, prefix,n_mpi):
@@ -1121,6 +1003,11 @@ class ProtGenesis(EMProtocol):
         return cmd
 
     def getRestartFile(self, index=0):
+        """
+        Get input restart file
+        :param int index: Index of the simulation
+        :return str: restart file
+        """
         rstfile = self.inputRST.get()
         rstList = rstfile.split(" ")
         if len(rstList) >1:

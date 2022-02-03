@@ -120,24 +120,10 @@ class Plugin(pwem.Plugin):
                                   % env.getLibFolder(), 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
-        if os.path.exists(env.getEmFolder() + '/situs.tgz'):
-            os.system('rm ' + env.getEmFolder() + '/situs.tgz')
-
-        situs = env.addPackage('situs', version='3.1',
-                       url='http://situs.biomachina.org/disseminate/Situs_3.1.tar.gz',
-                       tar='situs.tgz',
-                       createBuildDir=False,
-                       buildDir='Situs_3.1',
-                       commands=[('cd src;'
-                                  'make;'
-                                  'make install;', "bin/map2map")],
-                       target="Situs_3.1", default=True)
-
-
         if os.path.exists(env.getEmFolder() + '/genesis.tgz'):
             os.system('rm ' + env.getEmFolder() + '/genesis.tgz')
 
-        env.addPackage('genesis', version='1.4.0', deps=[lapack, situs],
+        env.addPackage('genesis', version='1.4.0', deps=[lapack],
                        url='https://github.com/mms29/nmmd/archive/master.tar.gz',
                        tar='genesis.tgz',
                        createBuildDir=True,

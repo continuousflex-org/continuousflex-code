@@ -8,6 +8,49 @@ import pwem.emlib.metadata as md
 import sys
 from subprocess import Popen
 
+EMFIT_NONE = 0
+EMFIT_VOLUMES = 1
+EMFIT_IMAGES = 2
+
+FORCEFIELD_CHARMM = 0
+FORCEFIELD_AAGO = 1
+FORCEFIELD_CAGO = 2
+
+SIMULATION_MD = 0
+SIMULATION_MIN = 1
+SIMULATION_REMD = 2
+
+PROGRAM_ATDYN = 0
+PROGRAM_SPDYN= 1
+
+INTEGRATOR_VVERLET = 0
+INTEGRATOR_LEAPFROG = 1
+INTEGRATOR_NMMD = 2
+
+IMPLICIT_SOLVENT_GBSA = 0
+IMPLICIT_SOLVENT_NONE = 1
+
+TPCONTROL_NONE = 0
+TPCONTROL_LANGEVIN = 1
+TPCONTROL_BERENDSEN = 2
+TPCONTROL_BUSSI = 3
+
+ENSEMBLE_NVT = 0
+ENSEMBLE_NVE = 1
+ENSEMBLE_NPT = 2
+
+BOUNDARY_NOBC = 0
+BOUNDARY_PBC = 1
+
+ELECTROSTATICS_PME = 0
+ELECTROSTATICS_CUTOFF = 1
+
+NUCLEIC_NO = 0
+NUCLEIC_RNA =1
+NUCLEIC_DNA = 2
+
+RB_PROJMATCH = 0
+RB_WAVELET = 1
 
 class PDBMol:
     def __init__(self, pdb_file):
@@ -262,10 +305,10 @@ def matchPDBatoms(mols, ca_only=False):
 
     if mols[0].chainID[0] in mols[1].chainID:
         chaintype = 1
-        print("\t Matching segments %s %s ... "% (str(mols[0].chainID), str(mols[1].chainID)))
+        print("\t Matching segments ... ")
     elif mols[0].chainName[0] in mols[1].chainName:
         chaintype = 0
-        print("\t Matching chains %s %s ... "% (str(mols[0].chainName), str(mols[1].chainName)))
+        print("\t Matching chains ... ")
 
     else:
         raise RuntimeError("\t Warning : No matching chains")
@@ -303,14 +346,6 @@ def matchPDBatoms(mols, ca_only=False):
     print("\t Done")
 
     return np.array(idx)
-
-NUCLEIC_NO = 0
-NUCLEIC_RNA =1
-NUCLEIC_DNA = 2
-
-FORCEFIELD_CHARMM = 0
-FORCEFIELD_AAGO = 1
-FORCEFIELD_CAGO = 2
 
 def generatePSF(inputPDB, inputTopo, outputPrefix, nucleicChoice):
     fnPSFgen = outputPrefix+"psfgen.tcl"
@@ -591,7 +626,7 @@ def runParallelJobs(commands, env=None, numberOfThreads=1, numberOfMpi=1):
     processes = []
     for cmd in commands:
         if (numberOfMpi != 1):
-            cmd += "mpirun -np %s " % numberOfMpi
+            cmd = "mpirun -np %s " % numberOfMpi + cmd
         print("Running command : %s" %cmd)
         processes.append(Popen(cmd, shell=True, env=env, stdout=sys.stdout, stderr = sys.stderr))
 
