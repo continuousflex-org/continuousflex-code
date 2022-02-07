@@ -129,8 +129,8 @@ class Plugin(pwem.Plugin):
                        createBuildDir=True,
                        buildDir='genesis',
                        commands=[('tar -xf ../genesis.tgz -C .;'
-                                  'mv nmmd-master/* .;'
-                                  'rm -r nmmd-master;'
+                                  'mv nmmd-nmmd_image_merge/* .;'
+                                  'rm -r nmmd-nmmd_image_merge;'
                                   './configure;'
                                   'make install;', "bin/atdyn")],
                        neededProgs=['mpif90'],
