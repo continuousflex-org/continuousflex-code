@@ -227,14 +227,14 @@ class ProtGenesis(EMProtocol):
                       help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==1")
         group.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=True,
                       help="Center the volume to the origin", condition="EMfitChoice==1")
-        group.addParam('origin_x', params.FloatParam, default=None, label="Origin X",
+        group.addParam('origin_x', params.FloatParam, default=0, label="Origin X",
                       help="Origin of the first voxel in X direction (in Angstrom) ",
                       condition="EMfitChoice==1 and not centerOrigin")
-        group.addParam('origin_y', params.FloatParam, default=None, label="Origin X",
-                      help="Origin of the first voxel in X direction (in Angstrom) ",
+        group.addParam('origin_y', params.FloatParam, default=0, label="Origin Y",
+                      help="Origin of the first voxel in Y direction (in Angstrom) ",
                       condition="EMfitChoice==1 and not centerOrigin")
-        group.addParam('origin_z', params.FloatParam, default=None, label="Origin X",
-                      help="Origin of the first voxel in X direction (in Angstrom) ",
+        group.addParam('origin_z', params.FloatParam, default=0, label="Origin Z",
+                      help="Origin of the first voxel in Z direction (in Angstrom) ",
                       condition="EMfitChoice==1 and not centerOrigin")
 
         # Images
@@ -392,12 +392,9 @@ class ProtGenesis(EMProtocol):
                     new_mrc.header['origin']['y'] = origin[1]
                     new_mrc.header['origin']['z'] = origin[2]
                 else:
-                    if self.origin_x.get() is not None:
-                        new_mrc.header['origin']['x'] = self.origin_x.get()
-                    if self.origin_y.get() is not None:
-                        new_mrc.header['origin']['y'] = self.origin_y.get()
-                    if self.origin_z.get() is not None:
-                        new_mrc.header['origin']['z'] = self.origin_z.get()
+                    new_mrc.header['origin']['x'] = self.origin_x.get()
+                    new_mrc.header['origin']['y'] = self.origin_y.get()
+                    new_mrc.header['origin']['z'] = self.origin_z.get()
                 new_mrc.update_header_from_data()
                 new_mrc.update_header_stats()
 

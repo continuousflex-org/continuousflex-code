@@ -44,7 +44,6 @@ class Plugin(pwem.Plugin):
         cls._defineEmVar(CONTINUOUSFLEX_HOME, 'xmipp')
         cls._defineEmVar(NMA_HOME,'nma')
         cls._defineEmVar(GENESIS_HOME, 'genesis-1.4.0')
-        cls._defineEmVar(SITUS_HOME, 'situs-3.1')
         cls._defineVar(VMD_HOME,'/usr/local/lib/vmd')
 
     #   @classmethod
@@ -131,8 +130,8 @@ class Plugin(pwem.Plugin):
                        commands=[('tar -xf ../genesis.tgz -C .;'
                                   'mv nmmd-nmmd_image_merge/* .;'
                                   'rm -r nmmd-nmmd_image_merge;'
-                                  './configure;'
-                                  'make install;', "bin/atdyn")],
+                                  './configure LDFLAGS=-L%s ;'
+                                  'make install;' % env.getLibFolder(), "bin/atdyn")],
                        neededProgs=['mpif90'],
                        target="genesis", default=True)
 
