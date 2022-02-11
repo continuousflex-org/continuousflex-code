@@ -7,6 +7,7 @@ from xmippLib import SymList
 import pwem.emlib.metadata as md
 import sys
 from subprocess import Popen
+import re
 
 EMFIT_NONE = 0
 EMFIT_VOLUMES = 1
@@ -727,19 +728,43 @@ def flipAngles(inputMeta, outputMeta):
         Md1.setValue(md.MDL_ANGLE_PSI, -psi1, 1)
     Md1.write(outputMeta)
 
-def getAngularDist(md1, md2, idx1=1, idx2=1):
-    rot1        = md1.getValue(md.MDL_ANGLE_ROT, int(idx1))
-    tilt1       = md1.getValue(md.MDL_ANGLE_TILT, int(idx1))
-    psi1        = md1.getValue(md.MDL_ANGLE_PSI, int(idx1))
-    rot2        = md2.getValue(md.MDL_ANGLE_ROT, int(idx2))
-    tilt2       = md2.getValue(md.MDL_ANGLE_TILT, int(idx2))
-    psi2        = md2.getValue(md.MDL_ANGLE_PSI, int(idx2))
+# def getAngularDist(md1, md2, idx1=1, idx2=1):
+#     rot1        = md1.getValue(md.MDL_ANGLE_ROT, int(idx1))
+#     tilt1       = md1.getValue(md.MDL_ANGLE_TILT, int(idx1))
+#     psi1        = md1.getValue(md.MDL_ANGLE_PSI, int(idx1))
+#     rot2        = md2.getValue(md.MDL_ANGLE_ROT, int(idx2))
+#     tilt2       = md2.getValue(md.MDL_ANGLE_TILT, int(idx2))
+#     psi2        = md2.getValue(md.MDL_ANGLE_PSI, int(idx2))
+#
+#     return  SymList.computeDistanceAngles(SymList(), rot1, tilt1, psi1, rot2, tilt2, psi2, False, True, False)
+#
+#
+# def getShiftDist(md1, md2, idx1=1, idx2=1):
+#     shiftx1 = md1.getValue(md.MDL_SHIFT_X, int(idx1))
+#     shifty1 = md1.getValue(md.MDL_SHIFT_Y, int(idx1))
+#     shiftx2 = md2.getValue(md.MDL_SHIFT_X, int(idx2))
+#     shifty2 = md2.getValue(md.MDL_SHIFT_Y, int(idx2))
+#     return np.linalg.norm(np.array([shiftx1, shifty1, 0.0]) - np.array([shiftx2, shifty2, 0.0]))
 
-    return  SymList.computeDistanceAngles(SymList(), rot1, tilt1, psi1, rot2, tilt2, psi2, False, True, False)
+def getAngularShiftDist(angle1MetaFile, angle2MetaData, angle2Idx, tmpPrefix, symmetry):
 
-def getShiftDist(md1, md2, idx1=1, idx2=1):
-    shiftx1 = md1.getValue(md.MDL_SHIFT_X, int(idx1))
-    shifty1 = md1.getValue(md.MDL_SHIFT_Y, int(idx1))
-    shiftx2 = md2.getValue(md.MDL_SHIFT_X, int(idx2))
-    shifty2 = md2.getValue(md.MDL_SHIFT_Y, int(idx2))
-    return np.linalg.norm(np.array([shiftx1, shifty1, 0.0]) - np.array([shiftx2, shifty2, 0.0]))
+    mdImgTmp = md.MetaData()
+    mdImgTmp.addObject()
+    mdImgTmp.setValue(md.MDL_ANGLE_ROT, angle2MetaData.getValue(md.MDL_ANGLE_ROT, angle2Idx), 1)
+    mdImgTmp.setValue(md.MDL_ANGLE_TILT,angle2MetaData.getValue(md.MDL_ANGLE_TILT,angle2Idx), 1)
+    mdImgTmp.setValue(md.MDL_ANGLE_PSI, angle2MetaData.getValue(md.MDL_ANGLE_PSI, angle2Idx), 1)
+    mdImgTmp.setValue(md.MDL_SHIFT_X,   angle2MetaData.getValue(md.MDL_SHIFT_X,   angle2Idx), 1)
+    mdImgTmp.setValue(md.MDL_SHIFT_Y,   angle2MetaData.getValue(md.MDL_SHIFT_Y,   angle2Idx), 1)
+    mdImgTmp.write(tmpPrefix + ".xmd")
+
+    cmd = "xmipp_angular_distance --ang1 %s --ang2 %s.xmd --oroot %sDist --sym %s --check_mirrors > %s.log" % \
+          (angle1MetaFile, tmpPrefix, tmpPrefix, symmetry, tmpPrefix)
+    runCommand(cmd)
+    with open(tmpPrefix + ".log", "r") as f:
+        for line in f:
+            if "angular" in line:
+                angDist = float(re.findall("\d+\.\d+", line)[0])
+            if "shift" in line:
+                shftDist = float(re.findall("\d+\.\d+", line)[0])
+    return angDist, shftDist
+
