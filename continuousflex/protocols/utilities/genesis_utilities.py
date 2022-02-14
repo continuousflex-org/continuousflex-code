@@ -2,11 +2,12 @@ import numpy as np
 import os
 import copy
 from Bio.SVDSuperimposer import SVDSuperimposer
-from pyworkflow.utils import runCommand
+from pyworkflow.utils import runCommand, buildRunCommand
 from xmippLib import SymList
 import pwem.emlib.metadata as md
 import sys
 from subprocess import Popen
+
 
 EMFIT_NONE = 0
 EMFIT_VOLUMES = 1
@@ -607,7 +608,7 @@ def lastPDBFromDCD(inputPDB,inputDCD,  outputPDB):
     # CLEAN TMP FILES
     runCommand("rm -f %s_tmp_dcd2pdb.tcl" % (outputPDB))
 
-def runParallelJobs(commands, env=None, numberOfThreads=1, numberOfMpi=1):
+def runParallelJobs(commands, env=None, numberOfThreads=1, numberOfMpi=1, hostConfig=None):
     """
     Run multiple commands in parallel. Wait until all commands returned
     :param list commands: list of commands to run in parallel
@@ -625,8 +626,9 @@ def runParallelJobs(commands, env=None, numberOfThreads=1, numberOfMpi=1):
     # run process
     processes = []
     for cmd in commands:
-        if (numberOfMpi != 1):
-            cmd = "mpirun -np %s " % numberOfMpi + cmd
+        programname, params = cmd.split(" ",1)
+        cmd = buildRunCommand(programname, params, numberOfMpi=numberOfMpi, hostConfig=hostConfig,
+                              env=env)
         print("Running command : %s" %cmd)
         processes.append(Popen(cmd, shell=True, env=env, stdout=sys.stdout, stderr = sys.stderr))
 

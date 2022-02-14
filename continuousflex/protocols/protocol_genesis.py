@@ -433,7 +433,7 @@ class ProtGenesis(EMProtocol):
                 prefix = self.getOutputPrefix(indexFit)
 
                 # Create INP file
-                self.createINP(inputPDB=self.getInputPDBprefix(indexFit) + ".pdb",
+                self.createGenesisInputFile(inputPDB=self.getInputPDBprefix(indexFit) + ".pdb",
                                outputPrefix=prefix, indexFit=indexFit)
 
                 # Create Genesis command
@@ -442,7 +442,7 @@ class ProtGenesis(EMProtocol):
 
             # Run Genesis
             runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
-                            numberOfThreads=self.numberOfThreads.get())
+                            numberOfThreads=self.numberOfThreads.get(), hostConfig=self._stepsExecutor.hostConfig)
 
     def runParallelGenesisRBFitting(self):
 
@@ -469,7 +469,7 @@ class ProtGenesis(EMProtocol):
                     cmds_pdb2vol.append(pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix,
                                                 sampling_rate=self.pixel_size.get(),
                                                 image_size=self.image_size.get()))
-                runParallelJobs(cmds_pdb2vol, env=self.getGenesisEnv())
+                runParallelJobs(cmds_pdb2vol, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig)
 
                 # Loop 4 times to refine the angles
                 # sampling_rate = [10.0, 5.0, 3.0, 2.0]
@@ -503,8 +503,8 @@ class ProtGenesis(EMProtocol):
                             cmds_alignement.append(waveletAssignement(inputImage=inputImage,
                                                                       inputProj=tmpPrefix, outputMeta=tmpMeta))
                     # run parallel jobs
-                    runParallelJobs(cmds_projectVol, env=self.getGenesisEnv())
-                    runParallelJobs(cmds_alignement, env=self.getGenesisEnv())
+                    runParallelJobs(cmds_projectVol, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig)
+                    runParallelJobs(cmds_alignement, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig)
 
                     cmds_continuousAssign = []
                     for i2 in range(n_parallel):
@@ -517,7 +517,7 @@ class ProtGenesis(EMProtocol):
                         cmds_continuousAssign.append(continuousAssign(inputMeta=tmpMeta,
                                                                       inputVol=tmpPrefix,
                                                                       outputMeta=currentAngles))
-                    runParallelJobs(cmds_continuousAssign, env=self.getGenesisEnv())
+                    runParallelJobs(cmds_continuousAssign, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig)
 
 
                 # Cleaning volumes and projections
@@ -538,13 +538,13 @@ class ProtGenesis(EMProtocol):
                         inputPDB = self.getOutputPrefix(indexFit) + ".pdb"
 
                     # Create INP file
-                    self.createINP(inputPDB=inputPDB,
+                    self.createGenesisInputFile(inputPDB=inputPDB,
                                    outputPrefix=prefix, indexFit=indexFit)
 
                     # run GENESIS
                     cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
                 runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
-                                numberOfThreads=self.numberOfThreads.get())
+                                numberOfThreads=self.numberOfThreads.get(), hostConfig=self._stepsExecutor.hostConfig)
 
                 # append files
                 if iterFit != 0:
@@ -585,7 +585,7 @@ class ProtGenesis(EMProtocol):
                 self.inputRST.set(rstfile)
             self.inputRST.set(initrst)
 
-    def createINP(self,inputPDB, outputPrefix, indexFit):
+    def createGenesisInputFile(self,inputPDB, outputPrefix, indexFit):
         """
         Create INP input file for GENESIS
         :param str inputPDB: input PDB file name
@@ -984,11 +984,10 @@ class ProtGenesis(EMProtocol):
                     position=pwutils.Environ.BEGIN)
         return environ
 
-    def getGenesisCmd(self, prefix,n_mpi):
+    def getGenesisCmd(self, prefix):
         """
         Get GENESIS cmd to run
         :param str prefix: prefix of the simulation
-        :param int n_mpi: number of MPI processes
         :return str : GENESIS commadn to run
         """
         cmd=""
