@@ -30,6 +30,8 @@ from pwem.objects.data import AtomStruct, SetOfAtomStructs, SetOfPDBs, SetOfVolu
 import numpy as np
 import mrcfile
 from pwem.utils import runProgram
+from pyworkflow.utils import getListFromRangeString
+
 
 from .utilities.genesis_utilities import *
 from xmipp3 import Plugin
@@ -202,11 +204,13 @@ class ProtGenesis(EMProtocol):
                       choices=['None', 'Volume (s)', 'Image (s)'], important=True,
                       help="Type of cryo-EM data to be processed")
         form.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
-                      default=False, help="Center the input PDBs with the center of mass")
+                      default=False, help="Center the input PDBs with the center of mass", condition="EMfitChoice!=0")
         form.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
                       help="Force constant in Eem = k*(1 - c.c.). Note that in the case of REUS, the number of "
                            " force constant value must be equal to the number of replicas, for example for 4 replicas,"
-                           " a valid force constant is \"1000 2000 3000 4000\" "
+                           " a valid force constant is \"1000 2000 3000 4000\", otherwise you can specify a range of "
+                           " values (for example \"1000-4000\") and the force constant values will be linearly distributed "
+                           " to each replica."
                       , condition="EMfitChoice!=0")
         form.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EMfit Sigma",
                       help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
@@ -449,10 +453,10 @@ class ProtGenesis(EMProtocol):
         # SETUP MPI parameters
         numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
 
+        initrst = str(self.inputRST.get())
+
         for i1 in range(numLinearFit + 1):
             n_parallel = numParallelFit if i1 < numLinearFit else numLastIter
-
-            initrst = self.inputRST.get()
 
             # Loop rigidbody align / GENESIS fitting
             for iterFit in range(self.rb_n_iter.get()):
@@ -722,7 +726,11 @@ class ProtGenesis(EMProtocol):
             s += "\n[RESTRAINTS] \n" #-----------------------------------------------------------
             s += "nfunctions = 1 \n"
             s += "function1 = EM \n"
-            s += "constant1 = %s \n" % self.constantK.get()
+            constStr = self.constantK.get()
+            if "-" in constStr :
+                splt = constStr.split("-")
+                constStr = str(np.linspace(int(splt[0]),int(splt[1]),self.nreplica.get()))[1:-1]
+            s += "constant1 = %s \n" %constStr
             s += "select_index1 = 1 \n"
 
             s += "\n[EXPERIMENTS] \n" #-----------------------------------------------------------
@@ -935,7 +943,7 @@ class ProtGenesis(EMProtocol):
 
         if self.simulationType.get() == SIMULATION_REMD :
             nreplica = self.nreplica.get()
-            if nreplica < self.numberOfMpi.get():
+            if nreplica > self.numberOfMpi.get():
                 raise RuntimeError("Number of MPI cores should be larger than the number of replicas.")
         else :
             nreplica = 1
