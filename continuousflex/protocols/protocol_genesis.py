@@ -441,7 +441,7 @@ class ProtGenesis(EMProtocol):
                                outputPrefix=prefix, indexFit=indexFit)
 
                 # Create Genesis command
-                genesis_cmd = self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit)
+                genesis_cmd = self.getGenesisCmd(prefix=prefix)
                 cmds.append(genesis_cmd)
 
             # Run Genesis
@@ -546,7 +546,7 @@ class ProtGenesis(EMProtocol):
                                    outputPrefix=prefix, indexFit=indexFit)
 
                     # run GENESIS
-                    cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
+                    cmds.append(self.getGenesisCmd(prefix=prefix))
                 runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
                                 numberOfThreads=self.numberOfThreads.get(), hostConfig=self._stepsExecutor.hostConfig)
 
