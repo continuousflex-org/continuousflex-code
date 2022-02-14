@@ -729,7 +729,7 @@ class ProtGenesis(EMProtocol):
             constStr = self.constantK.get()
             if "-" in constStr :
                 splt = constStr.split("-")
-                constStr = str(np.linspace(int(splt[0]),int(splt[1]),self.nreplica.get()))[1:-1]
+                constStr = " ".join([str(int(i)) for i in np.linspace(int(splt[0]),int(splt[1]),self.nreplica.get())])
             s += "constant1 = %s \n" %constStr
             s += "select_index1 = 1 \n"
 
