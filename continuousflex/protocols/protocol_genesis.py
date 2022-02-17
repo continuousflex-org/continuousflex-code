@@ -776,6 +776,9 @@ class ProtGenesis(EMProtocol):
         # CREATE SET OF PDBs
         pdbset = self._createSetOfPDBs("outputPDBs")
 
+        if self.simulationType.get() == SIMULATION_REMD:
+            self.convertReusOutputDcd()
+
         # Add each output PDB to the Set
         for i in range(self.getNumberOfFitting()):
 
@@ -1022,3 +1025,52 @@ class ProtGenesis(EMProtocol):
             return rstList[index]
         else:
             return rstList[0]
+
+    def convertReusOutputDcd(self):
+
+        for i in range(self.getNumberOfFitting()):
+            remdPrefix = self._getExtraPath("%s_output_remd" % str(i + 1).zfill(5))
+            tmpPrefix =  self._getExtraPath("%s_output_tmp" % str(i + 1).zfill(5))
+            inp_file = self._getExtraPath("tmp_INP")
+
+            with open(inp_file, "w") as f:
+                f.write("\n[INPUT]\n")
+                f.write("reffile = %s.pdb # PDB file\n" % self.getInputPDBprefix(i))
+                f.write("remfile = %s{}.rem  # REMD parameter ID file\n" % remdPrefix)
+                f.write("dcdfile = %s{}.dcd  # DCD file\n" % remdPrefix)
+                f.write("logfile = %s{}.log  # REMD energy log file\n" % remdPrefix)
+
+                f.write("\n[OUTPUT]\n")
+                f.write("trjfile = %s{}.dcd  # coordinates sorted by temperature\n"% tmpPrefix)
+                f.write("logfile = %s{}.log  # energy log sorted by temperature\n"% tmpPrefix)
+
+                f.write("\n[SELECTION]\n")
+                f.write("group1 = all  # selection group 1\n")
+
+                f.write("\n[FITTING]\n")
+                f.write("fitting_method = NO  # [NO,TR,TR+ROT,TR+ZROT,XYTR,XYTR+ZROT]\n")
+                f.write("mass_weight = NO  # mass-weight is not applied\n")
+
+                f.write("\n[OPTION]\n")
+                f.write("check_only = NO\n")
+                f.write("convert_type = PARAMETER  # (REPLICA/PARAMETER)\n")
+                f.write("num_replicas = %i  # total number of replicas used in the simulation\n"% self.nreplica.get())
+                f.write("convert_ids =  # selected index (empty = all)(example: 1 2 5-10)\n")
+                f.write("nsteps = %i  # nsteps in [DYNAMICS]\n" % self.n_steps.get())
+                f.write("exchange_period = %i  # exchange_period in [REMD]\n" % self.exchange_period.get())
+                f.write("crdout_period = %i  # crdout_period in [DYNAMICS]\n" % self.eneout_period.get() )
+                f.write("eneout_period = %i  # eneout_period in [DYNAMICS]\n" % self.crdout_period.get() )
+                f.write("trjout_format = DCD  # (PDB/DCD)\n")
+                f.write("trjout_type = COOR+BOX  # (COOR/COOR+BOX)\n")
+                f.write("trjout_atom = 1  # atom group\n")
+                f.write("centering = NO\n")
+                f.write("pbc_correct = NO\n")
+
+            runCommand("remd_convert %s"%inp_file, env=self.getGenesisEnv())
+            for j in range(self.nreplica.get()):
+                repPrefix = self._getExtraPath("%s_output_remd%i" % (str(i + 1).zfill(5), j+1))
+                reptmpPrefix = self._getExtraPath("%s_output_tmp%i" % (str(i + 1).zfill(5), j+1))
+                runCommand("mv %s.dcd %s.dcd"%(reptmpPrefix,repPrefix))
+                runCommand("mv %s.log %s.log"%(reptmpPrefix,repPrefix))
+
+
