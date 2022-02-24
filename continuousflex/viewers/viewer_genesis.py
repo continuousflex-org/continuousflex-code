@@ -526,7 +526,7 @@ class GenesisViewer(ProtocolViewer):
                 coords_list = []
                 for i in range(n_inv_pca):
                     coords_list.append(inv_pca[0][i].reshape((initdcdcp.n_atoms, 3)))
-                tmpPath = self.protocol._getTmpPath("traj")
+                tmpPath = self.protocol._getExtraPath("traj")
                 save_dcd(mol=initdcdcp, coords_list=coords_list, prefix=tmpPath)
                 initdcdcp.coords = coords_list[0]
                 initdcdcp.save(tmpPath+".pdb")

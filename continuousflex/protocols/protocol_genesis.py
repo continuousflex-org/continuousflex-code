@@ -201,7 +201,7 @@ class ProtGenesis(EMProtocol):
         # Experiments =================================================================================================
         form.addSection(label='Experiments')
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
-                      choices=['None', 'Volume (s)', 'Image (s)'], important=True,
+                      choices=['None', 'Volume'], important=True,
                       help="Type of cryo-EM data to be processed")
         form.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
                       default=False, help="Center the input PDBs with the center of mass", condition="EMfitChoice!=0")
@@ -224,8 +224,8 @@ class ProtGenesis(EMProtocol):
 
         # Volumes
         group = form.addGroup('Volume Parameters', condition="EMfitChoice==1")
-        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
-                      label="Input volume (s)", help='Select the target EM density volume',
+        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume",
+                      label="Input volume", help='Select the target EM density volume',
                       condition="EMfitChoice==1", important=True)
         group.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
                       help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==1")
@@ -316,8 +316,8 @@ class ProtGenesis(EMProtocol):
                 for i in range(n_pdb):
                     prefix = self.getInputPDBprefix(i)
                     generatePSF(inputPDB=prefix+".pdb", inputTopo=self.inputRTF.get(),
-                                outputPrefix=prefix, nucleicChoice=self.nucleicChoice.get())
-                    generateGROTOP(inputPDB=prefix+".pdb", outputPrefix=prefix,
+                                outputPrefix=prefix+"_AA", nucleicChoice=self.nucleicChoice.get())
+                    generateGROTOP(inputPDB=prefix+"_AA.pdb", outputPrefix=prefix,
                                    forcefield=self.forcefield.get(), smog_dir=self.smog_dir.get(),
 					nucleicChoice=self.nucleicChoice.get())
 
