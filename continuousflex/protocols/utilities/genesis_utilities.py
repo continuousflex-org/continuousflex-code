@@ -405,6 +405,11 @@ def generatePSF(inputPDB, inputTopo, outputPrefix, nucleicChoice):
     #Run VMD PSFGEN
     runCommand("vmd -dispdev text -e %s > %s.log " %(fnPSFgen,outputPrefix))
 
+    # Check PDB
+    outMol = PDBMol(outputPrefix+".pdb")
+    if outMol.n_atoms == 0:
+        raise RuntimeError("VMD psfgen failed, check %s.log for details"%outputPrefix)
+
     #Clean
     os.system("rm -f " + fnPSFgen)
 
@@ -458,7 +463,7 @@ def generateGROTOP(inputPDB, outputPrefix, forcefield, smog_dir, nucleicChoice):
 
     if forcefield == FORCEFIELD_CAGO:
         mol.select_atoms(mol.allatoms2ca())
-    mol.save(inputPDB)
+    mol.save(outputPrefix+".pdb")
 
     # ADD CHARGE TO TOP FILE
     grotopFile = outputPrefix + ".top"
@@ -565,30 +570,17 @@ def getRMSD(mol1,mol2, align = False, idx=None):
     return np.sqrt(np.mean(np.square(np.linalg.norm(coord1 - coord2, axis=1))))
 
 def rmsdFromDCD(outputPrefix, inputPDB, targetPDB, idx, align=False):
-
-    # EXTRACT PDBs from dcd file
-    with open("%s_tmp_dcd2pdb.tcl" % outputPrefix, "w") as f:
-        s = ""
-        s += "mol load pdb %s dcd %s.dcd\n" % (inputPDB, outputPrefix)
-        s += "set nf [molinfo top get numframes]\n"
-        s += "for {set i 0 } {$i < $nf} {incr i} {\n"
-        s += "[atomselect top all frame $i] writepdb %stmp$i.pdb\n" % outputPrefix
-        s += "}\n"
-        s += "exit\n"
-        f.write(s)
-    runCommand("vmd -dispdev text -e %s_tmp_dcd2pdb.tcl > /dev/null" % outputPrefix)
-
     # COMPUTE RMSD
     rmsd = []
     inputPDBmol = PDBMol(inputPDB)
     targetPDBmol = PDBMol(targetPDB)
 
     rmsd.append(getRMSD(mol1 = inputPDBmol, mol2=targetPDBmol, align=align, idx=idx))
-    i=0
-    while(os.path.exists("%stmp%i.pdb"%(outputPrefix,i+1))):
-        f = "%stmp%i.pdb"%(outputPrefix,i+1)
-        rmsd.append(getRMSD(mol1 = PDBMol(f), mol2=targetPDBmol, align=align, idx=idx))
-        i+=1
+    coord_arr = dcd2numpyArr(outputPrefix+".dcd")
+
+    for i in range(len(coord_arr)):
+        inputPDBmol.coords[:,:] = coord_arr[i]
+        rmsd.append(getRMSD(mol1 = inputPDBmol, mol2=targetPDBmol, align=align, idx=idx))
 
     # CLEAN TMP FILES AND SAVE
     runCommand("rm -f %stmp*" % (outputPrefix))
@@ -770,3 +762,29 @@ def getAngularShiftDist(angle1MetaFile, angle2MetaData, angle2Idx, tmpPrefix, sy
                 shftDist = float(re.findall("\d+\.\d+", line)[0])
     return angDist, shftDist
 
+
+def dcd2numpyArr(filename):
+    print("> Reading dcd file %s"%filename)
+    with open(filename,'rb') as f:
+
+        # Header
+        f.read(4)
+        coordType = f.read(4).decode('ascii')
+        nframe = int.from_bytes((f.read(4)), "little")
+        for i in range(21): f.read(4)
+        ntitle = int.from_bytes((f.read(4)), "little")
+        title = f.read(80*ntitle).decode('ascii')
+        f.read(4)
+        f.read(4)
+        natom = int.from_bytes((f.read(4)), "little")
+        f.read(4)
+
+        # DCD COORD
+        dcd_arr = np.zeros((nframe, natom,3))
+        for i in range(nframe):
+            raw_arr = np.frombuffer((f.read(4 * 3*(natom+2))), dtype=np.float32)
+            dcd_arr[i] = raw_arr.reshape(3,(natom+2))[:, 1:-1].T
+
+    print("\t Done \n")
+
+    return dcd_arr
