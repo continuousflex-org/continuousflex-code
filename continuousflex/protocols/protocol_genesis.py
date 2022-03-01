@@ -316,8 +316,8 @@ class ProtGenesis(EMProtocol):
                 for i in range(n_pdb):
                     prefix = self.getInputPDBprefix(i)
                     generatePSF(inputPDB=prefix+".pdb", inputTopo=self.inputRTF.get(),
-                                outputPrefix=prefix, nucleicChoice=self.nucleicChoice.get())
-                    generateGROTOP(inputPDB=prefix+".pdb", outputPrefix=prefix,
+                                outputPrefix=prefix+"_AA", nucleicChoice=self.nucleicChoice.get())
+                    generateGROTOP(inputPDB=prefix+"_AA.pdb", outputPrefix=prefix,
                                    forcefield=self.forcefield.get(), smog_dir=self.smog_dir.get(),
 					nucleicChoice=self.nucleicChoice.get())
 
