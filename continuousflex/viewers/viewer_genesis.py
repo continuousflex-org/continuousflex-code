@@ -279,14 +279,15 @@ class GenesisViewer(ProtocolViewer):
         emlist = self.getEMList()
         for i in emlist:
             outputPrefix = self.getOutputPrefixAll(i)
-            cc.append([])
+            cc_rep = []
             labels.append("CC %s"%str(i))
             for j in outputPrefix:
                 log_file = readLogFile(j + ".log")
                 if 'RESTR_CVS001' in log_file:
-                    cc[i].append(log_file['RESTR_CVS001'])
+                    cc_rep.append(log_file['RESTR_CVS001'])
                 else:
                     raise RuntimeError("CC not present in the log file")
+            cc.append(cc_rep)
 
         self.genesisPlotter(title="CC", data=cc, ndata=len(emlist),
                             nrep=len(self.getOutputPrefixAll()), labels=labels)
@@ -315,7 +316,7 @@ class GenesisViewer(ProtocolViewer):
                 x = self.getTimePeriod(len(data[i][j]))
                 if 1 < nrep <= nmax:
                     if ndata == 1 :
-                        ax.plot(x, data[i][j], color= colors[j], alpha=0.5, label="replica %i"%j)
+                        ax.plot(x, data[i][j], color= colors[j], alpha=0.5, label="#%i"%j)
                     else:
                         ax.plot(x, data[i][j], color= colors[i], alpha=0.5)
                 if nrep == 1 and ndata <= 10:
@@ -352,11 +353,12 @@ class GenesisViewer(ProtocolViewer):
         emlist = self.getEMList()
         for i in emlist:
             outputPrefix = self.getOutputPrefixAll(i)
-            rmsd.append([])
             labels.append("RMSD %s"%str(i))
+            rmsd_rep=[]
             for j in outputPrefix:
-                rmsd[i].append(rmsdFromDCD(outputPrefix=j, inputPDB=self.protocol.getInputPDBprefix(i)+".pdb",
+                rmsd_rep.append(rmsdFromDCD(outputPrefix=j, inputPDB=self.protocol.getInputPDBprefix(i)+".pdb",
                     targetPDB=self.getTargetPDB(i),idx=idx, align = self.alignTarget.get()))
+            rmsd.append(rmsd_rep)
 
         self.genesisPlotter(title="RMSD ($\AA$)", data=rmsd, ndata=len(emlist),
                             nrep=len(self.getOutputPrefixAll()), labels=labels)
