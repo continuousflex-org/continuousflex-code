@@ -65,6 +65,24 @@ class GenesisViewer(ProtocolViewer):
                           help=' Select the replicas to display. Examples:'
                                ' "1,3-5" -> [1,3,4,5]'
                                ' "1, 2, 4" -> [1,2,4]')
+
+        form.addParam('compareToPDB', params.BooleanParam, default=False,
+                        label="Compare to external PDB",
+                        help='TODO')
+        form.addParam('targetPDB', params.PathParam, default=None,
+                        label="Target PDB (s)", important=True,
+                        help=' Target PDBs to compute RMSD against. Atom mathcing is performed between '
+                             ' the output PDBs and the target PDBs. Use the file pattern as file location with /*.pdb',
+                       condition= "compareToPDB")
+        form.addParam('referencePDB', params.PathParam, default="",
+                        label="Intial PDB",
+                        help='Atom matching will ignore the output PDB and will use the initial PDB instead.',
+                        expertLevel=params.LEVEL_ADVANCED,condition= "compareToPDB")
+
+        form.addParam('alignTarget', params.BooleanParam, default=False,
+                        label="Align Target PDB",
+                        help='TODO',condition= "compareToPDB")
+
         group = form.addGroup('Chimera 3D view')
         group.addParam('displayChimera', params.LabelParam,
                       label='Display results in Chimera',
@@ -81,26 +99,14 @@ class GenesisViewer(ProtocolViewer):
                       help='Show time series of the potentials used in MD simulation/Minimization')
 
         group = form.addGroup('RMSD analysis')
-        group.addParam('targetPDB', params.PathParam, default=None,
-                        label="Target PDB (s)", important=True,
-                        help=' Target PDBs to compute RMSD against. Atom mathcing is performed between '
-                             ' the output PDBs and the target PDBs. Use the file pattern as file location with /*.pdb')
-        group.addParam('referencePDB', params.PathParam, default="",
-                        label="Intial PDB",
-                        help='Atom matching will ignore the output PDB and will use the initial PDB instead.',
-                        expertLevel=params.LEVEL_ADVANCED)
-
         group.addParam('displayRMSDts', params.LabelParam,
                       label='Display RMSD time series',
-                      help='TODO')
+                      help='TODO',condition= "compareToPDB")
 
         group.addParam('displayRMSD', params.LabelParam,
                       label='Display final RMSD',
-                      help='TODO')
+                      help='TODO',condition= "compareToPDB")
 
-        group.addParam('alignTarget', params.BooleanParam, default=False,
-                        label="Align Target PDB",
-                        help='TODO')
 
         if self.protocol.EMfitChoice.get() != EMFIT_NONE:
             group = form.addGroup('Cryo EM fitting')
@@ -160,7 +166,7 @@ class GenesisViewer(ProtocolViewer):
                     count+=1
                     f.write("color #%s lime \n"%count)
 
-            if self.targetPDB.get() is not None:
+            if self.compareToPDB.get():
                 f.write("open %s \n" % os.path.abspath(self.getTargetPDB(index)))
                 count+=1
                 f.write("color #%s orange \n"%count)
@@ -196,7 +202,7 @@ class GenesisViewer(ProtocolViewer):
                 f.write("mol modstyle 1 0 Isosurface 0.5 0 0 0 1 1  \n")
                 f.write("mol modmaterial 1 0 Transparent \n")
 
-            if self.targetPDB.get() is not None:
+            if self.compareToPDB.get():
                 targetFile = self.getTargetPDB(index)
                 f.write("set nf [molinfo top get numframes]\n")
                 f.write("mol new %s waitfor all\n" %targetFile)
@@ -220,7 +226,7 @@ class GenesisViewer(ProtocolViewer):
 
     def _plotEnergyTotal(self):
         plotter = FlexPlotter()
-        ax = plotter.createSubPlot("Energy", "Time (ps)", "Energy")
+        ax = plotter.createSubPlot("Energy (kcal/mol)", "", "Energy (kcal/mol)")
         ene_default = ["TOTAL_ENE", "POTENTIAL_ENE", "KINETIC_ENE"]
 
         ene = {}
@@ -235,19 +241,19 @@ class GenesisViewer(ProtocolViewer):
                         else:
                             ene[e] = [log_file[e]]
 
-        x = np.arange(len(log_file["TOTAL_ENE"]))*\
-            (int(self.protocol.eneout_period.get()) )*\
-            float( self.protocol.time_step.get())
+
         for e in ene:
+            x, xlabel = self.getTimePeriod(len(log_file[e]))
             ax.errorbar(x = x, y=np.mean(ene[e], axis=0), yerr=np.std(ene[e], axis=0), label=e,
                         capthick=1.7, capsize=5,elinewidth=1.7,
                         errorevery=np.max([len(log_file["STEP"]) //10,1]))
+        ax.set_xlabel(xlabel)
         plotter.legend()
         plotter.show()
 
     def _plotEnergyDetail(self):
         plotter = FlexPlotter()
-        ax = plotter.createSubPlot("Energy", "Time (ps)", "Energy")
+        ax = plotter.createSubPlot("Energy (kcal/mol)", "", "Energy (kcal/mol)")
         ene_default = ["BOND", "ANGLE", "UREY-BRADLEY", "DIHEDRAL", "IMPROPER", "CMAP", "VDWAALS", "ELECT", "NATIVE_CONTACT",
                "NON-NATIVE_CONT", "RESTRAINT_TOTAL"]
 
@@ -263,19 +269,19 @@ class GenesisViewer(ProtocolViewer):
                         else:
                             ene[e] = [log_file[e]]
 
-        x = np.arange(len(log_file["BOND"])) * \
-            (int(self.protocol.eneout_period.get())) * \
-            float(self.protocol.time_step.get())
+
         for e in ene:
+            x, xlabel = self.getTimePeriod(len(log_file[e]))
             ax.errorbar(x = x, y=np.mean(ene[e], axis=0), yerr=np.std(ene[e], axis=0), label=e,
                         capthick=1.7, capsize=5,elinewidth=1.7,
-                        errorevery=np.max([len(log_file["STEP"]) //10,1]))
+                        errorevery=np.max([len(log_file[e]) //10,1]))
+        ax.set_xlabel(xlabel)
         plotter.legend()
         plotter.show()
 
     def _plotCC(self, paramName):
         plotter = FlexPlotter()
-        ax = plotter.createSubPlot("Correlation coefficient", "Time (ps)", "CC")
+        ax = plotter.createSubPlot("Correlation coefficient", "", "CC")
 
         # Get CC list
         cc = []
@@ -287,26 +293,29 @@ class GenesisViewer(ProtocolViewer):
 
         # Plot CC
         for i in range(len(cc)):
-            x = np.arange(len(cc[i])) * \
-                (int(self.protocol.eneout_period.get())) * \
-                float(self.protocol.time_step.get())
+            x, xlabel = self.getTimePeriod(len(cc[i]))
             if len(cc) <= 50:
-                ax.plot(x, cc[i], alpha=0.3, label="#%i"%i)
+                if len(cc) > 1:
+                    ax.plot(x, cc[i], alpha=0.5, label="#%i"%i)
+                else :
+                    ax.plot(x, cc[i], label="CC")
 
-        try :
-            cc_mean = np.mean(cc, axis=0)
-            cc_std = np.std(cc, axis=0)
-            ax.errorbar(x = x, y=cc_mean, yerr=cc_std,
-                        capthick=1.7, capsize=5,elinewidth=1.7, color="black",
-                        errorevery=np.max([len(cc_mean) //10,1]), label="Average")
-        except TypeError:
-            pass
+        if len(cc) > 1 :
+            try :
+                cc_mean = np.mean(cc, axis=0)
+                cc_std = np.std(cc, axis=0)
+                ax.errorbar(x = x, y=cc_mean, yerr=cc_std,
+                            capthick=1.7, capsize=5,elinewidth=1.7, color="black",
+                            errorevery=np.max([len(cc_mean) //10,1]), label="Average")
+            except TypeError:
+                pass
+        ax.set_xlabel(xlabel)
         plotter.legend()
         plotter.show()
 
     def _plotRMSDts(self, paramName):
         plotter = FlexPlotter()
-        ax = plotter.createSubPlot("RMSD ($\AA$)", "Time (ps)", "RMSD ($\AA$)")
+        ax = plotter.createSubPlot("RMSD ($\AA$)", "", "RMSD ($\AA$)")
 
         # Get matching atoms
         if self.referencePDB.get() != "":
@@ -326,20 +335,23 @@ class GenesisViewer(ProtocolViewer):
 
         # Plot RMSD
         for i in range(len(rmsd)):
-            x = np.arange(len(rmsd[i])) * \
-                (int(self.protocol.crdout_period.get())) * \
-                float(self.protocol.time_step.get())
+            x, xlabel = self.getTimePeriod(len(rmsd[i]))
             if len(rmsd) <=50:
-                ax.plot(x, rmsd[i], alpha=0.3, label="#%i"%i)
+                if len(rmsd) > 1:
+                    ax.plot(x, rmsd[i], alpha=0.5, label="#%i"%i)
+                else:
+                    ax.plot(x, rmsd[i], label="RMSD")
 
-        try :
-            rmsd_mean = np.mean(rmsd, axis=0)
-            rmsd_std = np.std(rmsd, axis=0)
-            ax.errorbar(x = x, y=rmsd_mean, yerr=rmsd_std,
-                        capthick=1.7, capsize=5,elinewidth=1.7, color="black",
-                        errorevery=np.max([len(rmsd_mean) //10,1]), label="Average")
-        except TypeError:
-            pass
+        if len(rmsd) > 1 :
+            try :
+                rmsd_mean = np.mean(rmsd, axis=0)
+                rmsd_std = np.std(rmsd, axis=0)
+                ax.errorbar(x = x, y=rmsd_mean, yerr=rmsd_std,
+                            capthick=1.7, capsize=5,elinewidth=1.7, color="black",
+                            errorevery=np.max([len(rmsd_mean) //10,1]), label="Average")
+            except TypeError:
+                pass
+        ax.set_xlabel(xlabel)
         plotter.legend()
         plotter.show()
 
@@ -377,6 +389,7 @@ class GenesisViewer(ProtocolViewer):
         ax.plot(rmsdf, "o", color="tab:blue", label="Final RMSD", markeredgecolor='black')
         ax.plot(rmsdi, "o", color="tab:green", label="Initial RMSD", markeredgecolor='black')
 
+        ax.set_xlabel(xlabel)
         plotter.legend()
         plotter.show()
 
@@ -442,7 +455,7 @@ class GenesisViewer(ProtocolViewer):
         initPDB = PDBMol(self.protocol.getInputPDBprefix()+".pdb")
 
         # MAtch atoms with target
-        if self.targetPDB.get() is not None:
+        if self.compareToPDB.get():
             targetPDB = PDBMol(self.getTargetPDB())
             if self.referencePDB.get() != "":
                 refPDB = PDBMol(self.referencePDB.get())
@@ -473,7 +486,7 @@ class GenesisViewer(ProtocolViewer):
         labels=["Fitted PDBs", "Init. PDBs"]
 
         # Get TargetPDBs coords
-        if self.targetPDB.get() is not None:
+        if self.compareToPDB.get():
             targetPDBs=[]
             for i in self.getEMList():
                 targetMol = PDBMol(self.getTargetPDB(i))
@@ -560,4 +573,16 @@ class GenesisViewer(ProtocolViewer):
             return outPrf[np.array(getListFromRangeString(self.replicaRange.get())) - 1]
         else:
             return outPrf
+
+    def getTimePeriod(self, length):
+        if self.protocol.simulationType.get() == SIMULATION_MIN:
+            timestep = 1.0
+            xlabel = "Number of iterations"
+        else:
+            timestep = float(self.protocol.time_step.get())
+            xlabel = "Time (ps)"
+        eneperiod = int(self.protocol.eneout_period.get())
+        x = np.arange(length) * eneperiod * timestep
+
+        return x, xlabel
 

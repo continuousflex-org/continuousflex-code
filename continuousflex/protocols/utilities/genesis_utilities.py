@@ -94,7 +94,6 @@ class PDBMol:
                         temp.append(l[11])
                         chainID.append(l[12])
                         elemName.append(l[13])
-        print("\t Done \n")
 
         atomNum = np.array(atomNum)
         atomNum[np.where(atomNum == "*****")[0]] = "-1"
@@ -112,6 +111,11 @@ class PDBMol:
         self.temp = np.array(temp).astype(float)
         self.chainID = np.array(chainID, dtype='<U4')
         self.elemName = np.array(elemName, dtype='<U2')
+
+        if self.n_atoms == 0 :
+            raise RuntimeError("Could not read PDB file : PDB file is empty")
+
+        print("\t Done \n")
 
     def save(self, file):
         """
@@ -780,11 +784,15 @@ def dcd2numpyArr(filename):
         f.read(4)
 
         # DCD COORD
-        dcd_arr = np.zeros((nframe, natom,3))
+        dcd_list= []
         for i in range(nframe):
-            raw_arr = np.frombuffer((f.read(4 * 3*(natom+2))), dtype=np.float32)
-            dcd_arr[i] = raw_arr.reshape(3,(natom+2))[:, 1:-1].T
+            bin_arr = f.read(4 * 3*(natom+2))
+            if len(bin_arr) == 4 * 3*(natom+2):
+                raw_arr = np.frombuffer(bin_arr, dtype=np.float32)
+                coord_arr = raw_arr.reshape(3,(natom+2))[:, 1:-1].T
+                dcd_list.append(coord_arr)
+            else: break
 
     print("\t Done \n")
 
-    return dcd_arr
+    return np.array(dcd_list)
