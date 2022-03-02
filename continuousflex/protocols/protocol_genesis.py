@@ -61,8 +61,8 @@ class ProtGenesis(EMProtocol):
                       pointerClass='AtomStruct, SetOfPDBs, SetOfAtomStructs', label="Input PDB (s)",
                       help='Select the input PDB or set of PDBs.', important=True)
 
-        form.addParam('inputRST', params.FileParam, label="GENESIS Restart File (optional)",
-                       help='Restart a previous GENESIS run with a .rst file', default="")
+        form.addParam('inputRST', params.FileParam, label="GENESIS Restart File",
+                       help='Restart a previous GENESIS run with a .rst file', default="",expertLevel=params.LEVEL_ADVANCED)
 
         group = form.addGroup('Forcefield Inputs')
         group.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0, important=True,
@@ -95,9 +95,10 @@ class ProtGenesis(EMProtocol):
                       help='CHARMM/X-PLOR psf file containing information of the system such as atomic masses,'
                             ' charges, and atom connectivities. To generate this file, you can either use the option'
                            '\" generate topology files\", VMD psfgen, or online CHARMM GUI.')
-        group.addParam('inputSTR', params.FileParam, label="CHARMM stream file (optional)",
+        group.addParam('inputSTR', params.FileParam, label="CHARMM stream file",
                       condition="forcefield==0", default="",
-                      help='CHARMM stream file containing both topology information and parameters')
+                      help='CHARMM stream file containing both topology information and parameters',
+                       expertLevel=params.LEVEL_ADVANCED)
 
 
 
@@ -770,29 +771,40 @@ class ProtGenesis(EMProtocol):
 
     def createOutputStep(self):
         """
-        Create output set of PDBs
+        Create output PDB or set of PDBs
         :return None:
         """
-        # CREATE SET OF PDBs
-        pdbset = self._createSetOfPDBs("outputPDBs")
-
-        if self.simulationType.get() == SIMULATION_REMD:
-            self.convertReusOutputDcd()
-
-        # Add each output PDB to the Set
-        for i in range(self.getNumberOfFitting()):
-
-            # Extract the pdb from the DCD file in case of SPDYN
+        # CREATE a output PDB
+        if self.simulationType.get() != SIMULATION_REMD and self.getNumberOfFitting() == 1:
             if self.md_program.get() == PROGRAM_SPDYN:
                 lastPDBFromDCD(
-                    inputDCD=self.getOutputPrefix(i)+ ".dcd",
-                    outputPDB=self.getOutputPrefix(i)+ ".pdb",
-                    inputPDB=self.getInputPDBprefix(i)+".pdb")
+                    inputDCD=self.getOutputPrefix()+ ".dcd",
+                    outputPDB=self.getOutputPrefix()+ ".pdb",
+                    inputPDB=self.getInputPDBprefix()+".pdb")
+            self._defineOutputs(outputPDB=AtomStruct(self.getOutputPrefix() + ".pdb"))
 
-            outputPrefix =self.getOutputPrefixAll(i)
-            for j in outputPrefix:
-                pdbset.append(AtomStruct(j + ".pdb"))
-        self._defineOutputs(outputPDBs=pdbset)
+
+        # CREATE SET OF output PDBs
+        else:
+
+            pdbset = self._createSetOfPDBs("outputPDBs")
+
+            if self.simulationType.get() == SIMULATION_REMD:
+                self.convertReusOutputDcd()
+
+            # Add each output PDB to the Set
+            for i in range(self.getNumberOfFitting()):
+                outputPrefix =self.getOutputPrefixAll(i)
+                for j in outputPrefix:
+                    # Extract the pdb from the DCD file in case of SPDYN
+                    if self.md_program.get() == PROGRAM_SPDYN:
+                        lastPDBFromDCD(
+                            inputDCD=j+ ".dcd",
+                            outputPDB=j + ".pdb",
+                            inputPDB=self.getInputPDBprefix(i) + ".pdb")
+
+                    pdbset.append(AtomStruct(j + ".pdb"))
+            self._defineOutputs(outputPDBs=pdbset)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
@@ -813,7 +825,7 @@ class ProtGenesis(EMProtocol):
         return errors
 
     def _citations(self):
-        pass
+        return ["kobayashi2017genesis","vuillemot2022NMMD"]
 
     def _methods(self):
         pass

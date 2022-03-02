@@ -134,7 +134,7 @@ class Plugin(pwem.Plugin):
                                   './configure LDFLAGS=-L%s ;'
                                   'make install;' % (target_branch,target_branch,env.getLibFolder()), "bin/atdyn")],
                        neededProgs=['mpif90'],
-                       target="genesis", default=True)
+                       target="genesis", default=False)
 
 
 files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol': 'volumes/AK_LP10.vol',
