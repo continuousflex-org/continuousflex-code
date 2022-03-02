@@ -317,8 +317,8 @@ class GenesisViewer(ProtocolViewer):
                 if 1 < nrep <= nmax:
                     if ndata == 1 :
                         ax.plot(x, data[i][j], color= colors[j], alpha=0.5, label="#%i"%j)
-                    else:
-                        ax.plot(x, data[i][j], color= colors[i], alpha=0.5)
+                    # else:
+                    #     ax.plot(x, data[i][j], color= colors[i], alpha=0.5)
                 if nrep == 1 and ndata <= 10:
                     ax.plot(x, data[i][j], color= colors[i],label=labels[i])
         if ndata > nmax :
