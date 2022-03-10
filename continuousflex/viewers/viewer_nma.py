@@ -30,10 +30,15 @@ visualization program.
 from pyworkflow.gui.project import ProjectWindow
 from pyworkflow.protocol.params import LabelParam, IntParam
 from pyworkflow.viewer import ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO
+
 from pwem.viewers import ObjectView, VmdView, DataView
 from pwem.emlib import MDL_NMA_ATOMSHIFT
+from pwem.objects import SetOfNormalModes
+
 from continuousflex.protocols import FlexProtNMA
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
+
+import os
 
 
 OBJCMD_NMA_PLOTDIST = "Plot distance profile"
@@ -45,7 +50,7 @@ class FlexNMAViewer(ProtocolViewer):
         Normally, NMA modes with high collectivity and low NMA score are preferred.
     """
     _label = 'viewer nma'
-    _targets = [FlexProtNMA]
+    _targets = [FlexProtNMA, SetOfNormalModes]
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
 
 #     def setProtocol(self, protocol):
@@ -54,6 +59,15 @@ class FlexNMAViewer(ProtocolViewer):
 #         self.isEm.set(inputPdb.getPseudoAtoms())
         
     def _defineParams(self, form):
+
+        if isinstance(self.protocol, SetOfNormalModes):
+            protocol_path = os.path.dirname(os.path.dirname(self.protocol[1].getModeFile()))
+            vmdFiles = protocol_path + "/extra/animations/"
+            nmdFile = protocol_path + "/modes.nmd"
+        else:
+            vmdFiles = self.protocol._getExtraPath("animations")
+            nmdFile = self.protocol._getPath("modes.nmd")
+
         form.addSection(label='Visualization')
   
         form.addParam('displayModes', LabelParam,
@@ -66,15 +80,21 @@ class FlexNMAViewer(ProtocolViewer):
         group.addParam('modeNumber', IntParam, default=7,
               label='Mode number')
         group.addParam('displayVmd', LabelParam,
+                       condition=os.path.isdir(vmdFiles),
                        label='Display mode animation with VMD?') 
         group.addParam('displayDistanceProfile', LabelParam, default=False,
                       label="Plot mode distance profile?",
                       help="Unitary shift of each atom or pseudoatom along the mode that is requested to be animated.")
+
+        form.addParam('displayVmd2', LabelParam,
+                       condition=os.path.isfile(nmdFile),
+                       label='Display mode animation with VMD NMWiz?') 
         
     def _getVisualizeDict(self):
         return {'displayModes': self._viewParam,
                 'displayMaxDistanceProfile': self._viewParam,
                 'displayVmd': self._viewSingleMode,
+                'displayVmd2': self._viewSingleMode,
                 'displayDistanceProfile': self._viewSingleMode,
                 } 
                         
@@ -84,15 +104,26 @@ class FlexNMAViewer(ProtocolViewer):
             # modes =  self.protocol.outputModes
             # return [ObjectView(self._project, modes.strId(), modes.getFileName())]
             # The following two lines display modes.xmd file
-            modes =  self.protocol._getPath("modes.xmd")
+            if isinstance(self.protocol, SetOfNormalModes):
+                modes = os.path.dirname(self.protocol[1].getModeFile()) + ".xmd"
+            else:
+                modes =  self.protocol._getPath("modes.xmd")
             return [DataView(modes)]
+
         elif paramName == 'displayMaxDistanceProfile':
-            fn = self.protocol._getExtraPath("maxAtomShifts.xmd")
+            if isinstance(self.protocol, SetOfNormalModes):
+                fn = os.path.dirname(os.path.dirname(self.protocol[1].getModeFile())) + "/extra/maxAtomShifts.xmd"
+            else:
+                fn = self.protocol._getExtraPath("maxAtomShifts.xmd")
             return [createShiftPlot(fn, "Maximum atom shifts", "maximum shift")]
     
     def _viewSingleMode(self, paramName):
         """ visualization for a selected mode. """
-        modes =  self.protocol.outputModes
+        if isinstance(self.protocol, SetOfNormalModes):
+            modes = self.protocol
+        else:
+            modes =  self.protocol.outputModes
+
         modeNumber = self.modeNumber.get()
         mode = modes[modeNumber]
         
@@ -101,8 +132,11 @@ class FlexNMAViewer(ProtocolViewer):
                                       "Display the output Normal Modes to see "
                                       "the availables ones." % modeNumber,
                                       title="Invalid input")]
+                                      
         elif paramName == 'displayVmd':
             return [createVmdView(self.protocol, modeNumber)]
+        elif paramName == 'displayVmd2':
+            return [createVmdNmwizView(self.protocol, modeNumber)]
         elif paramName == 'displayDistanceProfile':
             return [createDistanceProfilePlot(self.protocol, modeNumber)]
 
@@ -115,8 +149,12 @@ def createShiftPlot(mdFn, title, ylabel):
 
 
 def createDistanceProfilePlot(protocol, modeNumber):
-    vectorMdFn = protocol._getExtraPath("distanceProfiles","vec%d.xmd"
-                                        % modeNumber)
+    if isinstance(protocol, SetOfNormalModes):
+        vectorMdFn = os.path.dirname(os.path.dirname(protocol[1].getModeFile(
+        ))) + "/extra/distanceProfiles/vec%d.xmd" % modeNumber
+    else:
+        vectorMdFn = protocol._getExtraPath("distanceProfiles","vec%d.xmd"
+                                            % modeNumber)
     plotter = createShiftPlot(vectorMdFn, "Atom shifts for mode %d"
                               % modeNumber, "shift")
     return plotter
@@ -127,6 +165,12 @@ def createVmdView(protocol, modeNumber):
                                      % modeNumber)
     return VmdView('-e "%s"' % vmdFile)
 
+def createVmdNmwizView(protocol, modeNumber):
+    if isinstance(protocol, SetOfNormalModes):
+        nmdFile = os.path.dirname(os.path.dirname(protocol[1].getModeFile())) + "/modes.nmd"
+    else:
+        nmdFile = protocol._getPath("modes.nmd")
+    return VmdView('-e %s' % nmdFile)
 
 def showDistanceProfilePlot(protocol, modeNumber):
     createDistanceProfilePlot(protocol, modeNumber).show()
