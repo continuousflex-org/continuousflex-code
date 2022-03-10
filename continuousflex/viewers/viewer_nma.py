@@ -161,8 +161,11 @@ def createDistanceProfilePlot(protocol, modeNumber):
 
 
 def createVmdView(protocol, modeNumber):
-    vmdFile = protocol._getExtraPath("animations", "animated_mode_%03d.vmd"
-                                     % modeNumber)
+    if isinstance(protocol, SetOfNormalModes):
+        vmdFile = os.path.dirname(os.path.dirname(protocol[1].getModeFile())) + "/extra/animations/animated_mode_%03d.vmd" % modeNumber
+    else:
+        vmdFile = protocol._getExtraPath("animations", "animated_mode_%03d.vmd"
+                                        % modeNumber)
     return VmdView('-e "%s"' % vmdFile)
 
 def createVmdNmwizView(protocol, modeNumber):
