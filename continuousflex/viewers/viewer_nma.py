@@ -88,7 +88,9 @@ class FlexNMAViewer(ProtocolViewer):
 
         form.addParam('displayVmd2', LabelParam,
                        condition=os.path.isfile(nmdFile),
-                       label='Display mode animation with VMD NMWiz?') 
+                       label="Display mode animations with VMD NMWiz?",
+                       help="Use ProDy Normal Mode Wizard to view all modes in a more interactive way. "
+                            "See http://prody.csb.pitt.edu/tutorials/nmwiz_tutorial/nmwiz.html") 
         
     def _getVisualizeDict(self):
         return {'displayModes': self._viewParam,
