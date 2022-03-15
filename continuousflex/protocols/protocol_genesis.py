@@ -108,8 +108,8 @@ class ProtGenesis(EMProtocol):
                       choices=['Molecular Dynamics', 'Minimization', 'Replica-Exchange Molecular Dynamics'],
                       help="Type of simulation to be performed by GENESIS", important=True)
         form.addParam('integrator', params.EnumParam, label="Integrator", default=0,
-                      choices=['Velocity Verlet', 'Leapfrog', 'NMMD'],
-                      help="Type of integrator for the MD simulation", condition="simulationType!=1")
+                      choices=['Velocity Verlet (MD)', 'Leapfrog (MD)', 'Velocity Verlet (NMMD)'],
+                      help="Type of integrator for the simulation", condition="simulationType!=1")
         form.addParam('time_step', params.FloatParam, default=0.002, label='Time step (ps)',
                       help="Time step in the MD run", condition="simulationType!=1")
         form.addParam('n_steps', params.IntParam, default=10000, label='Number of steps',
