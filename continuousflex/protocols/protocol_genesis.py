@@ -774,35 +774,38 @@ class ProtGenesis(EMProtocol):
         Create output PDB or set of PDBs
         :return None:
         """
+        if self.simulationType.get() == SIMULATION_REMD:
+            self.convertReusOutputDcd()
+
+        # Convert Output
+        for i in range(self.getNumberOfFitting()):
+            outputPrefix = self.getOutputPrefixAll(i)
+            for j in outputPrefix:
+                # Extract the pdb from the DCD file in case of SPDYN
+                if self.md_program.get() == PROGRAM_SPDYN:
+                    lastPDBFromDCD(
+                        inputDCD=j + ".dcd",
+                        outputPDB=j + ".pdb",
+                        inputPDB=self.getInputPDBprefix(i) + ".pdb")
+                if self.forcefield.get() == FORCEFIELD_CAGO:
+                    input = PDBMol(self.getInputPDBprefix(i) + ".pdb")
+                    output = PDBMol(j + ".pdb")
+                    input.coords = output.coords
+                    input.save(j + ".pdb")
+
+
         # CREATE a output PDB
         if self.simulationType.get() != SIMULATION_REMD and self.getNumberOfFitting() == 1:
-            if self.md_program.get() == PROGRAM_SPDYN:
-                lastPDBFromDCD(
-                    inputDCD=self.getOutputPrefix()+ ".dcd",
-                    outputPDB=self.getOutputPrefix()+ ".pdb",
-                    inputPDB=self.getInputPDBprefix()+".pdb")
             self._defineOutputs(outputPDB=AtomStruct(self.getOutputPrefix() + ".pdb"))
-
 
         # CREATE SET OF output PDBs
         else:
 
             pdbset = self._createSetOfPDBs("outputPDBs")
-
-            if self.simulationType.get() == SIMULATION_REMD:
-                self.convertReusOutputDcd()
-
             # Add each output PDB to the Set
             for i in range(self.getNumberOfFitting()):
                 outputPrefix =self.getOutputPrefixAll(i)
                 for j in outputPrefix:
-                    # Extract the pdb from the DCD file in case of SPDYN
-                    if self.md_program.get() == PROGRAM_SPDYN:
-                        lastPDBFromDCD(
-                            inputDCD=j+ ".dcd",
-                            outputPDB=j + ".pdb",
-                            inputPDB=self.getInputPDBprefix(i) + ".pdb")
-
                     pdbset.append(AtomStruct(j + ".pdb"))
             self._defineOutputs(outputPDBs=pdbset)
 
@@ -990,9 +993,11 @@ class ProtGenesis(EMProtocol):
         if not self.estimateAngleShift.get():
             mdImg = md.MetaData(self.imageAngleShift.get())
             idx = int(index + 1)
+
         else:
             mdImg = md.MetaData(self._getExtraPath("%s_current_angles.xmd" % str(index + 1).zfill(5)))
             idx=1
+
         return [
             mdImg.getValue(md.MDL_ANGLE_ROT, idx),
             mdImg.getValue(md.MDL_ANGLE_TILT, idx),

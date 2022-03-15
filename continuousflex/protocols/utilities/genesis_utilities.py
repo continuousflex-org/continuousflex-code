@@ -634,7 +634,9 @@ def runParallelJobs(commands, env=None, numberOfThreads=1, numberOfMpi=1, hostCo
         exitcode = processes[i].wait()
         print("Process done %s" %str(exitcode))
         if exitcode != 0:
-            raise RuntimeError("Command returned with errors : %s" %str(commands[i]))
+            # raise RuntimeError("Command returned with errors : %s" %str(commands[i]))
+            print("Command returned with errors : %s" %str(commands[i]))
+
 
 def pdb2vol(inputPDB, outputVol, sampling_rate, image_size):
     """
