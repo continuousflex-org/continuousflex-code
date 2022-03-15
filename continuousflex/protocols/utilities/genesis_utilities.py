@@ -634,7 +634,9 @@ def runParallelJobs(commands, env=None, numberOfThreads=1, numberOfMpi=1, hostCo
         exitcode = processes[i].wait()
         print("Process done %s" %str(exitcode))
         if exitcode != 0:
-            raise RuntimeError("Command returned with errors : %s" %str(commands[i]))
+            # raise RuntimeError("Command returned with errors : %s" %str(commands[i]))
+            print("Command returned with errors : %s" %str(commands[i]))
+
 
 def pdb2vol(inputPDB, outputVol, sampling_rate, image_size):
     """
@@ -769,29 +771,74 @@ def getAngularShiftDist(angle1MetaFile, angle2MetaData, angle2Idx, tmpPrefix, sy
 
 def dcd2numpyArr(filename):
     print("> Reading dcd file %s"%filename)
-    with open(filename,'rb') as f:
+    with open(filename, 'rb') as f:
 
         # Header
-        f.read(4)
-        coordType = f.read(4).decode('ascii')
-        nframe = int.from_bytes((f.read(4)), "little")
-        for i in range(21): f.read(4)
-        ntitle = int.from_bytes((f.read(4)), "little")
-        title = f.read(80*ntitle).decode('ascii')
-        f.read(4)
-        f.read(4)
-        natom = int.from_bytes((f.read(4)), "little")
-        f.read(4)
+        # ---------------- INIT
 
-        # DCD COORD
-        dcd_list= []
+        start_size = int.from_bytes((f.read(4)), "little")
+        crd_type = f.read(4).decode('ascii')
+        nframe = int.from_bytes((f.read(4)), "little")
+        start_frame = int.from_bytes((f.read(4)), "little")
+        len_frame = int.from_bytes((f.read(4)), "little")
+        len_total = int.from_bytes((f.read(4)), "little")
+        for i in range(5):
+            f.read(4)
+        time_step = np.frombuffer(f.read(4), dtype=np.float32)
+        for i in range(9):
+            f.read(4)
+        charmm_version = int.from_bytes((f.read(4)), "little")
+
+        end_size = int.from_bytes((f.read(4)), "little")
+
+        if end_size != start_size:
+            raise RuntimeError("Can not read dcd file")
+
+        # ---------------- TITLE
+
+        start_size = int.from_bytes((f.read(4)), "little")
+        ntitle = int.from_bytes((f.read(4)), "little")
+        title = f.read(80 * ntitle).decode('ascii')
+        end_size = int.from_bytes((f.read(4)), "little")
+
+        if end_size != start_size:
+            raise RuntimeError("Can not read dcd file")
+
+        # ---------------- NATOM
+
+        start_size = int.from_bytes((f.read(4)), "little")
+        natom = int.from_bytes((f.read(4)), "little")
+        end_size = int.from_bytes((f.read(4)), "little")
+
+        if end_size != start_size:
+            raise RuntimeError("Can not read dcd file")
+
+        # ----------------- DCD COORD
+        dcd_list = []
         for i in range(nframe):
-            bin_arr = f.read(4 * 3*(natom+2))
-            if len(bin_arr) == 4 * 3*(natom+2):
-                raw_arr = np.frombuffer(bin_arr, dtype=np.float32)
-                coord_arr = raw_arr.reshape(3,(natom+2))[:, 1:-1].T
-                dcd_list.append(coord_arr)
-            else: break
+            coordarr = np.zeros((natom, 3))
+            for j in range(3):
+
+                start_size = int.from_bytes((f.read(4)), "little")
+                while (start_size != 4 * natom):
+                    # print("\n-- UNKNOWN %s -- " % start_size)
+
+                    f.read(start_size)
+                    end_size = int.from_bytes((f.read(4)), "little")
+                    if end_size != start_size:
+                        raise RuntimeError("Can not read dcd file")
+                    start_size = int.from_bytes((f.read(4)), "little")
+
+                bin_arr = f.read(4 * natom)
+                if len(bin_arr) == 4 * natom:
+                    coordarr[:, j] = np.frombuffer(bin_arr, dtype=np.float32)
+                else:
+                    break
+                end_size = int.from_bytes((f.read(4)), "little")
+                if end_size != start_size:
+                    raise RuntimeError("Can not read dcd file %i %i " % (start_size, end_size))
+
+            dcd_list.append(coordarr)
 
     print("\t Done \n")
 

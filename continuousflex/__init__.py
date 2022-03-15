@@ -144,16 +144,16 @@ files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol'
                     'subtomograms':'HEMNMA_3D/subtomograms/*.vol',
                     'precomputed_HEMNMA3D_atoms':'HEMNMA_3D/gold/precomputed_atomic.xmd',
                     'precomputed_HEMNMA3D_pseudo':'HEMNMA_3D/gold/precomputed_pseudo.xmd',
+
                     'charmm_prm':'genesis/par_all36_prot.prm',
                     'charmm_top':'genesis/top_all36_prot.rtf',
-                    'charmm_str':'genesis/toppar_water_ions.str',
                     '1ake_pdb':'genesis/1ake.pdb',
-                    '1ake_vol':'genesis/1ake.vol',
+                    '1ake_vol':'genesis/1ake.mrc',
                     '4ake_pdb':'genesis/4ake.pdb',
-                    'ionize_pdb':'genesis/ionize.pdb',
-                    'ionize_psf':'genesis/ionize.psf',
-                    '4ake_ca_pdb':'genesis/4ake_cago.pdb',
-                    '4ake_ca_top':'genesis/4ake_cago.top',
+                    '4ake_aa_pdb':'genesis/4ake_aa.pdb',
+                    '4ake_aa_psf':'genesis/4ake_aa.psf',
+                    '4ake_ca_pdb':'genesis/4ake_ca.pdb',
+                    '4ake_ca_top':'genesis/4ake_ca.top',
                     }
 DataSet(name='nma_V2.0', folder='nma_V2.0', files=files_dictionary,
         url='https://raw.githubusercontent.com/MohamadHarastani/nma_V2.0/main/')

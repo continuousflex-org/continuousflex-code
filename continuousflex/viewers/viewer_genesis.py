@@ -38,7 +38,7 @@ import pwem.emlib.metadata as md
 import re
 
 from sklearn.decomposition import PCA
-
+from matplotlib.pyplot import cm
 
 class GenesisViewer(ProtocolViewer):
     """ Visualization of results from the GENESIS protocol
@@ -225,8 +225,6 @@ class GenesisViewer(ProtocolViewer):
         self._plotEnergyDetail()
 
     def _plotEnergyTotal(self):
-        plotter = FlexPlotter()
-        ax = plotter.createSubPlot("Energy (kcal/mol)", "", "Energy (kcal/mol)")
         ene_default = ["TOTAL_ENE", "POTENTIAL_ENE", "KINETIC_ENE"]
 
         ene = {}
@@ -240,20 +238,17 @@ class GenesisViewer(ProtocolViewer):
                             ene[e].append(log_file[e])
                         else:
                             ene[e] = [log_file[e]]
+        enelist =[]
+        labels=[]
+        for e in ene :
+            labels.append(e)
+            enelist.append(ene[e])
 
 
-        for e in ene:
-            x, xlabel = self.getTimePeriod(len(log_file[e]))
-            ax.errorbar(x = x, y=np.mean(ene[e], axis=0), yerr=np.std(ene[e], axis=0), label=e,
-                        capthick=1.7, capsize=5,elinewidth=1.7,
-                        errorevery=np.max([len(log_file["STEP"]) //10,1]))
-        ax.set_xlabel(xlabel)
-        plotter.legend()
-        plotter.show()
+        self.genesisPlotter(title="Energy (kcal/mol)", data=enelist, ndata=len(enelist),
+                            nrep=len(enelist[0]), labels=labels)
 
     def _plotEnergyDetail(self):
-        plotter = FlexPlotter()
-        ax = plotter.createSubPlot("Energy (kcal/mol)", "", "Energy (kcal/mol)")
         ene_default = ["BOND", "ANGLE", "UREY-BRADLEY", "DIHEDRAL", "IMPROPER", "CMAP", "VDWAALS", "ELECT", "NATIVE_CONTACT",
                "NON-NATIVE_CONT", "RESTRAINT_TOTAL"]
 
@@ -268,54 +263,84 @@ class GenesisViewer(ProtocolViewer):
                             ene[e].append(log_file[e])
                         else:
                             ene[e] = [log_file[e]]
+        enelist =[]
+        labels=[]
+        for e in ene :
+            labels.append(e)
+            enelist.append(ene[e])
 
-
-        for e in ene:
-            x, xlabel = self.getTimePeriod(len(log_file[e]))
-            ax.errorbar(x = x, y=np.mean(ene[e], axis=0), yerr=np.std(ene[e], axis=0), label=e,
-                        capthick=1.7, capsize=5,elinewidth=1.7,
-                        errorevery=np.max([len(log_file[e]) //10,1]))
-        ax.set_xlabel(xlabel)
-        plotter.legend()
-        plotter.show()
+        self.genesisPlotter(title="Energy (kcal/mol)", data=enelist, ndata=len(enelist),
+                            nrep=len(enelist[0]), labels=labels)
 
     def _plotCC(self, paramName):
-        plotter = FlexPlotter()
-        ax = plotter.createSubPlot("Correlation coefficient", "", "CC")
-
         # Get CC list
         cc = []
-        for i in self.getEMList():
+        labels=[]
+        emlist = self.getEMList()
+        for i in emlist:
             outputPrefix = self.getOutputPrefixAll(i)
+            cc_rep = []
+            if len(emlist) == 1:
+                labels.append("CC")
+            else:
+                labels.append("CC %s" % str(i + 1))
             for j in outputPrefix:
                 log_file = readLogFile(j + ".log")
-                cc.append(log_file['RESTR_CVS001'])
+                if 'RESTR_CVS001' in log_file:
+                    cc_rep.append(log_file['RESTR_CVS001'])
+                else:
+                    raise RuntimeError("CC not present in the log file")
+            cc.append(cc_rep)
 
-        # Plot CC
-        for i in range(len(cc)):
-            x, xlabel = self.getTimePeriod(len(cc[i]))
-            if len(cc) <= 50:
-                if len(cc) > 1:
-                    ax.plot(x, cc[i], alpha=0.5, label="#%i"%i)
-                else :
-                    ax.plot(x, cc[i], label="CC")
+        self.genesisPlotter(title="CC", data=cc, ndata=len(emlist),
+                            nrep=len(self.getOutputPrefixAll()), labels=labels)
 
-        if len(cc) > 1 :
-            try :
-                cc_mean = np.mean(cc, axis=0)
-                cc_std = np.std(cc, axis=0)
-                ax.errorbar(x = x, y=cc_mean, yerr=cc_std,
-                            capthick=1.7, capsize=5,elinewidth=1.7, color="black",
-                            errorevery=np.max([len(cc_mean) //10,1]), label="Average")
+
+    def genesisPlotter(self, title, data, ndata, nrep, labels):
+        plotter = FlexPlotter()
+        ax = plotter.createSubPlot(title, "", title)
+        nmax= 10
+        colors = [cm.get_cmap("tab10", 10)(i) for i in range(nmax) ]
+
+        for i in range(ndata):
+            if ndata <= nmax and nrep > 1:
+                try:
+                    meandata = np.mean(data[i], axis=0)
+                    stddata = np.std(data[i], axis=0)
+                    x = self.getTimePeriod(len(meandata))
+                    ax.errorbar(x=x, y=meandata, yerr=stddata,
+                                capthick=1.7, capsize=5, elinewidth=1.7, color=colors[i] if ndata!= 1 else "black",
+                                errorevery=np.max([len(meandata) // 10, 1]), label="%s Average" % labels[i])
+                except TypeError:
+                    x = self.getTimePeriod(len(data[i][0]))
+                    ax.plot(x, data[i][0], color=colors[i], label=labels[i])
+
+            for j in range(nrep):
+                x = self.getTimePeriod(len(data[i][j]))
+                if 1 < nrep <= nmax:
+                    if ndata == 1 :
+                        ax.plot(x, data[i][j], color= colors[j], alpha=0.5, label="#%i"%(j+1))
+                    # else:
+                    #     ax.plot(x, data[i][j], color= colors[i], alpha=0.5)
+                if nrep == 1 and ndata <= 10:
+                    ax.plot(x, data[i][j], color= colors[i],label=labels[i])
+        if ndata > nmax :
+            try:
+                meandata = np.mean(data, axis=(0,1))
+                stddata = np.std(data, axis=(0,1))
+                x = self.getTimePeriod(len(meandata))
+                ax.errorbar(x=x, y=meandata, yerr=stddata,
+                            capthick=1.7, capsize=5, elinewidth=1.7, color="black",
+                            errorevery=np.max([len(meandata) // 10, 1]), label="Global Average")
             except TypeError:
-                pass
+                x = self.getTimePeriod(len(data[0][0]))
+                ax.plot(x, data[0][0], color=colors[0], label=labels[0])
+        xlabel = "Number of iterations" if self.protocol.simulationType.get() == SIMULATION_MIN else "Time (ps)"
         ax.set_xlabel(xlabel)
         plotter.legend()
         plotter.show()
 
     def _plotRMSDts(self, paramName):
-        plotter = FlexPlotter()
-        ax = plotter.createSubPlot("RMSD ($\AA$)", "", "RMSD ($\AA$)")
 
         # Get matching atoms
         if self.referencePDB.get() != "":
@@ -327,33 +352,23 @@ class GenesisViewer(ProtocolViewer):
 
         # Get RMSD list
         rmsd = []
-        for i in self.getEMList():
+        labels=[]
+        emlist = self.getEMList()
+        for i in emlist:
             outputPrefix = self.getOutputPrefixAll(i)
+            if len(emlist) == 1:
+                labels.append("RMSD")
+            else:
+                labels.append("RMSD %s"%str(i+1))
+            rmsd_rep=[]
             for j in outputPrefix:
-                rmsd.append(rmsdFromDCD(outputPrefix=j, inputPDB=self.protocol.getInputPDBprefix(i)+".pdb",
+                rmsd_rep.append(rmsdFromDCD(outputPrefix=j, inputPDB=self.protocol.getInputPDBprefix(i)+".pdb",
                     targetPDB=self.getTargetPDB(i),idx=idx, align = self.alignTarget.get()))
+            rmsd.append(rmsd_rep)
 
-        # Plot RMSD
-        for i in range(len(rmsd)):
-            x, xlabel = self.getTimePeriod(len(rmsd[i]))
-            if len(rmsd) <=50:
-                if len(rmsd) > 1:
-                    ax.plot(x, rmsd[i], alpha=0.5, label="#%i"%i)
-                else:
-                    ax.plot(x, rmsd[i], label="RMSD")
+        self.genesisPlotter(title="RMSD ($\AA$)", data=rmsd, ndata=len(emlist),
+                            nrep=len(self.getOutputPrefixAll()), labels=labels)
 
-        if len(rmsd) > 1 :
-            try :
-                rmsd_mean = np.mean(rmsd, axis=0)
-                rmsd_std = np.std(rmsd, axis=0)
-                ax.errorbar(x = x, y=rmsd_mean, yerr=rmsd_std,
-                            capthick=1.7, capsize=5,elinewidth=1.7, color="black",
-                            errorevery=np.max([len(rmsd_mean) //10,1]), label="Average")
-            except TypeError:
-                pass
-        ax.set_xlabel(xlabel)
-        plotter.legend()
-        plotter.show()
 
     def _plotRMSD(self, paramName):
         plotter = FlexPlotter()
@@ -388,8 +403,6 @@ class GenesisViewer(ProtocolViewer):
 
         ax.plot(rmsdf, "o", color="tab:blue", label="Final RMSD", markeredgecolor='black')
         ax.plot(rmsdi, "o", color="tab:green", label="Initial RMSD", markeredgecolor='black')
-
-        ax.set_xlabel(xlabel)
         plotter.legend()
         plotter.show()
 
@@ -577,12 +590,9 @@ class GenesisViewer(ProtocolViewer):
     def getTimePeriod(self, length):
         if self.protocol.simulationType.get() == SIMULATION_MIN:
             timestep = 1.0
-            xlabel = "Number of iterations"
         else:
             timestep = float(self.protocol.time_step.get())
-            xlabel = "Time (ps)"
         eneperiod = int(self.protocol.eneout_period.get())
-        x = np.arange(length) * eneperiod * timestep
 
-        return x, xlabel
+        return np.arange(length) * eneperiod * timestep
 
