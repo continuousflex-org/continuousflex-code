@@ -280,7 +280,10 @@ class GenesisViewer(ProtocolViewer):
         for i in emlist:
             outputPrefix = self.getOutputPrefixAll(i)
             cc_rep = []
-            labels.append("CC %s"%str(i))
+            if len(emlist) == 1:
+                labels.append("CC")
+            else:
+                labels.append("CC %s" % str(i + 1))
             for j in outputPrefix:
                 log_file = readLogFile(j + ".log")
                 if 'RESTR_CVS001' in log_file:
@@ -316,7 +319,7 @@ class GenesisViewer(ProtocolViewer):
                 x = self.getTimePeriod(len(data[i][j]))
                 if 1 < nrep <= nmax:
                     if ndata == 1 :
-                        ax.plot(x, data[i][j], color= colors[j], alpha=0.5, label="#%i"%j)
+                        ax.plot(x, data[i][j], color= colors[j], alpha=0.5, label="#%i"%(j+1))
                     # else:
                     #     ax.plot(x, data[i][j], color= colors[i], alpha=0.5)
                 if nrep == 1 and ndata <= 10:
@@ -353,7 +356,10 @@ class GenesisViewer(ProtocolViewer):
         emlist = self.getEMList()
         for i in emlist:
             outputPrefix = self.getOutputPrefixAll(i)
-            labels.append("RMSD %s"%str(i))
+            if len(emlist) == 1:
+                labels.append("RMSD")
+            else:
+                labels.append("RMSD %s"%str(i+1))
             rmsd_rep=[]
             for j in outputPrefix:
                 rmsd_rep.append(rmsdFromDCD(outputPrefix=j, inputPDB=self.protocol.getInputPDBprefix(i)+".pdb",
