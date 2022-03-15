@@ -71,7 +71,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                       help='Select the set of volumes that will be analyzed using normal modes.')
         form.addParam('copyDeformations', params.PathParam,
                       expertLevel=params.LEVEL_ADVANCED,
-                      label='Precomputed results (for developmemt)',
+                      label='Precomputed results (for development)',
                       help='Enter a metadata file with precomputed elastic  \n'
                            'and rigid-body alignment parameters to perform \n'
                            'remaining steps using this file.')
