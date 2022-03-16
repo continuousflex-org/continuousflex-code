@@ -108,10 +108,7 @@ class Plugin(pwem.Plugin):
 
         # env.addPackage('nma', version='3.0', deps=[arpack, lapack],
         env.addPackage('nma', version='3.1', deps=[arpack, lapack],
-                       # url='https://github.com/slajo/NMA_basic_code/raw/master/nma_v3.tar',
-                       # url='https://github.com/MohamadHarastani/nma_basic_codes/raw/main/nma_v4.tar',
-                       # url='https://github.com/MohamadHarastani/nma_basic_codes/raw/main/nma_v5.tar',
-                       url='https://github.com/slajo/NMA_basic_code/raw/master/nma_v5.tar',
+                       url='https://github.com/continuousflex-org/NMA_basic_code/raw/master/nma_v5.tar',
                        createBuildDir=False,
                        buildDir='nma',
                        target="nma",
@@ -130,5 +127,5 @@ files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol'
                     'precomputed_HEMNMA3D_atoms':'HEMNMA_3D/gold/precomputed_atomic.xmd',
                     'precomputed_HEMNMA3D_pseudo':'HEMNMA_3D/gold/precomputed_pseudo.xmd'}
 DataSet(name='nma_V2.0', folder='nma_V2.0', files=files_dictionary,
-        url='https://raw.githubusercontent.com/MohamadHarastani/nma_V2.0/main/')
+        url='https://raw.githubusercontent.com/continuousflex-org/testdata-continuousflex/main')
 
