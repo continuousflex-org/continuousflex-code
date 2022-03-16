@@ -682,7 +682,7 @@ def projectMatch(inputImage, inputProj, outputMeta):
     """
     cmd = "xmipp_angular_projection_matching "
     args= "-i %s -o %s --ref %s.stk "%(inputImage, outputMeta, inputProj)
-    args +="--search5d_shift 7.0 --search5d_step 1.0"
+    args +="--search5d_shift 10.0 --search5d_step 1.0"
     return cmd + " "+ args
 
 def waveletAssignement(inputImage, inputProj, outputMeta):
@@ -695,7 +695,7 @@ def waveletAssignement(inputImage, inputProj, outputMeta):
     """
     cmd = "xmipp_angular_discrete_assign "
     args= "-i %s -o %s --ref %s.doc "%(inputImage, outputMeta, inputProj)
-    args +="--psi_step 5.0 --max_shift_change 7.0 --search5D"
+    args +="--psi_step 5.0 --max_shift_change 10.0 --search5D"
     return cmd + " "+ args
 
 def continuousAssign(inputMeta, inputVol, outputMeta):
