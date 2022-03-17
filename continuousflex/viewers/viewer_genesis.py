@@ -58,7 +58,8 @@ class GenesisViewer(ProtocolViewer):
                           help=' Select the EM data to display. Examples:'
                                ' "1,3-5" -> [1,3,4,5]'
                                ' "1, 2, 4" -> [1,2,4]')
-        if self.protocol.simulationType.get() == SIMULATION_REMD:
+        if self.protocol.simulationType.get() == SIMULATION_REMD\
+                or self.protocol.simulationType.get() == SIMULATION_RENMMD:
             form.addParam('replicaRange', params.NumericRangeParam,
                           label="Replica selection",
                           default="1-%i"%self.protocol.nreplica.get(),
@@ -582,7 +583,8 @@ class GenesisViewer(ProtocolViewer):
 
     def getOutputPrefixAll(self, index=0):
         outPrf = np.array(self.protocol.getOutputPrefixAll(index))
-        if self.protocol.simulationType.get() == SIMULATION_REMD:
+        if self.protocol.simulationType.get() == SIMULATION_REMD \
+                or self.protocol.simulationType.get() == SIMULATION_RENMMD:
             return outPrf[np.array(getListFromRangeString(self.replicaRange.get())) - 1]
         else:
             return outPrf

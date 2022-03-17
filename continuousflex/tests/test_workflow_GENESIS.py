@@ -112,8 +112,7 @@ class testGENESIS(TestWorkflow):
           restartchoice=True,
           inputRST=protGenesisMin.getOutputPrefix() + ".rst",
 
-          simulationType=SIMULATION_MD,
-          integrator=INTEGRATOR_NMMD,
+          simulationType=SIMULATION_NMMD,
           time_step=0.002,
           n_steps=100, # 3000
           eneout_period=100,
@@ -220,8 +219,7 @@ class testGENESIS(TestWorkflow):
                                                   restartchoice=True,
                                                   inputRST=protGenesisMin.getOutputPrefix() + ".rst",
 
-                                                  simulationType=SIMULATION_REMD,
-                                                integrator=INTEGRATOR_NMMD,
+                                                  simulationType=SIMULATION_RENMMD,
                                                   time_step=0.0005,
                                                   n_steps=1000,
                                                   eneout_period=100,

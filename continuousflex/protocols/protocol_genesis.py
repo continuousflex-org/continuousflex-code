@@ -105,119 +105,133 @@ class ProtGenesis(EMProtocol):
         # Simulation =================================================================================================
         form.addSection(label='Simulation')
         form.addParam('simulationType', params.EnumParam, label="Simulation type", default=0,
-                      choices=['Molecular Dynamics', 'Minimization', 'Replica-Exchange Molecular Dynamics'],
+                      choices=['Minimization', 'Molecular Dynamics (MD)', 'Normal Mode Molecular Dynamics (NMMD)', 'Replica-Exchange MD', 'Replica-Exchange NMMD'],
                       help="Type of simulation to be performed by GENESIS", important=True)
-        form.addParam('integrator', params.EnumParam, label="Integrator", default=0,
-                      choices=['Velocity Verlet (MD)', 'Leapfrog (MD)', 'Velocity Verlet (NMMD)'],
-                      help="Type of integrator for the simulation", condition="simulationType!=1")
-        form.addParam('time_step', params.FloatParam, default=0.002, label='Time step (ps)',
-                      help="Time step in the MD run", condition="simulationType!=1")
-        form.addParam('n_steps', params.IntParam, default=10000, label='Number of steps',
+
+        group = form.addGroup('Simulation parameters')
+        group.addParam('integrator', params.EnumParam, label="Integrator", default=0,
+                      choices=['Velocity Verlet', 'Leapfrog', ''],
+                      help="Type of integrator for the simulation", condition="simulationType!=0")
+        group.addParam('time_step', params.FloatParam, default=0.002, label='Time step (ps)',
+                      help="Time step in the MD run", condition="simulationType!=0")
+        group.addParam('n_steps', params.IntParam, default=10000, label='Number of steps',
                       help="Total number of steps in one MD run")
-        form.addParam('eneout_period', params.IntParam, default=100, label='Energy output period',
+        group.addParam('eneout_period', params.IntParam, default=100, label='Energy output period',
                       help="Output frequency for the energy data")
-        form.addParam('crdout_period', params.IntParam, default=100, label='Coordinate output period',
+        group.addParam('crdout_period', params.IntParam, default=100, label='Coordinate output period',
                       help="Output frequency for the coordinates data")
-        form.addParam('nbupdate_period', params.IntParam, default=10, label='Non-bonded update period',
+        group.addParam('nbupdate_period', params.IntParam, default=10, label='Non-bonded update period',
                       help="Update frequency of the non-bonded pairlist",
                       expertLevel=params.LEVEL_ADVANCED)
 
-        group = form.addGroup('NMMD parameters', condition="integrator==2 and simulationType!=1")
+        group = form.addGroup('NMMD parameters', condition="simulationType==2 or simulationType==4")
         group.addParam('nm_number', params.IntParam, default=10, label='Number of normal modes',
                       help="Number of normal modes for NMMD. 10 should work in most cases. Avoid "
                            " using too much NM (>50).",
-                      condition="integrator==2 and simulationType!=1")
+                      condition="simulationType==2 or simulationType==4")
         group.addParam('nm_mass', params.FloatParam, default=10.0, label='NM mass',
-                      help="Mass value of Normal modes for NMMD", condition="integrator==2 and simulationType!=1",
+                      help="Mass value of Normal modes for NMMD", condition="simulationType==2 or simulationType==4",
                       expertLevel=params.LEVEL_ADVANCED)
         group.addParam('nm_limit', params.FloatParam, default=1000.0, label='NM amplitude threshold',
                       help="Threshold of normal mode amplitude above which the normal modes are updated",
-                      condition="integrator==2 and simulationType!=1",expertLevel=params.LEVEL_ADVANCED)
+                      condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
         group.addParam('elnemo_cutoff', params.FloatParam, default=8.0, label='NMA cutoff (A)',
-                      help="Cutoff distance for elastic network model", condition="integrator==2 and simulationType!=1",
+                      help="Cutoff distance for elastic network model", condition="simulationType==2 or simulationType==4",
                       expertLevel=params.LEVEL_ADVANCED)
         group.addParam('elnemo_rtb_block', params.IntParam, default=10, label='NMA Number of residue RTB',
                       help="Number of residue per RTB block in the NMA computation",
-                      condition="integrator==2 and simulationType!=1",expertLevel=params.LEVEL_ADVANCED)
+                      condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
 
-        group = form.addGroup('REMD parameters', condition="simulationType==2")
+        group = form.addGroup('REMD parameters', condition="simulationType==3 or simulationType==4")
         group.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
-                      help="Number of MD steps between replica exchanges", condition="simulationType==2")
+                      help="Number of MD steps between replica exchanges", condition="simulationType==3 or simulationType==4")
         group.addParam('nreplica', params.IntParam, default=1, label='Number of replicas',
-                      help="Number of replicas for REMD", condition="simulationType==2")
-        # ENERGY =================================================================================================
-        form.addSection(label='Energy')
-        form.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,
+                      help="Number of replicas for REMD", condition="simulationType==3 or simulationType==4")
+
+        group = form.addGroup('Energy', condition="simulationType!=0")
+        group.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,
                       choices=['GBSA', 'NONE'],
                       help="Turn on Generalized Born/Solvent accessible surface area model. Boundary condition must be NO."
                            " ATDYN only.")
 
-        form.addParam('electrostatics', params.EnumParam, label="Non-bonded interactions", default=1,
+        group.addParam('boundary', params.EnumParam, label="Boundary", default=0,
+                      choices=['No boundary', 'Periodic Boundary Condition'],
+                      help="Type of boundary condition")
+        group.addParam('box_size_x', params.FloatParam, label='Box size X',
+                      help="Box size along the x dimension", condition="boundary==1")
+        group.addParam('box_size_y', params.FloatParam, label='Box size Y',
+                      help="Box size along the y dimension", condition="boundary==1")
+        group.addParam('box_size_z', params.FloatParam, label='Box size Z',
+                      help="Box size along the z dimension", condition="boundary==1")
+
+        group.addParam('electrostatics', params.EnumParam, label="Non-bonded interactions", default=1,
                       choices=['PME', 'Cutoff'],
                       help="Type of Non-bonded interactions. "
                            " CUTOFF: Non-bonded interactions including the van der Waals interaction are just"
                            " truncated at cutoffdist; "
                            " PME : Particle mesh Ewald (PME) method is employed for long-range interactions."
                             " This option is only availabe in the periodic boundary condition")
-        form.addParam('vdw_force_switch', params.BooleanParam, label="Switch function Van der Waals", default=True,
+        group.addParam('vdw_force_switch', params.BooleanParam, label="Switch function Van der Waals", default=True,
                       help="This paramter determines whether the force switch function for van der Waals interactions is"
                         " employed or not. The users must take care about this parameter, when the CHARMM"
                         " force field is used. Typically, vdw_force_switch=YES should be specified in the case of"
                         " CHARMM36",expertLevel=params.LEVEL_ADVANCED)
-        form.addParam('switch_dist', params.FloatParam, default=10.0, label='Switch Distance',
+        group.addParam('switch_dist', params.FloatParam, default=10.0, label='Switch Distance',
                       help="Switch-on distance for nonbonded interaction energy/force quenching")
-        form.addParam('cutoff_dist', params.FloatParam, default=12.0, label='Cutoff Distance',
+        group.addParam('cutoff_dist', params.FloatParam, default=12.0, label='Cutoff Distance',
                       help="Cut-off distance for the non-bonded interactions. This distance must be larger than"
                             " switchdist, while smaller than pairlistdist")
-        form.addParam('pairlist_dist', params.FloatParam, default=15.0, label='Pairlist Distance',
+        group.addParam('pairlist_dist', params.FloatParam, default=15.0, label='Pairlist Distance',
                       help="Distance used to make a Verlet pair list for non-bonded interactions . This distance"
                             " must be larger than cutoffdist")
 
-        # Ensemble =================================================================================================
-        form.addSection(label='Ensemble')
-        form.addParam('ensemble', params.EnumParam, label="Ensemble", default=0,
+        group = form.addGroup('Ensemble', condition="simulationType!=0")
+        group.addParam('ensemble', params.EnumParam, label="Ensemble", default=0,
                       choices=['NVT', 'NVE', 'NPT'],
                       help="Type of ensemble, NVE: Microcanonical ensemble, NVT: Canonical ensemble,"
                            " NPT: Isothermal-isobaric ensemble")
-        form.addParam('tpcontrol', params.EnumParam, label="Thermostat/Barostat", default=1,
+        group.addParam('tpcontrol', params.EnumParam, label="Thermostat/Barostat", default=1,
                       choices=['NO', 'LANGEVIN', 'BERENDSEN', 'BUSSI'],
                       help="Type of thermostat and barostat. The availabe algorithm depends on the integrator :"
                            " LEAP : BERENDSEN, LANGEVIN;  VVER : BERENDSEN (NVT only), LANGEVIN, BUSSI; "
                            " NMMD : LANGEVIN (NVT only)")
-        form.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
+        group.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
                       help="Initial and target temperature")
-        form.addParam('pressure', params.FloatParam, default=1.0, label='Pressure (atm)',
+        group.addParam('pressure', params.FloatParam, default=1.0, label='Pressure (atm)',
                       help="Target pressure in the NPT ensemble", condition="ensemble==2")
-        # Boundary =================================================================================================
-        form.addSection(label='Boundary')
-        form.addParam('boundary', params.EnumParam, label="Boundary", default=0,
-                      choices=['No boundary', 'Periodic Boundary Condition'],
-                      help="Type of boundary condition")
-        form.addParam('box_size_x', params.FloatParam, label='Box size X',
-                      help="Box size along the x dimension", condition="boundary==1")
-        form.addParam('box_size_y', params.FloatParam, label='Box size Y',
-                      help="Box size along the y dimension", condition="boundary==1")
-        form.addParam('box_size_z', params.FloatParam, label='Box size Z',
-                      help="Box size along the z dimension", condition="boundary==1")
+
+        group = form.addGroup('Contraints', condition="simulationType!=0")
+        group.addParam('rigid_bond', params.BooleanParam, label="Rigid bonds (SHAKE/RATTLE)",
+                      default=False,
+                      help="Turn on or off the SHAKE/RATTLE algorithms for covalent bonds involving hydrogen")
+        group.addParam('fast_water', params.BooleanParam, label="Fast water (SETTLE)",
+                      default=False,
+                      help="Turn on or off the SETTLE algorithm for the constraints of the water molecules")
+        group.addParam('water_model', params.StringParam, label='Water model', default="TIP3",
+                      help="Residue name of the water molecule to be rigidified in the SETTLE algorithm", condition="fast_water")
+
         # Experiments =================================================================================================
-        form.addSection(label='Experiments')
+        form.addSection(label='EM data')
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
                       choices=['None', 'Volume'], important=True,
                       help="Type of cryo-EM data to be processed")
-        form.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
-                      default=False, help="Center the input PDBs with the center of mass", condition="EMfitChoice!=0")
-        form.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
+
+        group = form.addGroup('Fitting Parameters', condition="simulationType!=0")
+        group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
                       help="Force constant in Eem = k*(1 - c.c.). Note that in the case of REUS, the number of "
                            " force constant value must be equal to the number of replicas, for example for 4 replicas,"
                            " a valid force constant is \"1000 2000 3000 4000\", otherwise you can specify a range of "
                            " values (for example \"1000-4000\") and the force constant values will be linearly distributed "
                            " to each replica."
                       , condition="EMfitChoice!=0")
-        form.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EMfit Sigma",
+        group.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
+                      default=False, help="Center the input PDBs with the center of mass", condition="EMfitChoice!=0")
+
+        group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EM Fit Sigma",
                       help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
                         " of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
                       condition="EMfitChoice!=0",expertLevel=params.LEVEL_ADVANCED)
-        form.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EMfit Tolerance',
+        group.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EM Fit Tolerance',
                       help="This variable determines the tail length of the Gaussian function. For example, if em-"
                         " fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
                         " than 0.1% of the maximum value. Smaller value requires large computational cost",
@@ -265,16 +279,6 @@ class ProtGenesis(EMProtocol):
                       help='Xmipp metadata file of rigid body parameters for each image (3 euler angles, 2 shift)')
         group.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
                       help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==2")
-        # Constraints =================================================================================================
-        form.addSection(label='Constraints')
-        form.addParam('rigid_bond', params.BooleanParam, label="Rigid bonds (SHAKE/RATTLE)",
-                      default=False,
-                      help="Turn on or off the SHAKE/RATTLE algorithms for covalent bonds involving hydrogen")
-        form.addParam('fast_water', params.BooleanParam, label="Fast water (SETTLE)",
-                      default=False,
-                      help="Turn on or off the SETTLE algorithm for the constraints of the water molecules")
-        form.addParam('water_model', params.StringParam, label='Water model', default="TIP3",
-                      help="Residue name of the water molecule to be rigidified in the SETTLE algorithm", condition="fast_water")
 
         form.addParallelSection(threads=1, mpi=1)
         # --------------------------- INSERT steps functions --------------------------------------------
@@ -552,7 +556,7 @@ class ProtGenesis(EMProtocol):
                                 numberOfThreads=self.numberOfThreads.get(), hostConfig=self._stepsExecutor.hostConfig)
 
                 if self.rb_n_iter.get()> 1 :
-                    if self.simulationType.get() == SIMULATION_REMD:
+                    if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
                         raise RuntimeError("Simulation REMD not allowed for Rigid body fitting iteration > 1")
 
                     # append files
@@ -621,7 +625,7 @@ class ProtGenesis(EMProtocol):
             s += "rstfile = %s\n" % self.getRestartFile(indexFit)
 
         s += "\n[OUTPUT] \n" #-----------------------------------------------------------
-        if self.simulationType.get() == SIMULATION_REMD:
+        if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
             s += "remfile = %s_remd{}.rem\n" %outputPrefix
             s += "logfile = %s_remd{}.log\n" %outputPrefix
             s += "dcdfile = %s_remd{}.dcd\n" %outputPrefix
@@ -661,12 +665,13 @@ class ProtGenesis(EMProtocol):
             s += "method = SD\n"
         else:
             s += "\n[DYNAMICS] \n" #-----------------------------------------------------------
-            if self.integrator.get() == INTEGRATOR_VVERLET:
+            if self.simulationType.get() == SIMULATION_NMMD or self.simulationType.get() == SIMULATION_RENMMD:
+                s += "integrator = NMMD  \n"
+            elif self.integrator.get() == INTEGRATOR_VVERLET:
                 s += "integrator = VVER  \n"
             elif self.integrator.get() == INTEGRATOR_LEAPFROG:
                 s += "integrator = LEAP  \n"
-            elif self.integrator.get() == INTEGRATOR_NMMD:
-                s += "integrator = NMMD  \n"
+
             s += "timestep = %f \n" % self.time_step.get()
         s += "nsteps = %i \n" % self.n_steps.get()
         s += "eneout_period = %i \n" % self.eneout_period.get()
@@ -674,7 +679,7 @@ class ProtGenesis(EMProtocol):
         s += "rstout_period = %i \n" % self.n_steps.get()
         s += "nbupdate_period = %i \n" % self.nbupdate_period.get()
 
-        if self.integrator.get() == INTEGRATOR_NMMD:
+        if self.simulationType.get() == SIMULATION_NMMD or self.simulationType.get() == SIMULATION_RENMMD:
             s += "\n[NMMD] \n" #-----------------------------------------------------------
             s+= "nm_number = %i \n" % self.nm_number.get()
             s+= "nm_mass = %f \n" % self.nm_mass.get()
@@ -682,18 +687,19 @@ class ProtGenesis(EMProtocol):
             s+= "elnemo_cutoff = %f \n" % self.elnemo_cutoff.get()
             s+= "elnemo_rtb_block = %i \n" % self.elnemo_rtb_block.get()
             s+= "elnemo_path = %s \n" %  Plugin.getVar("NMA_HOME")
-            if self.simulationType.get() == SIMULATION_REMD:
+            if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD :
                 s+= "nm_prefix = %s_remd{} \n" % outputPrefix
             else:
                 s += "nm_prefix = %s \n" % outputPrefix
 
-        s += "\n[CONSTRAINTS] \n" #-----------------------------------------------------------
-        if self.rigid_bond.get()        : s += "rigid_bond = YES \n"
-        else                            : s += "rigid_bond = NO \n"
-        if self.fast_water.get()      :
-            s += "fast_water = YES \n"
-            s += "water_model = %s \n" %self.water_model.get()
-        else                            : s += "fast_water = NO \n"
+        if self.simulationType.get() != SIMULATION_MIN:
+            s += "\n[CONSTRAINTS] \n" #-----------------------------------------------------------
+            if self.rigid_bond.get()        : s += "rigid_bond = YES \n"
+            else                            : s += "rigid_bond = NO \n"
+            if self.fast_water.get()      :
+                s += "fast_water = YES \n"
+                s += "water_model = %s \n" %self.water_model.get()
+            else                            : s += "fast_water = NO \n"
 
         s += "\n[BOUNDARY] \n" #-----------------------------------------------------------
         if self.boundary.get() == BOUNDARY_PBC:
@@ -704,24 +710,25 @@ class ProtGenesis(EMProtocol):
         else :
             s += "type = NOBC \n"
 
-        s += "\n[ENSEMBLE] \n" #-----------------------------------------------------------
-        if self.ensemble.get() == ENSEMBLE_NVE:
-            s += "ensemble = NVE  \n"
-        elif self.ensemble.get() == ENSEMBLE_NPT:
-            s += "ensemble = NPT  \n"
-        else:
-            s += "ensemble = NVT  \n"
-        if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
-            s += "tpcontrol = LANGEVIN  \n"
-        elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
-            s += "tpcontrol = BERENDSEN  \n"
-        elif self.tpcontrol.get() == TPCONTROL_BUSSI:
-            s += "tpcontrol = BUSSI  \n"
-        else:
-            s += "tpcontrol = NO  \n"
-        s += "temperature = %.2f \n" % self.temperature.get()
-        if self.ensemble.get() == ENSEMBLE_NPT:
-            s += "pressure = %.2f \n" % self.pressure.get()
+        if self.simulationType.get() != SIMULATION_MIN:
+            s += "\n[ENSEMBLE] \n" #-----------------------------------------------------------
+            if self.ensemble.get() == ENSEMBLE_NVE:
+                s += "ensemble = NVE  \n"
+            elif self.ensemble.get() == ENSEMBLE_NPT:
+                s += "ensemble = NPT  \n"
+            else:
+                s += "ensemble = NVT  \n"
+            if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
+                s += "tpcontrol = LANGEVIN  \n"
+            elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
+                s += "tpcontrol = BERENDSEN  \n"
+            elif self.tpcontrol.get() == TPCONTROL_BUSSI:
+                s += "tpcontrol = BUSSI  \n"
+            else:
+                s += "tpcontrol = NO  \n"
+            s += "temperature = %.2f \n" % self.temperature.get()
+            if self.ensemble.get() == ENSEMBLE_NPT:
+                s += "pressure = %.2f \n" % self.pressure.get()
 
         if (self.EMfitChoice.get()==EMFIT_VOLUMES or self.EMfitChoice.get()==EMFIT_IMAGES)\
                 and self.simulationType.get() != SIMULATION_MIN:
@@ -756,7 +763,7 @@ class ProtGenesis(EMProtocol):
                 s += "emfit_shift_x = %f\n" % rigid_body_params[3]
                 s += "emfit_shift_y =  %f\n" % rigid_body_params[4]
 
-            if self.simulationType.get() == SIMULATION_REMD:
+            if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
                 s += "\n[REMD] \n" #-----------------------------------------------------------
                 s += "dimension = 1 \n"
                 s += "exchange_period = %i \n" % self.exchange_period.get()
@@ -774,7 +781,7 @@ class ProtGenesis(EMProtocol):
         Create output PDB or set of PDBs
         :return None:
         """
-        if self.simulationType.get() == SIMULATION_REMD:
+        if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
             self.convertReusOutputDcd()
 
         # Convert Output
@@ -797,7 +804,8 @@ class ProtGenesis(EMProtocol):
                 input.save(j + ".pdb")
 
         # CREATE a output PDB
-        if self.simulationType.get() != SIMULATION_REMD and self.getNumberOfFitting() == 1:
+        if (self.simulationType.get() != SIMULATION_REMD  and self.simulationType.get() != SIMULATION_RENMMD )\
+                and self.getNumberOfFitting() == 1:
             self._defineOutputs(outputPDB=AtomStruct(self.getOutputPrefix() + ".pdb"))
 
         # CREATE SET OF output PDBs
@@ -951,7 +959,7 @@ class ProtGenesis(EMProtocol):
         :return list: list of all output prefix of the specified index
         """
         outputPrefix=[]
-        if self.simulationType.get() == SIMULATION_REMD:
+        if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
             for i in range(self.nreplica.get()):
                 outputPrefix.append(self._getExtraPath("%s_output_remd%i" %
                                 (str(index + 1).zfill(5), i + 1)))
@@ -965,7 +973,7 @@ class ProtGenesis(EMProtocol):
         :return tuple: numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
         """
 
-        if self.simulationType.get() == SIMULATION_REMD :
+        if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
             nreplica = self.nreplica.get()
             if nreplica > self.numberOfMpi.get():
                 raise RuntimeError("Number of MPI cores should be larger than the number of replicas.")
