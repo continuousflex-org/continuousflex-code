@@ -5,17 +5,21 @@ ContinuousFlex plugin
 This plugin provides the latest Scipion protocols for cryo-EM continuous conformational flexibility/heterogeneity analysis of biomolecular complexes.
 
 
-Installation
+Requirements
 ------------
 
-You will need to use `3.0 <https://github.com/I2PC/scipion/releases>`_ version of Scipion to be able to run these protocols. To install the plugin, you have two options:
-We you need help installing Scipion3, please refer to the Scipion Documentation `here <https://scipion-em.github.io/docs/docs/scipion-modes/how-to-install.html>`__
+You will need to use `3.0 <https://github.com/I2PC/scipion/releases>`_ version of Scipion to be able to run these protocols.
+If you need help installing Scipion3, please refer to the Scipion Documentation `here <https://scipion-em.github.io/docs/docs/scipion-modes/how-to-install.html>`__
 
 Make sure that you have cmake installed on your Linux system. For example, if you are using Ubuntu
  .. code-block::
 
     sudo apt install cmake
 
+Installation
+------------
+
+To install the plugin, you have two options:
 
 a) Stable version
 
@@ -56,10 +60,12 @@ Protocols
 * StructMap: Structural Mapping method to interpret heterogeneity of a set of single particle cryo-EM maps in terms of continuous conformational transitions [4]
 * HEMNMA-3D: Extension of HEMNMA to continuous conformational variability analysis of macromolecules from in situ cryo-ET subtomograms [5]
 * TomoFlow: Method for analyzing continuous conformational variability of macromolecules in in vitro and in situ cryogenic subtomograms based on 3D dense optical flow [7]
+* GENESIS: Software to perform cryo-EM flexible fitting [8] using Molecular Dynamics (MD) [9] simulations and Normal Mode Molecular Dynamics (NMMD) [10]
 
 Notes:
 
-* The plugin additionally provides the test data and automated tests of the protocols in Scipion 3. The following two types of tests of HEMNMA and HEMNMA-3D can be produced by running, in the terminal, "scipion3 tests continuousflex.tests.test_workflow_HEMNMA" and “scipion3 tests continuousflex.tests.test_workflow_HEMNMA3D”, respectively: (1) tests of the entire protocol with the flexible references coming from an atomic structure and from an EM map; and (2) test of the alignment module (test run using 5 MPI threads). The automated tests of the TomoFlow method are also available and can be run using scipion3 tests continuousflex.tests.test_workflow_TomoFlow.
+* The plugin additionally provides the test data and automated tests of the protocols in Scipion 3. The following two types of tests of HEMNMA and HEMNMA-3D can be produced by running, in the terminal, "scipion3 tests continuousflex.tests.test_workflow_HEMNMA" and “scipion3 tests continuousflex.tests.test_workflow_HEMNMA3D”, respectively: (1) tests of the entire protocol with the flexible references coming from an atomic structure and from an EM map; and (2) test of the alignment module (test run using 5 MPI threads). The automated tests of the TomoFlow method are also available and can be run using scipion3 tests continuousflex.tests.test_workflow_TomoFlow. 
+* GENESIS is not installed by default in continuousflex, to install GENESIS, go to the plugin manager and under continuousflex plugin and check install GENESIS. The automated tests of GENESIS provide an example of cryo-EM flexible fitting of an atomic model into a 3D density map using NMMD for CHARMM and C-Alpha Go model. The tests can be produced by running "scipion3 tests continuousflex.tests.test_workflow_GENESIS" (need at least 2 MPI cores).
 * HEMNMA additionally provides tools for synthesizing noisy and CTF-affected single particle cryo-EM images with flexible or rigid biomolecular conformations, for several types of conformational distributions, from a given atomic structure or an EM map. One part of the noise is applied on the ideal projections before and the other after the CTF, as described in [6].
 * HEMNMA-3D additionally provides tools for synthesizing noisy, CTF and missing wedge affected cryo-ET tomograms and single particle subtomograms with flexible or rigid biomolecular conformations, for several types of conformational distributions, from a given atomic structure or an EM map. One part of the noise is applied on the ideal projections before and the other after the CTF, as described in [6].
 * A reproduction of some utility codes with their corresponding licenses are contained in this plugin for subtomogram averaging, missing wedge correction, denoising and data reading. These codes are not used in the methods above, but they are made optional for data preprocessing and visualization.
@@ -80,5 +86,11 @@ References
 [6] Jonic S, Sorzano CO, Thevenaz P, El-Bez C, De Carlo S, Unser M: Spline-based image-to-volume registration for three-dimensional electron microscopy. Ultramicroscopy 2005, 103:303-317. `[Author’s version] <http://www-ext.impmc.upmc.fr/~jonic/Papers/Ultramicroscopy_2005_v103_p303.pdf>`__
 
 [7] Harastani M, Eltsov M, Leforestier A, Jonic S: TomoFlow: Analysis of continuous conformational variability of macromolecules in cryogenic subtomograms based on 3D dense optical flow. J Mol Biol 2021,167381. `[Author’s version] <https://hal.archives-ouvertes.fr/hal-03452809>`__ `[Journal] <https://doi.org/10.1016/j.jmb.2021.167381>`__
+
+[8] Kobayashi C, Jung J, Matsunaga Y, Mori T, Ando T, Tamura K, ... & Sugita Y: GENESIS 1.1: A hybrid‐parallel molecular dynamics simulator with enhanced sampling algorithms on multiple computational platforms. J. Comput. Chem. 2017, 38, 2193– 2206  `[Journal] <https://doi.org/10.1002/jcc.24874>`__  
+
+[9] Orzechowski M, Tama F: Flexible fitting of high-resolution x-ray structures into cryoelectron microscopy maps using biased molecular dynamics simulations. Biophysical journal 2008, 95(12), 5692-5705. `[Journal] <https://doi.org/10.1529/biophysj.108.139451>`__  
+
+[10] Vuillemot R, Miyashita O, Tama F, Rouiller I, Jonic S, NMMD: Efficient Cryo-EM Flexible Fitting Based on Simultaneous Normal Mode and Molecular Dynamics atomic displacements. J Mol Biol 2022, 167483. `[Author’s version] <https://hal.archives-ouvertes.fr/hal-03577246>`__ `[Journal] <https://doi.org/10.1016/j.jmb.2022.167483>`__
 
 # scipion-em-continuousflex
