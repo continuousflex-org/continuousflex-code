@@ -58,7 +58,7 @@ class ProtGenesis(EMProtocol):
                       expertLevel=params.LEVEL_ADVANCED)
 
         form.addParam('inputPDB', params.PointerParam,
-                      pointerClass='AtomStruct, SetOfPDBs, SetOfAtomStructs', label="Input PDB (s)",
+                      pointerClass='AtomStruct', label="Input PDB",
                       help='Select the input PDB or set of PDBs.', important=True)
 
         form.addParam('inputRST', params.FileParam, label="GENESIS Restart File",
