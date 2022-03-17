@@ -122,7 +122,7 @@ class Plugin(pwem.Plugin):
         if os.path.exists(env.getEmFolder() + '/genesis.tgz'):
             os.system('rm ' + env.getEmFolder() + '/genesis.tgz')
 
-        target_branch = "nmmd"
+        target_branch = "nmmd_image_merge"
         env.addPackage('genesis', version='1.4.0', deps=[lapack],
                        url='https://github.com/mms29/nmmd/archive/%s.tar.gz' %target_branch,
                        tar='genesis.tgz',
