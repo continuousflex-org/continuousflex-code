@@ -103,7 +103,6 @@ keywords = ""
   doi= {https://doi.org/10.1002/pro.3772}
 }
 
-
 @article{moebel2020monte,
   title={A Monte Carlo framework for missing wedge restoration and noise removal in cryo-electron tomography},
   author={Moebel, Emmanuel and Kervrann, Charles},
@@ -112,6 +111,26 @@ keywords = ""
   pages={100013},
   year={2020},
   publisher={Elsevier}
+}
+
+@article{vuillemot2022NMMD,
+title = {NMMD: Efficient Cryo-EM Flexible Fitting Based on Simultaneous Normal Mode and Molecular Dynamics atomic displacements},
+journal = {Journal of Molecular Biology},
+volume = {434},
+number = {7},
+pages = {167483},
+year = {2022},
+issn = {0022-2836},
+doi = {https://doi.org/10.1016/j.jmb.2022.167483},
+url = {https://www.sciencedirect.com/science/article/pii/S0022283622000523},
+author = {Rémi Vuillemot and Osamu Miyashita and Florence Tama and Isabelle Rouiller and Slavica Jonic}
+}
+
+@misc{kobayashi2017genesis,
+  title={GENESIS 1.1: A hybrid-parallel molecular dynamics simulator with enhanced sampling algorithms on multiple computational platforms},
+  author={Kobayashi, Chigusa and Jung, Jaewoon and Matsunaga, Yasuhiro and Mori, Takaharu and Ando, Tadashi and Tamura, Koichi and Kamiya, Motoshi and Sugita, Yuji},
+  year={2017},
+  publisher={Wiley Online Library}
 }
 
 """
