@@ -148,7 +148,9 @@ class ProtGenesis(EMProtocol):
         group.addParam('nreplica', params.IntParam, default=1, label='Number of replicas',
                       help="Number of replicas for REMD", condition="simulationType==3 or simulationType==4")
 
-        group = form.addGroup('Energy', condition="simulationType!=0")
+        # MD params =================================================================================================
+        form.addSection(label='MD parameters')
+        group = form.addGroup('Energy')
         group.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,
                       choices=['GBSA', 'NONE'],
                       help="Turn on Generalized Born/Solvent accessible surface area model. Boundary condition must be NO."
@@ -200,7 +202,7 @@ class ProtGenesis(EMProtocol):
         group.addParam('pressure', params.FloatParam, default=1.0, label='Pressure (atm)',
                       help="Target pressure in the NPT ensemble", condition="ensemble==2")
 
-        group = form.addGroup('Contraints', condition="simulationType!=0")
+        group = form.addGroup('Contraints', condition="simulationType==1 or simulationType==3")
         group.addParam('rigid_bond', params.BooleanParam, label="Rigid bonds (SHAKE/RATTLE)",
                       default=False,
                       help="Turn on or off the SHAKE/RATTLE algorithms for covalent bonds involving hydrogen")
@@ -216,7 +218,7 @@ class ProtGenesis(EMProtocol):
                       choices=['None', 'Volume (s)', 'Image (s)'], important=True,
                       help="Type of cryo-EM data to be processed")
 
-        group = form.addGroup('Fitting Parameters', condition="simulationType!=0")
+        group = form.addGroup('Fitting parameters', condition="simulationType!=0")
         group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
                       help="Force constant in Eem = k*(1 - c.c.). Note that in the case of REUS, the number of "
                            " force constant value must be equal to the number of replicas, for example for 4 replicas,"
