@@ -58,7 +58,7 @@ class ProtGenesis(EMProtocol):
                       expertLevel=params.LEVEL_ADVANCED)
 
         form.addParam('inputPDB', params.PointerParam,
-                      pointerClass='AtomStruct, SetOfPDBs, SetOfAtomStructs', label="Input PDB (s)",
+                      pointerClass='AtomStruct', label="Input PDB",
                       help='Select the input PDB or set of PDBs.', important=True)
 
         form.addParam('inputRST', params.FileParam, label="GENESIS Restart File",
@@ -215,7 +215,7 @@ class ProtGenesis(EMProtocol):
         # Experiments =================================================================================================
         form.addSection(label='EM data')
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
-                      choices=['None', 'Volume (s)', 'Image (s)'], important=True,
+                      choices=['None', 'Volume'], important=True,
                       help="Type of cryo-EM data to be processed")
 
         group = form.addGroup('Fitting parameters', condition="simulationType!=0")
@@ -241,7 +241,7 @@ class ProtGenesis(EMProtocol):
 
         # Volumes
         group = form.addGroup('Volume Parameters', condition="EMfitChoice==1")
-        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
+        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume",
                       label="Input volume", help='Select the target EM density volume',
                       condition="EMfitChoice==1", important=True)
         group.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
