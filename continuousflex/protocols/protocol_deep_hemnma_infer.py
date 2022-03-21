@@ -32,12 +32,6 @@ from pwem.protocols import ProtAnalysis3D
 from pwem.utils import runProgram
 
 
-OPTION_SHFITS = 0
-OPTION_ANGLES = 1
-OPTION_SHIFTS_ANGLES = 2
-OPTION_NMA = 3
-OPTION_ALL = 4
-
 
 
 class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
@@ -52,22 +46,11 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
     #--------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
-        form.addParam('analyze_option', params.EnumParam, label='choose what operation you want?',
-                      display=params.EnumParam.DISPLAY_COMBO,
-                      choices=['train on shifts',
-                               'tain on angles',
-                               'tain on shifts and angles',
-                               'train on normal mode amplitudes'], default = OPTION_NMA,
+        form.addParam('trained_model', params.PointerParam, pointerClass='FlexProtDeepHEMNMATrain',
+                      label = 'Trained model', help='TODO')
+        form.addParam('inputParticles', PointerParam, pointerClass='SetOfParticles',
+                      label="Inference set",
                       help='TODO')
-        group = form.addGroup('Train on conformational variability', condition='analyze_option == %d or analyze_option == %d'% (OPTION_NMA, OPTION_ALL))
-        group.addParam('inputNMA', PointerParam, pointerClass='FlexProtAlignmentNMA',
-                      label="Previous HEMNMA run",
-                      help='Select a previous run of the NMA image alignment.', allowsNull=True)
-        group = form.addGroup('Train on rigid-body variability ', condition='analyze_option == %d or analyze_option == %d or analyze_option == %d' %(OPTION_SHFITS, OPTION_ANGLES, OPTION_SHIFTS_ANGLES))
-        group.addParam('inputNMA', PointerParam, pointerClass='SetOfParticles',
-                      label="Preious run of rigid-body alignment",
-                      help='Select a previous run of rigid-body alignment.', allowsNull=True)
-        form.addParam('learning_rate', params.FloatParam, label = 'Learning rate', default = 0.0001)
         form.addParallelSection(threads=0, mpi=0)    
     
     

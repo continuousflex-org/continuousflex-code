@@ -25,21 +25,22 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-from pwem.protocols import ProtImportPdb, ProtImportParticles, ProtSplitSet, ProtSubSet
+from pwem.protocols import ProtImportPdb, ProtImportParticles, ProtImportVolumes, ProtSubSet
 from pwem.tests.workflows import TestWorkflow
 from pwem import Domain
 from pyworkflow.tests import setupTestProject, DataSet
 
 from continuousflex.protocols import (FlexProtNMA, FlexProtAlignmentNMA,
                                       FlexProtDimredNMA, NMA_CUTOFF_ABS,
-                                      FlexProtConvertToPseudoAtoms, FlexBatchProtNMACluster)
+                                      FlexProtDeepHEMNMATrain,
+                                      FlexProtDeepHEMNMAInfer)
 
 from continuousflex.protocols.pdb.protocol_pseudoatoms_base import NMA_MASK_THRE
 from continuousflex.protocols.protocol_nma_base import NMA_CUTOFF_REL
 from continuousflex.protocols.protocol_nma_alignment import NMA_ALIGNMENT_PROJ
 from xmipp3.protocols import XmippProtCropResizeParticles
 
-class TestDeepHEMNMA(TestWorkflow):
+class TestDeepHEMNMA1(TestWorkflow):
     """ Test protocol for HEMNMA (Hybrid Electron Microscopy Normal Mode Analysis). """
     @classmethod
     def setUpClass(cls):    
@@ -49,10 +50,7 @@ class TestDeepHEMNMA(TestWorkflow):
     
     def test_HEMNMA_atomic(self):
         """ Run NMA simple workflow for both Atomic and Pseudoatoms. """
-        #------------------------------------------------
-        # Case 1. Import a Pdb -> NMA
-        #------------------------------------------------
-        # Import a PDB
+
         protImportPdb = self.newProtocol(ProtImportPdb, inputPdbData=1,
                                          pdbFile=self.ds.getFile('pdb'))
         protImportPdb.setObjLabel('AK.pdb')
@@ -78,7 +76,7 @@ class TestDeepHEMNMA(TestWorkflow):
         protResizeParts.resizeOption.set(2) # this corresponds to factor
         protResizeParts.resizeFactor.set(0.25)
         protResizeParts.inputParticles.set(protImportParts.outputParticles)
-        protResizeParts.setObjLabel('Resizing (factor 0.5)')
+        protResizeParts.setObjLabel('Resizing (factor 0.25)')
         self.launchProtocol(protResizeParts)
 
         protSubset1 = self.newProtocol(ProtSubSet,
@@ -97,13 +95,72 @@ class TestDeepHEMNMA(TestWorkflow):
         protSubset2.inputSubSet.set(protSubset1.outputParticles)
         self.launchProtocol(protSubset2)
 
-        # Launch NMA alignment, but just reading result from a previous metadata
+        # Launch NMA alignment
         protAlignment = self.newProtocol(FlexProtAlignmentNMA,
                                          modeList='7-9')
         protAlignment.inputModes.set(protNMA1.outputModes)
         protAlignment.inputParticles.set(protSubset1.outputParticles)
         protAlignment.setObjLabel('HEMNMA atomic ref')
-        self.launchProtocol(protAlignment)       
+        self.launchProtocol(protAlignment)
+
+        protTrain = self.newProtocol(FlexProtDeepHEMNMATrain)
+        protTrain.inputNMA.set(protAlignment)
+        self.launchProtocol(protTrain)
+
+        protInfer = self.newProtocol(FlexProtDeepHEMNMAInfer)
+        protInfer.trained_model.set(protTrain) #angles and shifts
+        protInfer.inputParticles.set(protSubset2.outputParticles)
+        self.launchProtocol(protInfer)
+
+
+
+
+
+class TestDeepHEMNMA2(TestWorkflow):
+    @classmethod
+    def setUpClass(cls):
+        setupTestProject(cls)
+        cls.dataset = DataSet.getDataSet('relion_tutorial')
+        cls.vol = cls.dataset.getFile('volume')
+
+    def testXmippProjMatching(self):
+        print("Import Particles")
+        protImportParts = self.newProtocol(ProtImportParticles,
+                                           objLabel='Particles from scipion',
+                                           importFrom=ProtImportParticles.IMPORT_FROM_SCIPION,
+                                           sqliteFile=self.dataset.getFile('import/case2/particles.sqlite'),
+                                           magnification=50000,
+                                           samplingRate=7.08,
+                                           haveDataBeenPhaseFlipped=True
+                                           )
+        self.launchProtocol(protImportParts)
+        self.assertIsNotNone(protImportParts.getFiles(), "There was a problem with the import")
+
+        protSubset1 = self.newProtocol(ProtSubSet,
+                                      objLabel='Training set',
+                                      chooseAtRandom=True,
+                                      nElements=100)
+        protSubset1.inputFullSet.set(protImportParts.outputParticles)
+        self.launchProtocol(protSubset1)
+
+
+        protSubset2 = self.newProtocol(ProtSubSet,
+                                         objLabel='Inference set',
+                                         chooseAtRandom=False,
+                                         setOperation=1)
+        protSubset2.inputFullSet.set(protImportParts.outputParticles)
+        protSubset2.inputSubSet.set(protSubset1.outputParticles)
+        self.launchProtocol(protSubset2)
+
+        protTrain = self.newProtocol(FlexProtDeepHEMNMATrain)
+        protTrain.analyze_option.set(2) #angles and shifts
+        protTrain.inputParticles.set(protSubset1.outputParticles)
+        self.launchProtocol(protTrain)
+
+        protInfer = self.newProtocol(FlexProtDeepHEMNMAInfer)
+        protInfer.trained_model.set(protTrain) #angles and shifts
+        protInfer.inputParticles.set(protSubset2.outputParticles)
+        self.launchProtocol(protInfer)
 
 
 
