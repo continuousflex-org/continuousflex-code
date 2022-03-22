@@ -50,12 +50,12 @@ class GenesisViewer(ProtocolViewer):
     def _defineParams(self, form):
         form.addSection(label='Visualization')
 
-        if self.protocol.getNumberOfInputEM() >1:
+        if self.protocol.getNumberOfSimulation() >1:
             form.addParam('fitRange', params.NumericRangeParam,
-                          label="EM data selection",
-                          default="1-%i"%self.protocol.getNumberOfInputEM(),
+                          label="Simulation selection",
+                          default="1-%i"%self.protocol.getNumberOfSimulation(),
                           important = True,
-                          help=' Select the EM data to display. Examples:'
+                          help=' Select the simulation to display. Examples:'
                                ' "1,3-5" -> [1,3,4,5]'
                                ' "1, 2, 4" -> [1,2,4]')
         if self.protocol.simulationType.get() == SIMULATION_REMD\
@@ -70,17 +70,19 @@ class GenesisViewer(ProtocolViewer):
         form.addParam('compareToPDB', params.BooleanParam, default=False,
                         label="Compare to external PDB",
                         help='TODO')
-        form.addParam('targetPDB', params.PathParam, default=None,
+
+        group = form.addGroup('External PDB',condition= "compareToPDB")
+        group.addParam('targetPDB', params.PathParam, default=None,
                         label="Target PDB (s)", important=True,
                         help=' Target PDBs to compute RMSD against. Atom mathcing is performed between '
                              ' the output PDBs and the target PDBs. Use the file pattern as file location with /*.pdb',
                        condition= "compareToPDB")
-        form.addParam('referencePDB', params.PathParam, default="",
+        group.addParam('referencePDB', params.PathParam, default="",
                         label="Intial PDB",
                         help='Atom matching will ignore the output PDB and will use the initial PDB instead.',
                         expertLevel=params.LEVEL_ADVANCED,condition= "compareToPDB")
 
-        form.addParam('alignTarget', params.BooleanParam, default=False,
+        group.addParam('alignTarget', params.BooleanParam, default=False,
                         label="Align Target PDB",
                         help='TODO',condition= "compareToPDB")
 
@@ -99,7 +101,7 @@ class GenesisViewer(ProtocolViewer):
                       label='Display Potential Energy',
                       help='Show time series of the potentials used in MD simulation/Minimization')
 
-        group = form.addGroup('RMSD analysis')
+        group = form.addGroup('RMSD analysis', condition= "compareToPDB")
         group.addParam('displayRMSDts', params.LabelParam,
                       label='Display RMSD time series',
                       help='TODO',condition= "compareToPDB")
@@ -153,7 +155,7 @@ class GenesisViewer(ProtocolViewer):
 
     def _plotChimera(self, paramName):
         tmpChimeraFile = self.protocol._getExtraPath("chimera.cxc")
-        index = self.getEMList()[0]
+        index = self.getSimulationList()[0]
 
         with open(tmpChimeraFile, "w") as f:
             f.write("open %s.pdb \n"% os.path.abspath(self.protocol.getInputPDBprefix(index)))
@@ -186,7 +188,7 @@ class GenesisViewer(ProtocolViewer):
 
     def _plotTrajVMD(self, paramName):
         tmpVmdFile = self.protocol._getExtraPath("vmd.tcl")
-        index = self.getEMList()[0]
+        index = self.getSimulationList()[0]
         with open(tmpVmdFile, "w") as f:
             f.write("mol new %s.pdb waitfor all\n" % self.protocol.getInputPDBprefix(index))
             f.write("mol addfile %s.dcd waitfor all\n" % self.getOutputPrefixAll(index)[0])
@@ -229,7 +231,7 @@ class GenesisViewer(ProtocolViewer):
         ene_default = ["TOTAL_ENE", "POTENTIAL_ENE", "KINETIC_ENE"]
 
         ene = {}
-        for i in self.getEMList():
+        for i in self.getSimulationList():
             outputPrefix = self.getOutputPrefixAll(i)
             for j in outputPrefix:
                 log_file = readLogFile(j + ".log")
@@ -254,7 +256,7 @@ class GenesisViewer(ProtocolViewer):
                "NON-NATIVE_CONT", "RESTRAINT_TOTAL"]
 
         ene = {}
-        for i in self.getEMList():
+        for i in self.getSimulationList():
             outputPrefix = self.getOutputPrefixAll(i)
             for j in outputPrefix:
                 log_file = readLogFile(j+".log")
@@ -277,11 +279,11 @@ class GenesisViewer(ProtocolViewer):
         # Get CC list
         cc = []
         labels=[]
-        emlist = self.getEMList()
-        for i in emlist:
+        simlist = self.getSimulationList()
+        for i in simlist:
             outputPrefix = self.getOutputPrefixAll(i)
             cc_rep = []
-            if len(emlist) == 1:
+            if len(simlist) == 1:
                 labels.append("CC")
             else:
                 labels.append("CC %s" % str(i + 1))
@@ -293,7 +295,7 @@ class GenesisViewer(ProtocolViewer):
                     raise RuntimeError("CC not present in the log file")
             cc.append(cc_rep)
 
-        self.genesisPlotter(title="CC", data=cc, ndata=len(emlist),
+        self.genesisPlotter(title="CC", data=cc, ndata=len(simlist),
                             nrep=len(self.getOutputPrefixAll()), labels=labels)
 
 
@@ -354,10 +356,10 @@ class GenesisViewer(ProtocolViewer):
         # Get RMSD list
         rmsd = []
         labels=[]
-        emlist = self.getEMList()
-        for i in emlist:
+        simlist = self.getSimulationList()
+        for i in simlist:
             outputPrefix = self.getOutputPrefixAll(i)
-            if len(emlist) == 1:
+            if len(simlist) == 1:
                 labels.append("RMSD")
             else:
                 labels.append("RMSD %s"%str(i+1))
@@ -367,7 +369,7 @@ class GenesisViewer(ProtocolViewer):
                     targetPDB=self.getTargetPDB(i),idx=idx, align = self.alignTarget.get()))
             rmsd.append(rmsd_rep)
 
-        self.genesisPlotter(title="RMSD ($\AA$)", data=rmsd, ndata=len(emlist),
+        self.genesisPlotter(title="RMSD ($\AA$)", data=rmsd, ndata=len(simlist),
                             nrep=len(self.getOutputPrefixAll()), labels=labels)
 
 
@@ -379,7 +381,7 @@ class GenesisViewer(ProtocolViewer):
         initial_mols = []
         final_mols = []
         target_mols = []
-        for i in self.getEMList():
+        for i in self.getSimulationList():
             inputPDB = self.protocol.getInputPDBprefix(i)+".pdb"
             targetPDB = self.getTargetPDB(i)
             outputPrefs = self.getOutputPrefixAll(i)
@@ -396,7 +398,7 @@ class GenesisViewer(ProtocolViewer):
         idx = matchPDBatoms(mols=[ref_mol, target_mols[0]],ca_only=True)
         rmsdi=[]
         rmsdf=[]
-        for i in range(len(self.getEMList())):
+        for i in range(len(self.getSimulationList())):
             for j in range(len(outputPrefs)):
                 rmsdi.append(getRMSD(mol1=initial_mols[i],mol2=target_mols[i], idx=idx, align=self.alignTarget.get()))
                 rmsdf.append(getRMSD(mol1=final_mols[i*len(outputPrefs) + j]  ,
@@ -412,7 +414,7 @@ class GenesisViewer(ProtocolViewer):
         shift_dist = []
         mdImgGT = md.MetaData(self.rigidBodyParams.get())
         tmpPrefix = self.protocol._getExtraPath("tmpAngles")
-        for i in self.getEMList():
+        for i in self.getSimulationList():
             imgfn = self.protocol._getExtraPath("%s_current_angles.xmd" % (str(i+1).zfill(5)))
             if os.path.exists(imgfn):
                 angDist, shftDist = getAngularShiftDist(angle1MetaFile=imgfn,
@@ -439,18 +441,18 @@ class GenesisViewer(ProtocolViewer):
 
     def _plotAngularDistanceTs(self, paramName):
         mdImgGT = md.MetaData(self.rigidBodyParams.get())
-        EMList = self.getEMList()
+        SimulationList = self.getSimulationList()
         niter= self.protocol.rb_n_iter.get()
-        angular_dist = np.zeros((len(EMList),niter))
+        angular_dist = np.zeros((len(SimulationList),niter))
         tmpPrefix = self.protocol._getExtraPath("tmpAngles")
 
 
-        for i in range(len(EMList)):
+        for i in range(len(SimulationList)):
             for j in range(niter):
-                imgfn = self.protocol._getExtraPath("%s_iter%i_angles.xmd" % (str(EMList[i]+1).zfill(5), j))
+                imgfn = self.protocol._getExtraPath("%s_iter%i_angles.xmd" % (str(SimulationList[i]+1).zfill(5), j))
                 if os.path.exists(imgfn):
                     angDist,_ = getAngularShiftDist(angle1MetaFile=imgfn,
-                                    angle2MetaData=mdImgGT, angle2Idx=int(EMList[i]+1),
+                                    angle2MetaData=mdImgGT, angle2Idx=int(SimulationList[i]+1),
                                     tmpPrefix=tmpPrefix, symmetry=self.symmetry.get())
                     angular_dist[i, j] = angDist
 
@@ -459,7 +461,7 @@ class GenesisViewer(ProtocolViewer):
 
         plotter1 = FlexPlotter()
         ax1 = plotter1.createSubPlot("Angular Distance (°)", "Number of iterations", "Angular Distance (°)")
-        for i in range(len(EMList)):
+        for i in range(len(SimulationList)):
             ax1.plot(angular_dist[i,:])
         plotter1.show()
 
@@ -488,7 +490,7 @@ class GenesisViewer(ProtocolViewer):
         # Get fitted PDBs coords
         fitPDBs = []
         fitMols = []
-        for i in self.getEMList():
+        for i in self.getSimulationList():
             outputPrefix = self.getOutputPrefixAll(i)
             for j in outputPrefix:
                 mol = PDBMol(j+".pdb")
@@ -502,7 +504,7 @@ class GenesisViewer(ProtocolViewer):
         # Get TargetPDBs coords
         if self.compareToPDB.get():
             targetPDBs=[]
-            for i in self.getEMList():
+            for i in self.getSimulationList():
                 targetMol = PDBMol(self.getTargetPDB(i))
                 if self.alignTarget.get():
                     alignMol(fitMols[i], targetMol, idx=matchingAtoms)
@@ -567,8 +569,8 @@ class GenesisViewer(ProtocolViewer):
         np.save(file = self.protocol._getExtraPath("PCA_labels.npy"), arr= labels)
 
 
-    def getEMList(self):
-        if self.protocol.getNumberOfInputEM() > 1:
+    def getSimulationList(self):
+        if self.protocol.getNumberOfSimulation() > 1:
             return np.array(getListFromRangeString(self.fitRange.get())) -1
         else:
             return np.array([0])
