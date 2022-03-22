@@ -102,15 +102,8 @@ class testGENESIS(TestWorkflow):
         assert(potential_ene[0] > potential_ene[-1])
 
         protGenesisFitNMMD = self.newProtocol(ProtGenesis,
-
-          inputPDB=protGenesisMin.outputPDB,
-          forcefield=FORCEFIELD_CHARMM,
-          generateTop=False,
-          inputPRM=self.ds.getFile('charmm_prm'),
-          inputRTF=self.ds.getFile('charmm_top'),
-          inputPSF=protGenesisMin.getInputPDBprefix() + ".psf",
-          restartchoice=True,
-          inputRST=protGenesisMin.getOutputPrefix() + ".rst",
+          restartChoice=True,
+          restartProt = protGenesisMin,
 
           simulationType=SIMULATION_NMMD,
           time_step=0.002,
@@ -212,12 +205,8 @@ class testGENESIS(TestWorkflow):
         if NUMBER_OF_CPU >= 2:
             protGenesisFitREUS = self.newProtocol(ProtGenesis,
 
-                                                  inputPDB=protGenesisMin.outputPDB,
-                                                  forcefield=FORCEFIELD_CAGO,
-                                                  generateTop=False,
-                                                  inputTOP=protGenesisMin.getInputPDBprefix() + ".top",
-                                                  restartchoice=True,
-                                                  inputRST=protGenesisMin.getOutputPrefix() + ".rst",
+                                                  restartChoice=True,
+                                                  restartProt=protGenesisMin,
 
                                                   simulationType=SIMULATION_RENMMD,
                                                   time_step=0.0005,

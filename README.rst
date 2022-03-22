@@ -48,6 +48,8 @@ You should also consider having VMD on your system for visualization.
 We assume that VMD is installed on your system in "/usr/local/lib/vmd".
 If VMD is installed but does not work, you may run the command "scipion3 config" and look for VMD_HOME in the config file (the config file is usually at ~/scipion3/config/scipion.conf)
 
+Note: GENESIS is not installed by default in continuousflex. To install GENESIS, you can use the Plugin Manager, or run the command line "scipion3 installb genesis"
+
 Supported versions
 ------------------
 
@@ -60,7 +62,7 @@ Protocols
 * StructMap: Structural Mapping method to interpret heterogeneity of a set of single particle cryo-EM maps in terms of continuous conformational transitions [4]
 * HEMNMA-3D: Extension of HEMNMA to continuous conformational variability analysis of macromolecules from in situ cryo-ET subtomograms [5]
 * TomoFlow: Method for analyzing continuous conformational variability of macromolecules in in vitro and in situ cryogenic subtomograms based on 3D dense optical flow [7]
-* GENESIS: Software to perform cryo-EM flexible fitting [8] using Molecular Dynamics (MD) [9] simulations and Normal Mode Molecular Dynamics (NMMD) [10]
+* GENESIS: Software to perform cryo-EM flexible fitting using Molecular Dynamics (MD) simulations and Normal Mode Molecular Dynamics (NMMD) [8]
 
 Notes:
 
@@ -87,10 +89,6 @@ References
 
 [7] Harastani M, Eltsov M, Leforestier A, Jonic S: TomoFlow: Analysis of continuous conformational variability of macromolecules in cryogenic subtomograms based on 3D dense optical flow. J Mol Biol 2021,167381. `[Author’s version] <https://hal.archives-ouvertes.fr/hal-03452809>`__ `[Journal] <https://doi.org/10.1016/j.jmb.2021.167381>`__
 
-[8] Kobayashi C, Jung J, Matsunaga Y, Mori T, Ando T, Tamura K, ... & Sugita Y: GENESIS 1.1: A hybrid‐parallel molecular dynamics simulator with enhanced sampling algorithms on multiple computational platforms. J. Comput. Chem. 2017, 38, 2193– 2206  `[Journal] <https://doi.org/10.1002/jcc.24874>`__  
-
-[9] Orzechowski M, Tama F: Flexible fitting of high-resolution x-ray structures into cryoelectron microscopy maps using biased molecular dynamics simulations. Biophysical journal 2008, 95(12), 5692-5705. `[Journal] <https://doi.org/10.1529/biophysj.108.139451>`__  
-
-[10] Vuillemot R, Miyashita O, Tama F, Rouiller I, Jonic S, NMMD: Efficient Cryo-EM Flexible Fitting Based on Simultaneous Normal Mode and Molecular Dynamics atomic displacements. J Mol Biol 2022, 167483. `[Author’s version] <https://hal.archives-ouvertes.fr/hal-03577246>`__ `[Journal] <https://doi.org/10.1016/j.jmb.2022.167483>`__
+[8] Vuillemot R, Miyashita O, Tama F, Rouiller I, Jonic S, NMMD: Efficient Cryo-EM Flexible Fitting Based on Simultaneous Normal Mode and Molecular Dynamics atomic displacements. J Mol Biol 2022, 167483. `[Author’s version] <https://hal.archives-ouvertes.fr/hal-03577246>`__ `[Journal] <https://doi.org/10.1016/j.jmb.2022.167483>`__
 
 # scipion-em-continuousflex
