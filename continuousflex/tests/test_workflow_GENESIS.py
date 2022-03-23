@@ -142,7 +142,7 @@ class testGENESIS(TestWorkflow):
 
           numberOfThreads=int(np.min([NUMBER_OF_CPU,4])),
           )
-        protGenesisFitNMMD.setObjLabel('Flexible Fitting CHARMM')
+        protGenesisFitNMMD.setObjLabel('NMMD Flexible Fitting CHARMM')
 
         # Launch Fitting
         self.launchProtocol(protGenesisFitNMMD)
@@ -248,7 +248,7 @@ class testGENESIS(TestWorkflow):
                                               numberOfThreads=int(np.min([NUMBER_OF_CPU,4])),
                                               numberOfMpi=1,
                                               )
-        protGenesisFitNMMD.setObjLabel('Flexible Fitting CAGO')
+        protGenesisFitNMMD.setObjLabel('NMMD Flexible Fitting CAGO')
 
         # Launch Fitting
         self.launchProtocol(protGenesisFitNMMD)
@@ -324,7 +324,7 @@ class testGENESIS(TestWorkflow):
                                               numberOfThreads=1,
                                               numberOfMpi=4,
                                               )
-            protGenesisFitREUS.setObjLabel('Flexible Fitting CAGO+REUS')
+            protGenesisFitREUS.setObjLabel('NMMD + REUS Flexible Fitting CAGO')
 
             # Launch Fitting
             self.launchProtocol(protGenesisFitREUS)
