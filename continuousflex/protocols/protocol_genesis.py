@@ -230,7 +230,7 @@ class ProtGenesis(EMProtocol):
                       choices=['None', 'Volume'], important=True,
                       help="Type of cryo-EM data to be processed")
 
-        group = form.addGroup('Fitting parameters', condition="simulationType!=0")
+        group = form.addGroup('Fitting parameters', condition="EMfitChoice!=0")
         group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
                       help="Force constant in Eem = k*(1 - c.c.). Note that in the case of REUS, the number of "
                            " force constant value must be equal to the number of replicas, for example for 4 replicas,"
