@@ -77,11 +77,11 @@ class testGENESIS(TestWorkflow):
             cutoff_dist = 12.0,
             pairlist_dist = 15.0,
 
-            numberOfThreads = NUMBER_OF_CPU,
+            numberOfThreads = int(np.min([NUMBER_OF_CPU,4])),
 
        )
 
-        protGenesisMin.setObjLabel('[GENESIS]\n Energy Minimization CHARMM Implicit solvent')
+        protGenesisMin.setObjLabel('Energy Minimization CHARMM')
         # Launch minimisation
         self.launchProtocol(protGenesisMin)
 
@@ -140,9 +140,9 @@ class testGENESIS(TestWorkflow):
           voxel_size=2.0,
           centerOrigin=True,
 
-          numberOfThreads=NUMBER_OF_CPU,
+          numberOfThreads=int(np.min([NUMBER_OF_CPU,4])),
           )
-        protGenesisFitNMMD.setObjLabel('[GENESIS]\n Cryo-EM fitting with CHARMM implicit solvent')
+        protGenesisFitNMMD.setObjLabel('Flexible Fitting CHARMM')
 
         # Launch Fitting
         self.launchProtocol(protGenesisFitNMMD)
@@ -201,15 +201,87 @@ class testGENESIS(TestWorkflow):
             cutoff_dist = 12.0,
             pairlist_dist = 15.0,
 
-            numberOfThreads = NUMBER_OF_CPU,
+            numberOfThreads = int(np.min([NUMBER_OF_CPU,4])),
 
        )
-        protGenesisMin.setObjLabel('[GENESIS]\n Energy Minimization C-Alpha Go model')
+        protGenesisMin.setObjLabel('Energy Minimization CAGO')
         # Launch minimisation
         self.launchProtocol(protGenesisMin)
 
-        # Need at least 2 cores
-        if NUMBER_OF_CPU >= 2:
+        protGenesisFitNMMD = self.newProtocol(ProtGenesis,
+
+                                              inputPDB=protGenesisMin.outputPDB,
+                                              forcefield=FORCEFIELD_CAGO,
+                                              generateTop=False,
+                                              inputTOP=protGenesisMin.getInputPDBprefix() + ".top",
+                                              restartchoice=True,
+                                              inputRST=protGenesisMin.getOutputPrefix() + ".rst",
+
+                                              simulationType=SIMULATION_NMMD,
+                                              time_step=0.0005,
+                                              n_steps=1000,
+                                              eneout_period=100,
+                                              crdout_period=100,
+                                              nbupdate_period=10,
+                                              nm_number=6,
+                                              nm_mass=1.0,
+
+                                              implicitSolvent=IMPLICIT_SOLVENT_NONE,
+                                              electrostatics=ELECTROSTATICS_CUTOFF,
+                                              switch_dist=10.0,
+                                              cutoff_dist=12.0,
+                                              pairlist_dist=15.0,
+
+                                              ensemble=ENSEMBLE_NVT,
+                                              tpcontrol=TPCONTROL_LANGEVIN,
+                                              temperature=50.0,
+
+                                              boundary=BOUNDARY_NOBC,
+                                              EMfitChoice=EMFIT_VOLUMES,
+                                              constantK="500",
+                                              emfit_sigma=2.0,
+                                              emfit_tolerance=0.1,
+                                              inputVolume=self.protImportVol.outputVolume,
+                                              voxel_size=2.0,
+                                              centerOrigin=True,
+
+                                              numberOfThreads=int(np.min([NUMBER_OF_CPU,4])),
+                                              numberOfMpi=1,
+                                              )
+        protGenesisFitNMMD.setObjLabel('Flexible Fitting CAGO')
+
+        # Launch Fitting
+        self.launchProtocol(protGenesisFitNMMD)
+
+        # Get GENESIS log file
+        log_file = protGenesisFitNMMD.getOutputPrefix()+".log"
+
+        # Get the CC from the log file
+        cc = readLogFile(log_file)["RESTR_CVS001"]
+
+        # Get the RMSD from the dcd file
+        matchingAtoms = matchPDBatoms([PDBMol(protGenesisFitNMMD.getInputPDBprefix() + ".pdb")
+                                          , PDBMol(self.ds.getFile('1ake_pdb'))])
+        rmsd = rmsdFromDCD(outputPrefix = protGenesisFitNMMD.getOutputPrefix(),
+                           inputPDB = protGenesisFitNMMD.getInputPDBprefix()+".pdb",
+                           targetPDB=self.ds.getFile('1ake_pdb'),
+                           idx=matchingAtoms,
+                           align=False)
+
+        # Assert that the CC is increasing and  the RMSD is decreasing
+        print("\n\n//////////////////////////////////////////////")
+        print(protGenesisFitNMMD.getObjLabel())
+        print("Initial CC : %.2f"%cc[0])
+        print("Final CC : %.2f"%cc[-1])
+        print("Initial rmsd : %.2f Ang"%rmsd[0])
+        print("Final rmsd : %.2f Ang"%rmsd[-1])
+        print("//////////////////////////////////////////////\n\n")
+        assert (cc[0] < cc[-1])
+        assert (rmsd[0] > rmsd[-1])
+
+
+        # Need at least 4 cores
+        if NUMBER_OF_CPU >= 4:
             protGenesisFitREUS = self.newProtocol(ProtGenesis,
 
                                                   inputPDB=protGenesisMin.outputPDB,
@@ -228,7 +300,7 @@ class testGENESIS(TestWorkflow):
                                                   nm_number=6,
                                                   nm_mass=1.0,
                                                   exchange_period=100, # 100
-                                                  nreplica = 2,
+                                                  nreplica = 4,
 
                                               implicitSolvent=IMPLICIT_SOLVENT_NONE,
                                               electrostatics=ELECTROSTATICS_CUTOFF,
@@ -238,21 +310,21 @@ class testGENESIS(TestWorkflow):
 
                                               ensemble=ENSEMBLE_NVT,
                                               tpcontrol=TPCONTROL_LANGEVIN,
-                                              temperature=100.0,
+                                              temperature=50.0,
 
                                               boundary=BOUNDARY_NOBC,
                                               EMfitChoice=EMFIT_VOLUMES,
-                                              constantK="9000 11000",
+                                              constantK="500-1500",
                                               emfit_sigma=2.0,
                                               emfit_tolerance=0.1,
                                               inputVolume=self.protImportVol.outputVolume,
                                               voxel_size=2.0,
                                               centerOrigin=True,
 
-                                              numberOfThreads=NUMBER_OF_CPU//2,
-                                              numberOfMpi=2,
+                                              numberOfThreads=1,
+                                              numberOfMpi=4,
                                               )
-            protGenesisFitREUS.setObjLabel('[GENESIS]\n REUS (2 replicas) CAGO')
+            protGenesisFitREUS.setObjLabel('Flexible Fitting CAGO+REUS')
 
             # Launch Fitting
             self.launchProtocol(protGenesisFitREUS)
