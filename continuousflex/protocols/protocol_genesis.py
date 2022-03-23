@@ -54,17 +54,21 @@ class ProtGenesis(EMProtocol):
                     " their parallelization schemes. In SPDYN, the spatial decomposition scheme is implemented with new"
                     " parallel algorithms and GPGPU calculation. In ATDYN, the atomic decomposition scheme"
                     " is introduced for simplicity. The performance of ATDYN is not comparable to SPDYN due to the"
-                    " simple parallelization scheme but contains new methods and features.", important=True,
+                    " simple parallelization scheme but contains new methods and features. NMMD is available only for ATDYN.", important=True,
                       expertLevel=params.LEVEL_ADVANCED)
+
+        form.addParam('restartChoice', params.BooleanParam, label="Restart GENESIS protocol ?", default=False,
+                      help="Restart a previous GENESIS simulation. ")
+
+
+        form.addParam('restartProt', params.PointerParam, label="Input GENESIS protocol",pointerClass="ProtGenesis",
+                       help='Provide a GENESIS protocol to restart.', condition="restartChoice" )
 
         form.addParam('inputPDB', params.PointerParam,
                       pointerClass='AtomStruct', label="Input PDB",
-                      help='Select the input PDB or set of PDBs.', important=True)
+                      help='Select the input PDB.', important=True)
 
-        form.addParam('inputRST', params.FileParam, label="GENESIS Restart File",
-                       help='Restart a previous GENESIS run with a .rst file', default="",expertLevel=params.LEVEL_ADVANCED)
-
-        group = form.addGroup('Forcefield Inputs')
+        group = form.addGroup('Forcefield Inputs', condition="not restartChoice" )
         group.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0, important=True,
                       choices=['CHARMM', 'AAGO', 'CAGO'], help="Type of the force field used for energy and force calculation")
         group.addParam('generateTop', params.BooleanParam, label="Generate topology files ?",
@@ -73,31 +77,37 @@ class ProtGenesis(EMProtocol):
                                           " and SMOG2 for GO models. Note that the generated topology files will not include"
                                           " solvent.")
         group.addParam('nucleicChoice', params.EnumParam, label="Contains nucleic acids ?", default=0,
-                      choices=['NO', 'RNA', 'DNA'], condition ="generateTop",help="TODo")
-        group.addParam('smog_dir', params.FileParam, label="SMOG2 directory",
+                      choices=['NO', 'RNA', 'DNA'], condition ="generateTop",
+                       help="Specify if the generator should consider nucleic residues as DNA or RNA")
+        group.addParam('smog_dir', params.FileParam, label="Path to SMOG2 install directory (For SMOG2 installation, see "
+                                                           "https://smog-server.org/smog2/ , otherwise use the web GUI "
+                                                           "https://smog-server.org/cgi-bin/GenTopGro.pl )",
                       help='Path to SMOG2 directory', condition="(forcefield==1 or forcefield==2) and generateTop")
-        group.addParam('inputTOP', params.FileParam, label="GROMACS Topology File",
+        group.addParam('inputTOP', params.FileParam, label="GROMACS Topology File (top)",
                       condition="(forcefield==1 or forcefield==2) and not generateTop",
                       help='Gromacs ‘top’ file containing information of the system such as atomic masses, charges,'
-                           ' atom connectivities. For details about this format, see the Gromacs web site')
-        group.addParam('inputPRM', params.FileParam, label="CHARMM parameter file",
+                           ' atom connectivities. To generate this file for your system, you can either use the option'
+                           '\" generate topology files\" (SMOG 2 installation is required, https://smog-server.org/smog2/ ),'
+                           ' or using SMOG sever (https://smog-server.org/cgi-bin/GenTopGro.pl )')
+        group.addParam('inputPRM', params.FileParam, label="CHARMM parameter file (prm)",
                       condition = "forcefield==0",
                       help='CHARMM parameter file containing force field parameters, e.g. force constants and librium'
-                            ' geometries' )
-        group.addParam('inputRTF', params.FileParam, label="CHARMM topology file",
+                            ' geometries. Latest forcefields can be founded at http://mackerell.umaryland.edu/charmm_ff.shtml ' )
+        group.addParam('inputRTF', params.FileParam, label="CHARMM topology file (rtf)",
                       condition="forcefield==0 or ((forcefield==1 or forcefield==2) and generateTop)",
                       help='CHARMM topology file containing information about atom connectivity of residues and'
-                           ' other molecules. For details on the format, see the CHARMM web site.'
-                           ' In the case of generating topology files for GO models, '
+                           ' other molecules. Latest forcefields can be founded at http://mackerell.umaryland.edu/charmm_ff.shtml '
+                           ' Note: In the case of generating topology files for GO models (SMOG2), '
                            ' the CHARMM topology file and VMD psfgen are used to fill missing atoms/residues.')
-        group.addParam('inputPSF', params.FileParam, label="CHARMM Structure File",
+        group.addParam('inputPSF', params.FileParam, label="CHARMM Structure File (psf)",
                       condition="forcefield==0 and not generateTop",
                       help='CHARMM/X-PLOR psf file containing information of the system such as atomic masses,'
-                            ' charges, and atom connectivities. To generate this file, you can either use the option'
-                           '\" generate topology files\", VMD psfgen, or online CHARMM GUI.')
-        group.addParam('inputSTR', params.FileParam, label="CHARMM stream file",
+                            ' charges, and atom connectivities. To generate this file for your system, you can either use the option'
+                           '\" generate topology files\", VMD psfgen, or online CHARMM GUI ( https://www.charmm-gui.org/ ).')
+        group.addParam('inputSTR', params.FileParam, label="CHARMM stream file (str)",
                       condition="forcefield==0", default="",
-                      help='CHARMM stream file containing both topology information and parameters',
+                      help='CHARMM stream file containing both topology information and parameters. '
+                           'Latest forcefields can be founded at http://mackerell.umaryland.edu/charmm_ff.shtml ',
                        expertLevel=params.LEVEL_ADVANCED)
 
 
@@ -153,12 +163,13 @@ class ProtGenesis(EMProtocol):
         group = form.addGroup('Energy')
         group.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,
                       choices=['GBSA', 'NONE'],
-                      help="Turn on Generalized Born/Solvent accessible surface area model. Boundary condition must be NO."
+                      help="Turn on Generalized Born/Solvent accessible surface area model (Implicit Solvent). Boundary condition must be NO."
                            " ATDYN only.")
 
         group.addParam('boundary', params.EnumParam, label="Boundary", default=0,
                       choices=['No boundary', 'Periodic Boundary Condition'],
-                      help="Type of boundary condition")
+                      help="Type of boundary condition. In case of implicit solvent, "
+                           " GO models or vaccum simulation, choose No boundary")
         group.addParam('box_size_x', params.FloatParam, label='Box size X',
                       help="Box size along the x dimension", condition="boundary==1")
         group.addParam('box_size_y', params.FloatParam, label='Box size Y',
@@ -195,7 +206,7 @@ class ProtGenesis(EMProtocol):
         group.addParam('tpcontrol', params.EnumParam, label="Thermostat/Barostat", default=1,
                       choices=['NO', 'LANGEVIN', 'BERENDSEN', 'BUSSI'],
                       help="Type of thermostat and barostat. The availabe algorithm depends on the integrator :"
-                           " LEAP : BERENDSEN, LANGEVIN;  VVER : BERENDSEN (NVT only), LANGEVIN, BUSSI; "
+                           " Leapfrog : BERENDSEN, LANGEVIN;  Velocity Verlet : BERENDSEN (NVT only), LANGEVIN, BUSSI; "
                            " NMMD : LANGEVIN (NVT only)")
         group.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
                       help="Initial and target temperature")
@@ -205,7 +216,8 @@ class ProtGenesis(EMProtocol):
         group = form.addGroup('Contraints', condition="simulationType==1 or simulationType==3")
         group.addParam('rigid_bond', params.BooleanParam, label="Rigid bonds (SHAKE/RATTLE)",
                       default=False,
-                      help="Turn on or off the SHAKE/RATTLE algorithms for covalent bonds involving hydrogen")
+                      help="Turn on or off the SHAKE/RATTLE algorithms for covalent bonds involving hydrogen. "
+                           "Must be False for NMMD.")
         group.addParam('fast_water', params.BooleanParam, label="Fast water (SETTLE)",
                       default=False,
                       help="Turn on or off the SETTLE algorithm for the constraints of the water molecules")
@@ -218,7 +230,7 @@ class ProtGenesis(EMProtocol):
                       choices=['None', 'Volume'], important=True,
                       help="Type of cryo-EM data to be processed")
 
-        group = form.addGroup('Fitting parameters', condition="simulationType!=0")
+        group = form.addGroup('Fitting parameters', condition="EMfitChoice!=0")
         group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
                       help="Force constant in Eem = k*(1 - c.c.). Note that in the case of REUS, the number of "
                            " force constant value must be equal to the number of replicas, for example for 4 replicas,"
@@ -300,46 +312,52 @@ class ProtGenesis(EMProtocol):
         :return None:
         """
 
+        # COPY PDBS -------------------------------------------------------------
         inputPDBfn = self.getInputPDBfn()
         n_pdb = self.getNumberOfInputPDB()
-
-        # Copy PDBs :
         for i in range(n_pdb):
             runCommand("cp %s %s.pdb"%(inputPDBfn[i],self.getInputPDBprefix(i)))
+        print( "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+        print(n_pdb)
 
-        # GENERATE TOPOLOGY FILES
-        if self.generateTop.get():
-            #CHARMM
-            if self.forcefield.get() == FORCEFIELD_CHARMM:
+
+
+        # TOPOLOGY FILES -------------------------------------------------
+        if self.restartChoice.get():
+            if self.getForceField() == FORCEFIELD_CHARMM:
                 for i in range(n_pdb):
-                    prefix = self.getInputPDBprefix(i)
-                    generatePSF(inputPDB=prefix+".pdb",inputTopo=self.inputRTF.get(),
-                        outputPrefix=prefix, nucleicChoice=self.nucleicChoice.get())
-
-            # GROMACS
-            elif self.forcefield.get() == FORCEFIELD_AAGO\
-                    or self.forcefield.get() == FORCEFIELD_CAGO:
-                self.inputTOPfn = []
+                    runCommand("cp %s.psf %s.psf" % (self.restartProt.get().getInputPDBprefix(i), self.getInputPDBprefix(i)))
+            elif self.getForceField() == FORCEFIELD_AAGO  or self.getForceField() == FORCEFIELD_CAGO:
                 for i in range(n_pdb):
-                    prefix = self.getInputPDBprefix(i)
-                    generatePSF(inputPDB=prefix+".pdb", inputTopo=self.inputRTF.get(),
-                                outputPrefix=prefix+"_AA", nucleicChoice=self.nucleicChoice.get())
-                    generateGROTOP(inputPDB=prefix+"_AA.pdb", outputPrefix=prefix,
-                                   forcefield=self.forcefield.get(), smog_dir=self.smog_dir.get(),
-					nucleicChoice=self.nucleicChoice.get())
-
+                    runCommand("cp %s.top %s.top" % (self.restartProt.get().getInputPDBprefix(i), self.getInputPDBprefix(i)))
         else:
-            # CHARMM
-            if self.forcefield.get() == FORCEFIELD_CHARMM:
-                for i in range(n_pdb):
-                    runCommand("cp %s %s.psf" % (self.inputPSF.get(), self.getInputPDBprefix(i)))
+            if self.generateTop.get():
+                #CHARMM
+                if self.getForceField() == FORCEFIELD_CHARMM:
+                    for i in range(n_pdb):
+                        prefix = self.getInputPDBprefix(i)
+                        generatePSF(inputPDB=prefix+".pdb",inputTopo=self.inputRTF.get(),
+                            outputPrefix=prefix, nucleicChoice=self.nucleicChoice.get())
+                # GO MODELS
+                elif self.getForceField() == FORCEFIELD_AAGO or self.getForceField() == FORCEFIELD_CAGO:
+                    for i in range(n_pdb):
+                        prefix = self.getInputPDBprefix(i)
+                        generatePSF(inputPDB=prefix+".pdb", inputTopo=self.inputRTF.get(),
+                                    outputPrefix=prefix+"_AA", nucleicChoice=self.nucleicChoice.get())
+                        generateGROTOP(inputPDB=prefix+"_AA.pdb", outputPrefix=prefix,
+                                       forcefield=self.getForceField(), smog_dir=self.smog_dir.get(),
+                        nucleicChoice=self.nucleicChoice.get())
+            else:
+                # CHARMM
+                if self.getForceField() == FORCEFIELD_CHARMM:
+                    for i in range(n_pdb):
+                        runCommand("cp %s %s.psf" % (self.inputPSF.get(), self.getInputPDBprefix(i)))
 
-            # GROMACS
-            elif self.forcefield.get() == FORCEFIELD_AAGO\
-                    or self.forcefield.get() == FORCEFIELD_CAGO:
-                runCommand("cp %s %s.top" % (self.inputTOP.get(), self.getInputPDBprefix(i)))
+                # GO MODELS
+                elif self.getForceField() == FORCEFIELD_AAGO or self.getForceField() == FORCEFIELD_CAGO:
+                    runCommand("cp %s %s.top" % (self.inputTOP.get(), self.getInputPDBprefix(i)))
 
-        # Center PDBs
+        # Center PDBs -----------------------------------------------------
         if self.centerPDB.get():
             for i in range(self.getNumberOfInputPDB()):
                 cmd = "xmipp_pdb_center -i %s.pdb -o %s.pdb" %\
@@ -460,7 +478,7 @@ class ProtGenesis(EMProtocol):
         # SETUP MPI parameters
         numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
 
-        initrst = str(self.inputRST.get())
+        #TODO initrst = str(self.inputRST.get())
 
         for i1 in range(numLinearFit + 1):
             n_parallel = numParallelFit if i1 < numLinearFit else numLastIter
@@ -579,7 +597,7 @@ class ProtGenesis(EMProtocol):
                             runCommand(cp_cmd)
                             runCommand("vmd -dispdev text -e %s.tcl" % tmpPrefix)
 
-                    rstfile = ""
+                    # rstfile = ""
                     for i2 in range(n_parallel):
                         indexFit = i2 + i1 * numParallelFit
                         newPrefix = self.getOutputPrefix(indexFit)
@@ -588,8 +606,8 @@ class ProtGenesis(EMProtocol):
                         else:
                             tmpPrefix = self.getOutputPrefix(indexFit)
 
-                        runCommand("cp %s.rst %s.tmp.rst" % (tmpPrefix, newPrefix))
-                        rstfile += "%s.tmp.rst "%newPrefix
+                        # runCommand("cp %s.rst %s.tmp.rst" % (tmpPrefix, newPrefix))
+                        # rstfile += "%s.tmp.rst "%newPrefix
                         #save angles
                         angles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
                         saved_angles = self._getExtraPath("%s_iter%i_angles.xmd" % (str(indexFit + 1).zfill(5), iterFit))
@@ -597,8 +615,8 @@ class ProtGenesis(EMProtocol):
 
                         #cleaning
                         runCommand("rm -rf %s" %self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5)))
-                    self.inputRST.set(rstfile)
-            self.inputRST.set(initrst)
+            #         self.inputRST.set(rstfile)
+            # self.inputRST.set(initrst)
 
     def createGenesisInputFile(self,inputPDB, outputPrefix, indexFit):
         """
@@ -611,20 +629,23 @@ class ProtGenesis(EMProtocol):
         inputPDBprefix = self.getInputPDBprefix(indexFit)
         inputEMprefix = self.getInputEMprefix(indexFit)
         inp_file = "%s_INP"% outputPrefix
+        if self.restartChoice.get():
+            inputProt = self.restartProt.get()
+        else:
+            inputProt = self
 
         s = "\n[INPUT] \n" #-----------------------------------------------------------
         s += "pdbfile = %s\n" % inputPDB
-        if self.forcefield.get() == FORCEFIELD_CHARMM:
-            s += "topfile = %s\n" % self.inputRTF.get()
-            s += "parfile = %s\n" % self.inputPRM.get()
+        if self.getForceField() == FORCEFIELD_CHARMM:
+            s += "topfile = %s\n" % inputProt.inputRTF.get()
+            s += "parfile = %s\n" % inputProt.inputPRM.get()
             s += "psffile = %s.psf\n" % inputPDBprefix
-            if self.inputSTR.get() != "" and self.inputSTR.get() is not None:
-                s += "strfile = %s\n" % self.inputSTR.get()
-        elif self.forcefield.get() == FORCEFIELD_AAGO\
-                or self.forcefield.get() == FORCEFIELD_CAGO:
+            if inputProt.inputSTR.get() != "" and inputProt.inputSTR.get() is not None:
+                s += "strfile = %s\n" % inputProt.inputSTR.get()
+        elif self.getForceField() == FORCEFIELD_AAGO or self.getForceField() == FORCEFIELD_CAGO:
             s += "grotopfile = %s.top\n" % inputPDBprefix
-        if self.inputRST.get() != "" and self.inputRST.get() is not None:
-            s += "rstfile = %s\n" % self.getRestartFile(indexFit)
+        if self.restartChoice.get():
+            s += "rstfile = %s \n" % self.getRestartFile(indexFit)
 
         s += "\n[OUTPUT] \n" #-----------------------------------------------------------
         if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
@@ -639,11 +660,11 @@ class ProtGenesis(EMProtocol):
             s += "pdbfile = %s.pdb\n" %outputPrefix
 
         s += "\n[ENERGY] \n" #-----------------------------------------------------------
-        if self.forcefield.get() == FORCEFIELD_CHARMM:
+        if self.getForceField() == FORCEFIELD_CHARMM:
             s += "forcefield = CHARMM \n"
-        elif self.forcefield.get() == FORCEFIELD_AAGO:
+        elif self.getForceField() == FORCEFIELD_AAGO:
             s += "forcefield = AAGO  \n"
-        elif self.forcefield.get() == FORCEFIELD_CAGO:
+        elif self.getForceField() == FORCEFIELD_CAGO:
             s += "forcefield = CAGO  \n"
 
         if self.electrostatics.get() == ELECTROSTATICS_CUTOFF :
@@ -787,7 +808,7 @@ class ProtGenesis(EMProtocol):
             self.convertReusOutputDcd()
 
         # Convert Output
-        for i in range(self.getNumberOfFitting()):
+        for i in range(self.getNumberOfSimulation()):
             outputPrefix = self.getOutputPrefixAll(i)
             for j in outputPrefix:
                 # Extract the pdb from the DCD file in case of SPDYN
@@ -798,16 +819,16 @@ class ProtGenesis(EMProtocol):
                         inputPDB=self.getInputPDBprefix(i) + ".pdb")
 
 
-        if self.forcefield.get() == FORCEFIELD_CAGO:
+        if self.getForceField() == FORCEFIELD_CAGO:
             input = PDBMol(self.getInputPDBprefix(i) + ".pdb")
-            for i in range(self.getNumberOfFitting()):
+            for i in range(self.getNumberOfSimulation()):
                 output = PDBMol(j + ".pdb")
                 input.coords = output.coords
                 input.save(j + ".pdb")
 
         # CREATE a output PDB
         if (self.simulationType.get() != SIMULATION_REMD  and self.simulationType.get() != SIMULATION_RENMMD )\
-                and self.getNumberOfFitting() == 1:
+                and self.getNumberOfSimulation() == 1:
             self._defineOutputs(outputPDB=AtomStruct(self.getOutputPrefix() + ".pdb"))
 
         # CREATE SET OF output PDBs
@@ -815,7 +836,7 @@ class ProtGenesis(EMProtocol):
 
             pdbset = self._createSetOfPDBs("outputPDBs")
             # Add each output PDB to the Set
-            for i in range(self.getNumberOfFitting()):
+            for i in range(self.getNumberOfSimulation()):
                 outputPrefix =self.getOutputPrefixAll(i)
                 for j in outputPrefix:
                     pdbset.append(AtomStruct(j + ".pdb"))
@@ -823,7 +844,9 @@ class ProtGenesis(EMProtocol):
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
-        summary = []
+        summary = ["Genesis in a software for Molecular Dynamics Simulation, "
+                   "Normal Mode Molecular Dynamics (NMMD), Replica Exchange Umbrela "
+                   "Sampling (REUS) and Energy Minimization"]
         return summary
 
     def _validate(self):
@@ -852,10 +875,16 @@ class ProtGenesis(EMProtocol):
         Get the number of input PDBs
         :return int: number of input PDBs
         """
-        if isinstance(self.inputPDB.get(), SetOfAtomStructs) or \
-                isinstance(self.inputPDB.get(), SetOfPDBs):
-            return self.inputPDB.get().getSize()
-        else: return 1
+        if self.restartChoice.get():
+            allOutPrx = []
+            for i in range(self.restartProt.get().getNumberOfSimulation()):
+                allOutPrx += self.restartProt.get().getOutputPrefixAll(i)
+            return len(allOutPrx )
+        else:
+            if isinstance(self.inputPDB.get(), SetOfAtomStructs) or \
+                    isinstance(self.inputPDB.get(), SetOfPDBs):
+                return self.inputPDB.get().getSize()
+            else: return 1
 
     def getNumberOfInputEM(self):
         """
@@ -870,7 +899,7 @@ class ProtGenesis(EMProtocol):
             else: return 1
         else: return 0
 
-    def getNumberOfFitting(self):
+    def getNumberOfSimulation(self):
         """
         Get the number of simulations to perform
         :return int: Number of simulations
@@ -880,7 +909,8 @@ class ProtGenesis(EMProtocol):
 
         # Check input volumes/images correspond to input PDBs
         if numberOfInputPDB != numberOfInputEM and \
-                numberOfInputEM != 1 and numberOfInputPDB != 1:
+                numberOfInputEM != 1 and numberOfInputPDB != 1 \
+                and numberOfInputEM != 0:
             raise RuntimeError("Number of input volumes and PDBs must be the same.")
         return np.max([numberOfInputEM, numberOfInputPDB])
 
@@ -890,13 +920,19 @@ class ProtGenesis(EMProtocol):
         :return list : list of input PDB file names
         """
         initFn = []
-        if isinstance(self.inputPDB.get(), SetOfAtomStructs) or \
-                isinstance(self.inputPDB.get(), SetOfPDBs):
-            for i in range(self.inputPDB.get().getSize()):
-                initFn.append(self.inputPDB.get()[i+1].getFileName())
 
+        if self.restartChoice.get():
+            for i in range(self.restartProt.get().getNumberOfSimulation()):
+                initFn += self.restartProt.get().getOutputPrefixAll(i)
+            initFn = [i+".pdb" for i in initFn]
         else:
-            initFn.append(self.inputPDB.get().getFileName())
+            if isinstance(self.inputPDB.get(), SetOfAtomStructs) or \
+                    isinstance(self.inputPDB.get(), SetOfPDBs):
+                for i in range(self.inputPDB.get().getSize()):
+                    initFn.append(self.inputPDB.get()[i+1].getFileName())
+
+            else:
+                initFn.append(self.inputPDB.get().getFileName())
         return initFn
 
     def getInputEMfn(self):
@@ -981,12 +1017,12 @@ class ProtGenesis(EMProtocol):
                 raise RuntimeError("Number of MPI cores should be larger than the number of replicas.")
         else :
             nreplica = 1
-        n_fit = self.getNumberOfFitting() * nreplica
+        n_fit = self.getNumberOfSimulation() * nreplica
 
         if n_fit <= self.numberOfMpi.get():
-            numberOfMpiPerFit   = self.numberOfMpi.get()//self.getNumberOfFitting()
+            numberOfMpiPerFit   = self.numberOfMpi.get()//self.getNumberOfSimulation()
             numberOfLinearFit   = 1
-            numberOfParallelFit = self.getNumberOfFitting()
+            numberOfParallelFit = self.getNumberOfSimulation()
             numberOflastIter    = 0
         else:
             numberOfMpiPerFit   = nreplica
@@ -1048,16 +1084,25 @@ class ProtGenesis(EMProtocol):
         :param int index: Index of the simulation
         :return str: restart file
         """
-        rstfile = self.inputRST.get()
-        rstList = rstfile.split(" ")
-        if len(rstList) >1:
-            return rstList[index]
+        allOutPrx = []
+        for i in range(self.restartProt.get().getNumberOfSimulation()):
+            allOutPrx += self.restartProt.get().getOutputPrefixAll(i)
+        allOut = [i + ".rst" for i in allOutPrx]
+        return allOut[index]
+
+    def getForceField(self):
+        """
+        Get simulation forcefield
+        :return int: forcefield
+        """
+        if self.restartChoice.get():
+            return self.restartProt.get().getForceField()
         else:
-            return rstList[0]
+            return self.forcefield.get()
 
     def convertReusOutputDcd(self):
 
-        for i in range(self.getNumberOfFitting()):
+        for i in range(self.getNumberOfSimulation()):
             remdPrefix = self._getExtraPath("%s_output_remd" % str(i + 1).zfill(5))
             tmpPrefix =  self._getExtraPath("%s_output_tmp" % str(i + 1).zfill(5))
             inp_file = self._getExtraPath("tmp_INP")
