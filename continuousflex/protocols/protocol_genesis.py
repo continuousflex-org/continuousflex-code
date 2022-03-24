@@ -62,11 +62,13 @@ class ProtGenesis(EMProtocol):
 
 
         form.addParam('restartProt', params.PointerParam, label="Input GENESIS protocol",pointerClass="ProtGenesis",
-                       help='Provide a GENESIS protocol to restart.', condition="restartChoice" )
+                       help='Provide a GENESIS protocol to restart.', condition="restartChoice" ,important=True)
 
         form.addParam('inputPDB', params.PointerParam,
-                      pointerClass='AtomStruct', label="Input PDB",
-                      help='Select the input PDB.', important=True)
+                      pointerClass='AtomStruct,SetOfAtomStructs,SetOfPDBs', label="Input PDB (s)",
+                      help='Select the input PDB.', important=True, condition="not restartChoice" )
+        form.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
+                      default=False, help="Center the input PDBs with the center of mass", condition="not restartChoice" )
 
         group = form.addGroup('Forcefield Inputs', condition="not restartChoice" )
         group.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0, important=True,
@@ -79,10 +81,10 @@ class ProtGenesis(EMProtocol):
         group.addParam('nucleicChoice', params.EnumParam, label="Contains nucleic acids ?", default=0,
                       choices=['NO', 'RNA', 'DNA'], condition ="generateTop",
                        help="Specify if the generator should consider nucleic residues as DNA or RNA")
-        group.addParam('smog_dir', params.FileParam, label="Path to SMOG2 install directory (For SMOG2 installation, see "
-                                                           "https://smog-server.org/smog2/ , otherwise use the web GUI "
-                                                           "https://smog-server.org/cgi-bin/GenTopGro.pl )",
-                      help='Path to SMOG2 directory', condition="(forcefield==1 or forcefield==2) and generateTop")
+        group.addParam('smog_dir', params.FileParam, label="SMOG 2 install directory",
+                      help="Path to SMOG2 install directory (For SMOG2 installation, see "
+                       "https://smog-server.org/smog2/ , otherwise use the web GUI "
+                       "https://smog-server.org/cgi-bin/GenTopGro.pl )", condition="(forcefield==1 or forcefield==2) and generateTop")
         group.addParam('inputTOP', params.FileParam, label="GROMACS Topology File (top)",
                       condition="(forcefield==1 or forcefield==2) and not generateTop",
                       help='Gromacs ‘top’ file containing information of the system such as atomic masses, charges,'
@@ -227,7 +229,7 @@ class ProtGenesis(EMProtocol):
         # Experiments =================================================================================================
         form.addSection(label='EM data')
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
-                      choices=['None', 'Volume'], important=True,
+                      choices=['None', 'Volume (s)', 'Image (s)'], important=True,
                       help="Type of cryo-EM data to be processed")
 
         group = form.addGroup('Fitting parameters', condition="EMfitChoice!=0")
@@ -238,9 +240,6 @@ class ProtGenesis(EMProtocol):
                            " values (for example \"1000-4000\") and the force constant values will be linearly distributed "
                            " to each replica."
                       , condition="EMfitChoice!=0")
-        group.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
-                      default=False, help="Center the input PDBs with the center of mass", condition="EMfitChoice!=0")
-
         group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EM Fit Sigma",
                       help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
                         " of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
@@ -253,8 +252,8 @@ class ProtGenesis(EMProtocol):
 
         # Volumes
         group = form.addGroup('Volume Parameters', condition="EMfitChoice==1")
-        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume",
-                      label="Input volume", help='Select the target EM density volume',
+        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
+                      label="Input volume (s)", help='Select the target EM density volume',
                       condition="EMfitChoice==1", important=True)
         group.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
                       help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==1")
@@ -317,10 +316,6 @@ class ProtGenesis(EMProtocol):
         n_pdb = self.getNumberOfInputPDB()
         for i in range(n_pdb):
             runCommand("cp %s %s.pdb"%(inputPDBfn[i],self.getInputPDBprefix(i)))
-        print( "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-        print(n_pdb)
-
-
 
         # TOPOLOGY FILES -------------------------------------------------
         if self.restartChoice.get():
@@ -363,6 +358,7 @@ class ProtGenesis(EMProtocol):
                 cmd = "xmipp_pdb_center -i %s.pdb -o %s.pdb" %\
                         (self.getInputPDBprefix(i),self.getInputPDBprefix(i))
                 runCommand(cmd)
+                print(cmd)
 
 
     # --------------------------- Convert Input EM data --------------------------------------------
@@ -1088,7 +1084,7 @@ class ProtGenesis(EMProtocol):
         for i in range(self.restartProt.get().getNumberOfSimulation()):
             allOutPrx += self.restartProt.get().getOutputPrefixAll(i)
         allOut = [i + ".rst" for i in allOutPrx]
-        return allOut[index]
+        return allOut[int(np.min([len(allOut)-1, index]))]
 
     def getForceField(self):
         """
