@@ -103,7 +103,6 @@ keywords = ""
   doi= {https://doi.org/10.1002/pro.3772}
 }
 
-
 @article{moebel2020monte,
   title={A Monte Carlo framework for missing wedge restoration and noise removal in cryo-electron tomography},
   author={Moebel, Emmanuel and Kervrann, Charles},
@@ -113,6 +112,35 @@ keywords = ""
   year={2020},
   publisher={Elsevier}
 }
+
+@article{vuillemot2022NMMD,
+title = {NMMD: Efficient Cryo-EM Flexible Fitting Based on Simultaneous Normal Mode and Molecular Dynamics atomic displacements},
+journal = {Journal of Molecular Biology},
+volume = {434},
+number = {7},
+pages = {167483},
+year = {2022},
+issn = {0022-2836},
+doi = {https://doi.org/10.1016/j.jmb.2022.167483},
+url = {https://www.sciencedirect.com/science/article/pii/S0022283622000523},
+author = {Rémi Vuillemot and Osamu Miyashita and Florence Tama and Isabelle Rouiller and Slavica Jonic}
+}
+
+@article{kobayashi2017genesis,
+author = {Kobayashi, Chigusa and Jung, Jaewoon and Matsunaga, Yasuhiro and Mori, Takaharu and Ando, Tadashi and Tamura, Koichi and Kamiya, Motoshi and Sugita, Yuji},
+title = {GENESIS 1.1: A hybrid-parallel molecular dynamics simulator with enhanced sampling algorithms on multiple computational platforms},
+journal = {Journal of Computational Chemistry},
+volume = {38},
+number = {25},
+pages = {2193-2206},
+keywords = {molecular dynamics, string method, replica exchange molecular dynamics, graphics processing unit, multiple time step integration},
+doi = {https://doi.org/10.1002/jcc.24874},
+url = {https://onlinelibrary.wiley.com/doi/abs/10.1002/jcc.24874},
+eprint = {https://onlinelibrary.wiley.com/doi/pdf/10.1002/jcc.24874},
+abstract = {GENeralized-Ensemble SImulation System (GENESIS) is a software package for molecular dynamics (MD) simulation of biological systems. It is designed to extend limitations in system size and accessible time scale by adopting highly parallelized schemes and enhanced conformational sampling algorithms. In this new version, GENESIS 1.1, new functions and advanced algorithms have been added. The all-atom and coarse-grained potential energy functions used in AMBER and GROMACS packages now become available in addition to CHARMM energy functions. The performance of MD simulations has been greatly improved by further optimization, multiple time-step integration, and hybrid (CPU + GPU) computing. The string method and replica-exchange umbrella sampling with flexible collective variable choice are used for finding the minimum free-energy pathway and obtaining free-energy profiles for conformational changes of a macromolecule. These new features increase the usefulness and power of GENESIS for modeling and simulation in biological research. © 2017 Wiley Periodicals, Inc.},
+year = {2017}
+}
+
 
 """
 
