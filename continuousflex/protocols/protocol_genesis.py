@@ -69,6 +69,9 @@ class ProtGenesis(EMProtocol):
                       help='Select the input PDB.', important=True, condition="not restartChoice" )
         form.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
                       default=False, help="Center the input PDBs with the center of mass", condition="not restartChoice" )
+        form.addParam('raiseError', params.BooleanParam, label="Stop execution if fails ?", default=True,
+                      help="Stop execution if GENESIS program fails",expertLevel=params.LEVEL_ADVANCED)
+
 
         group = form.addGroup('Forcefield Inputs', condition="not restartChoice" )
         group.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0, important=True,
@@ -113,7 +116,6 @@ class ProtGenesis(EMProtocol):
                        expertLevel=params.LEVEL_ADVANCED)
 
 
-
         # Simulation =================================================================================================
         form.addSection(label='Simulation')
         form.addParam('simulationType', params.EnumParam, label="Simulation type", default=0,
@@ -153,6 +155,12 @@ class ProtGenesis(EMProtocol):
         group.addParam('elnemo_rtb_block', params.IntParam, default=10, label='NMA Number of residue RTB',
                       help="Number of residue per RTB block in the NMA computation",
                       condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('nm_file', params.FileParam, label='NM File', default="",
+                      help="TODO", condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('nm_init', params.FileParam, label='NM init', default=None,
+                      help="TODO", condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('nm_dt', params.FloatParam, label='NM time step', default=None,
+                      help="TODO", condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
 
         group = form.addGroup('REMD parameters', condition="simulationType==3 or simulationType==4")
         group.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
@@ -297,10 +305,28 @@ class ProtGenesis(EMProtocol):
         # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
+
+        # Convert input PDB
         self._insertFunctionStep("convertInputPDBStep")
+
+        # Convert input EM data
         if self.EMfitChoice.get() != EMFIT_NONE:
             self._insertFunctionStep("convertInputEMStep")
-        self._insertFunctionStep("runGenesisStep")
+
+        # SETUP MPI parameters
+        numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
+
+        # Parallel Genesis simulation
+        if not(self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get()):
+            for i in range(numLinearFit + 1):
+                self._insertFunctionStep("runParallelGenesis", i)
+
+        # Parallel rigid body fitting for EMFIT images
+        else:
+            for i in range(numLinearFit + 1):
+                self._insertFunctionStep("runParallelGenesisRBFitting", i)
+
+        # Create output data
         self._insertFunctionStep("createOutputStep")
 
     # --------------------------- Convert Input PDBs --------------------------------------------
@@ -425,194 +451,183 @@ class ProtGenesis(EMProtocol):
 
     # --------------------------- GENESIS step --------------------------------------------
 
-    def runGenesisStep(self):
-        """
-        Run GENESIS simulations step
-        :return None:
-        """
-
-        rb_condition = self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get()
-
-        # Parallel Genesis simulation
-        if not(rb_condition):
-            self.runParallelGenesis()
-
-        # Parallel rigid body fitting for EMFIT images
-        else:
-            self.runParallelGenesisRBFitting()
-
-    def runParallelGenesis(self):
+    def runParallelGenesis(self,indexLinearFit):
         """
         Run multiple GENESIS simulations in parallel
+        :param int indexLinearFit:  current number of linear fitting
         :return None:
         """
 
         # SETUP MPI parameters
         numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
 
-        for i1 in range(numLinearFit + 1):
-            cmds = []
-            n_parallel = numParallelFit if i1 < numLinearFit else numLastIter
-            for i2 in range(n_parallel):
-                indexFit = i2 + i1 * numParallelFit
-                prefix = self.getOutputPrefix(indexFit)
+        cmds = []
+        n_parallel = numParallelFit if indexLinearFit < numLinearFit else numLastIter
+        for i in range(n_parallel):
+            indexFit = i + indexLinearFit * numParallelFit
+            prefix = self.getOutputPrefix(indexFit)
 
-                # Create INP file
-                self.createGenesisInputFile(inputPDB=self.getInputPDBprefix(indexFit) + ".pdb",
-                               outputPrefix=prefix, indexFit=indexFit)
+            # Create INP file
+            self.createGenesisInputFile(inputPDB=self.getInputPDBprefix(indexFit) + ".pdb",
+                           outputPrefix=prefix, indexFit=indexFit)
 
-                # Create Genesis command
-                genesis_cmd = self.getGenesisCmd(prefix=prefix)
-                cmds.append(genesis_cmd)
+            # Create Genesis command
+            genesis_cmd = self.getGenesisCmd(prefix=prefix)
+            cmds.append(genesis_cmd)
 
-            # Run Genesis
-            runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
-                            numberOfThreads=self.numberOfThreads.get(), hostConfig=self._stepsExecutor.hostConfig)
+        # Run Genesis
+        runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
+                        numberOfThreads=self.numberOfThreads.get(), hostConfig=self._stepsExecutor.hostConfig,
+                        raiseError=self.raiseError.get())
 
-    def runParallelGenesisRBFitting(self):
+    def runParallelGenesisRBFitting(self,indexLinearFit):
 
         # SETUP MPI parameters
         numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
 
         #TODO initrst = str(self.inputRST.get())
 
-        for i1 in range(numLinearFit + 1):
-            n_parallel = numParallelFit if i1 < numLinearFit else numLastIter
+        n_parallel = numParallelFit if indexLinearFit < numLinearFit else numLastIter
 
-            # Loop rigidbody align / GENESIS fitting
-            for iterFit in range(self.rb_n_iter.get()):
+        # Loop rigidbody align / GENESIS fitting
+        for iterFit in range(self.rb_n_iter.get()):
 
-                # ------   ALIGN PDBs---------
-                # Transform PDBs to volume
-                cmds_pdb2vol = []
-                for i2 in range(n_parallel):
-                    indexFit = i2 + i1 * numParallelFit
-                    inputPDB = self.getInputPDBprefix(indexFit) + ".pdb" if iterFit == 0 \
-                        else self.getOutputPrefix(indexFit) + ".pdb"
+            # ------   ALIGN PDBs---------
+            # Transform PDBs to volume
+            cmds_pdb2vol = []
+            for i in range(n_parallel):
+                indexFit = i + indexLinearFit * numParallelFit
+                inputPDB = self.getInputPDBprefix(indexFit) + ".pdb" if iterFit == 0 \
+                    else self.getOutputPrefix(indexFit) + ".pdb"
 
+                tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                cmds_pdb2vol.append(pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix,
+                                            sampling_rate=self.pixel_size.get(),
+                                            image_size=self.image_size.get()))
+            runParallelJobs(cmds_pdb2vol, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig,
+                            raiseError=self.raiseError.get())
+
+            # Loop 4 times to refine the angles
+            # sampling_rate = [10.0, 5.0, 3.0, 2.0]
+            # angular_distance = [-1, 20, 10, 5]
+            sampling_rate = [10.0]
+            angular_distance = [-1]
+            for i_align in range(len(sampling_rate)):
+                cmds_projectVol = []
+                cmds_alignement = []
+                for i in range(n_parallel):
+                    indexFit = i + indexLinearFit * numParallelFit
                     tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                    cmds_pdb2vol.append(pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix,
-                                                sampling_rate=self.pixel_size.get(),
-                                                image_size=self.image_size.get()))
-                runParallelJobs(cmds_pdb2vol, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig)
+                    inputImage = self.getInputEMprefix(indexFit) + ".spi"
+                    tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
+                    currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
 
-                # Loop 4 times to refine the angles
-                # sampling_rate = [10.0, 5.0, 3.0, 2.0]
-                # angular_distance = [-1, 20, 10, 5]
-                sampling_rate = [10.0]
-                angular_distance = [-1]
-                for i_align in range(len(sampling_rate)):
-                    cmds_projectVol = []
-                    cmds_alignement = []
-                    for i2 in range(n_parallel):
-                        indexFit = i2 + i1 * numParallelFit
-                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        inputImage = self.getInputEMprefix(indexFit) + ".spi"
-                        tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
-                        currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
-
-                        # get commands
-                        if self.rb_method.get() == RB_PROJMATCH:
-                            cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
-                                                              outputProj=tmpPrefix, expImage=inputImage,
-                                                              sampling_rate=sampling_rate[i_align],
-                                                              angular_distance=angular_distance[i_align]))
-                            cmds_alignement.append(projectMatch(inputImage=inputImage,
-                                                                inputProj=tmpPrefix, outputMeta=tmpMeta))
-                        else:
-                            cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
-                                                              outputProj=tmpPrefix, expImage=inputImage,
-                                                              sampling_rate=sampling_rate[i_align],
-                                                              angular_distance=angular_distance[i_align],
-                                                              compute_neighbors=False))
-                            cmds_alignement.append(waveletAssignement(inputImage=inputImage,
-                                                                      inputProj=tmpPrefix, outputMeta=tmpMeta))
-                    # run parallel jobs
-                    runParallelJobs(cmds_projectVol, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig)
-                    runParallelJobs(cmds_alignement, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig)
-
-                    cmds_continuousAssign = []
-                    for i2 in range(n_parallel):
-                        indexFit = i2 + i1 * numParallelFit
-                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
-                        currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
-                        if self.rb_method.get() == RB_PROJMATCH:
-                            flipAngles(inputMeta=tmpMeta, outputMeta=tmpMeta)
-                        cmds_continuousAssign.append(continuousAssign(inputMeta=tmpMeta,
-                                                                      inputVol=tmpPrefix,
-                                                                      outputMeta=currentAngles))
-                    runParallelJobs(cmds_continuousAssign, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig)
-
-
-                # Cleaning volumes and projections
-                for i2 in range(n_parallel):
-                    indexFit = i2 + i1 * numParallelFit
-                    tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                    runCommand("rm -f %s*" % tmpPrefix)
-
-                # ------   Run Genesis ---------
-                cmds = []
-                for i2 in range(n_parallel):
-                    indexFit = i2 + i1 * numParallelFit
-                    if iterFit == 0:
-                        prefix = self.getOutputPrefix(indexFit)
-                        inputPDB = self.getInputPDBprefix(indexFit) + ".pdb"
+                    # get commands
+                    if self.rb_method.get() == RB_PROJMATCH:
+                        cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
+                                                          outputProj=tmpPrefix, expImage=inputImage,
+                                                          sampling_rate=sampling_rate[i_align],
+                                                          angular_distance=angular_distance[i_align]))
+                        cmds_alignement.append(projectMatch(inputImage=inputImage,
+                                                            inputProj=tmpPrefix, outputMeta=tmpMeta))
                     else:
-                        prefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        inputPDB = self.getOutputPrefix(indexFit) + ".pdb"
+                        cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
+                                                          outputProj=tmpPrefix, expImage=inputImage,
+                                                          sampling_rate=sampling_rate[i_align],
+                                                          angular_distance=angular_distance[i_align],
+                                                          compute_neighbors=False))
+                        cmds_alignement.append(waveletAssignement(inputImage=inputImage,
+                                                                  inputProj=tmpPrefix, outputMeta=tmpMeta))
+                # run parallel jobs
+                runParallelJobs(cmds_projectVol, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig,
+                                raiseError=self.raiseError.get())
+                runParallelJobs(cmds_alignement, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig,
+                                raiseError=self.raiseError.get())
 
-                    # Create INP file
-                    self.createGenesisInputFile(inputPDB=inputPDB,
-                                   outputPrefix=prefix, indexFit=indexFit)
+                cmds_continuousAssign = []
+                for i in range(n_parallel):
+                    indexFit = i + indexLinearFit * numParallelFit
+                    tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                    tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
+                    currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
+                    if self.rb_method.get() == RB_PROJMATCH:
+                        flipAngles(inputMeta=tmpMeta, outputMeta=tmpMeta)
+                    cmds_continuousAssign.append(continuousAssign(inputMeta=tmpMeta,
+                                                                  inputVol=tmpPrefix,
+                                                                  outputMeta=currentAngles))
+                runParallelJobs(cmds_continuousAssign, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig,
+                                raiseError=self.raiseError.get())
 
-                    # run GENESIS
-                    cmds.append(self.getGenesisCmd(prefix=prefix))
-                runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
-                                numberOfThreads=self.numberOfThreads.get(), hostConfig=self._stepsExecutor.hostConfig)
 
-                if self.rb_n_iter.get()> 1 :
-                    if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
-                        raise RuntimeError("Simulation REMD not allowed for Rigid body fitting iteration > 1")
+            # Cleaning volumes and projections
+            for i in range(n_parallel):
+                indexFit = i + i1 * numParallelFit
+                tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                runCommand("rm -f %s*" % tmpPrefix)
 
-                    # append files
-                    if iterFit != 0:
-                        for i2 in range(n_parallel):
-                            indexFit = i2 + i1 * numParallelFit
-                            tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                            newPrefix = self.getOutputPrefix(indexFit)
+            # ------   Run Genesis ---------
+            cmds = []
+            for i in range(n_parallel):
+                indexFit = i + indexLinearFit * numParallelFit
+                if iterFit == 0:
+                    prefix = self.getOutputPrefix(indexFit)
+                    inputPDB = self.getInputPDBprefix(indexFit) + ".pdb"
+                else:
+                    prefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                    inputPDB = self.getOutputPrefix(indexFit) + ".pdb"
 
-                            cat_cmd = "cat %s.log >> %s.log" % (tmpPrefix, newPrefix)
-                            tcl_cmd = "animate read dcd %s.dcd waitfor all\n" % (newPrefix)
-                            tcl_cmd += "animate read dcd %s.dcd waitfor all\n" % (tmpPrefix)
-                            tcl_cmd += "animate write dcd %s.dcd \nexit \n" % newPrefix
-                            with open("%s.tcl" % tmpPrefix, "w") as f:
-                                f.write(tcl_cmd)
-                            cp_cmd = "cp %s.pdb %s.pdb" % (tmpPrefix, newPrefix)
-                            runCommand(cat_cmd)
-                            runCommand(cp_cmd)
-                            runCommand("vmd -dispdev text -e %s.tcl" % tmpPrefix)
+                # Create INP file
+                self.createGenesisInputFile(inputPDB=inputPDB,
+                               outputPrefix=prefix, indexFit=indexFit)
 
-                    # rstfile = ""
-                    for i2 in range(n_parallel):
-                        indexFit = i2 + i1 * numParallelFit
+                # run GENESIS
+                cmds.append(self.getGenesisCmd(prefix=prefix))
+            runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
+                            numberOfThreads=self.numberOfThreads.get(), hostConfig=self._stepsExecutor.hostConfig,
+                            raiseError=self.raiseError.get())
+
+            if self.rb_n_iter.get()> 1 :
+                if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
+                    raise RuntimeError("Simulation REMD not allowed for Rigid body fitting iteration > 1")
+
+                # append files
+                if iterFit != 0:
+                    for i in range(n_parallel):
+                        indexFit = i + indexLinearFit * numParallelFit
+                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
                         newPrefix = self.getOutputPrefix(indexFit)
-                        if iterFit != 0:
-                            tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        else:
-                            tmpPrefix = self.getOutputPrefix(indexFit)
 
-                        # runCommand("cp %s.rst %s.tmp.rst" % (tmpPrefix, newPrefix))
-                        # rstfile += "%s.tmp.rst "%newPrefix
-                        #save angles
-                        angles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
-                        saved_angles = self._getExtraPath("%s_iter%i_angles.xmd" % (str(indexFit + 1).zfill(5), iterFit))
-                        runCommand("cp %s %s" % (angles, saved_angles))
+                        cat_cmd = "cat %s.log >> %s.log" % (tmpPrefix, newPrefix)
+                        tcl_cmd = "animate read dcd %s.dcd waitfor all\n" % (newPrefix)
+                        tcl_cmd += "animate read dcd %s.dcd waitfor all\n" % (tmpPrefix)
+                        tcl_cmd += "animate write dcd %s.dcd \nexit \n" % newPrefix
+                        with open("%s.tcl" % tmpPrefix, "w") as f:
+                            f.write(tcl_cmd)
+                        cp_cmd = "cp %s.pdb %s.pdb" % (tmpPrefix, newPrefix)
+                        runCommand(cat_cmd)
+                        runCommand(cp_cmd)
+                        runCommand("vmd -dispdev text -e %s.tcl" % tmpPrefix)
 
-                        #cleaning
-                        runCommand("rm -rf %s" %self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5)))
-            #         self.inputRST.set(rstfile)
-            # self.inputRST.set(initrst)
+                # rstfile = ""
+                for i in range(n_parallel):
+                    indexFit = i + indexLinearFit * numParallelFit
+                    newPrefix = self.getOutputPrefix(indexFit)
+                    if iterFit != 0:
+                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                    else:
+                        tmpPrefix = self.getOutputPrefix(indexFit)
+
+                    # runCommand("cp %s.rst %s.tmp.rst" % (tmpPrefix, newPrefix))
+                    # rstfile += "%s.tmp.rst "%newPrefix
+                    #save angles
+                    angles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
+                    saved_angles = self._getExtraPath("%s_iter%i_angles.xmd" % (str(indexFit + 1).zfill(5), iterFit))
+                    runCommand("cp %s %s" % (angles, saved_angles))
+
+                    #cleaning
+                    runCommand("rm -rf %s" %self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5)))
+        #         self.inputRST.set(rstfile)
+        # self.inputRST.set(initrst)
 
     def createGenesisInputFile(self,inputPDB, outputPrefix, indexFit):
         """
@@ -706,10 +721,19 @@ class ProtGenesis(EMProtocol):
             s+= "elnemo_cutoff = %f \n" % self.elnemo_cutoff.get()
             s+= "elnemo_rtb_block = %i \n" % self.elnemo_rtb_block.get()
             s+= "elnemo_path = %s \n" %  Plugin.getVar("NMA_HOME")
-            if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD :
+            if self.nm_file.get() != "":
+                s += "nm_file = %s \n" % self.nm_file.get()
+            elif self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD :
                 s+= "nm_prefix = %s_remd{} \n" % outputPrefix
             else:
                 s += "nm_prefix = %s \n" % outputPrefix
+            if self.nm_init.get() is not None and self.nm_init.get() != "":
+                s += "nm_init = %s \n" % " ".join([ str(i) for i in np.loadtxt(self.nm_init.get())[indexFit]])
+            if self.nm_dt.get() is None:
+                s += "nm_dt = %f \n" % self.time_step.get()
+            else:
+                s += "nm_dt = %f \n" % self.nm_dt.get()
+
 
         if self.simulationType.get() != SIMULATION_MIN:
             s += "\n[CONSTRAINTS] \n" #-----------------------------------------------------------

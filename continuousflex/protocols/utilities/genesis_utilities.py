@@ -606,7 +606,7 @@ def lastPDBFromDCD(inputPDB,inputDCD,  outputPDB):
     # CLEAN TMP FILES
     runCommand("rm -f %s_tmp_dcd2pdb.tcl" % (outputPDB))
 
-def runParallelJobs(commands, env=None, numberOfThreads=1, numberOfMpi=1, hostConfig=None):
+def runParallelJobs(commands, env=None, numberOfThreads=1, numberOfMpi=1, hostConfig=None, raiseError=True):
     """
     Run multiple commands in parallel. Wait until all commands returned
     :param list commands: list of commands to run in parallel
@@ -635,8 +635,11 @@ def runParallelJobs(commands, env=None, numberOfThreads=1, numberOfMpi=1, hostCo
         exitcode = processes[i].wait()
         print("Process done %s" %str(exitcode))
         if exitcode != 0:
-            # raise RuntimeError("Command returned with errors : %s" %str(commands[i]))
-            print("Command returned with errors : %s" %str(commands[i]))
+            err_msg = "Command returned with errors : %s" %str(commands[i])
+            if raiseError :
+                raise RuntimeError(err_msg)
+            else:
+                print(err_msg)
 
 
 def pdb2vol(inputPDB, outputVol, sampling_rate, image_size):
@@ -837,7 +840,11 @@ def dcd2numpyArr(filename):
                     break
                 end_size = int.from_bytes((f.read(4)), "little")
                 if end_size != start_size:
-                    raise RuntimeError("Can not read dcd file %i %i " % (start_size, end_size))
+                    if i>1:
+                        break
+                    else:
+                        pass
+                        # raise RuntimeError("Can not read dcd file %i %i " % (start_size, end_size))
 
             dcd_list.append(coordarr)
 
