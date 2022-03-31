@@ -30,7 +30,8 @@ from pyworkflow.protocol.params import (PointerParam, StringParam, EnumParam,
 import pyworkflow.protocol.params as params
 from pwem.protocols import ProtAnalysis3D
 from pwem.utils import runProgram
-
+import pwem.emlib.metadata as md
+import numpy as np
 
 OPTION_SHFITS = 0
 OPTION_ANGLES = 1
@@ -43,7 +44,8 @@ DEVICE_CPU = 1
 
 
 class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
-    """ This protocol is DeepHEMNMA
+    """ DeepHEMNMA protocol, a neural network that learns the rigid-body parameters and the normal mode
+        amplitudes estimated by HEMNMA protocol.
     """
     _label = 'deep hemnma train'
     
@@ -54,7 +56,7 @@ class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
     #--------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
-        form.addParam('analyze_option', params.EnumParam, label='choose what operation you want?',
+        form.addParam('analyze_option', params.EnumParam, label='set the training mode',
                       display=params.EnumParam.DISPLAY_COMBO,
                       choices=['train on shifts',
                                'tain on angles',
@@ -69,12 +71,14 @@ class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
         group.addParam('inputParticles', PointerParam, pointerClass='SetOfParticles',
                       label="Preious run of rigid-body alignment",
                       help='Select a previous run of rigid-body alignment.', allowsNull=True)
-        form.addParam('device_option', params.EnumParam, label='choose what device you want the training to happen?',
+        form.addParam('device_option', params.EnumParam, label='set the device for training',
                       display=params.EnumParam.DISPLAY_COMBO,
                       choices=['train on GPUs',
                                'tain on CPUs'], default = DEVICE_CUDA,
                       help='TODO')
         form.addParam('learning_rate', params.FloatParam, label = 'Learning rate', default = 0.0001)
+        form.addParam('epochs', params.IntParam, expertLevel=params.LEVEL_ADVANCED,label = 'Number of epochs', default = 400)
+        form.addParam('batch_size', params.IntParam ,expertLevel=params.LEVEL_ADVANCED, label = 'Batch size', default = 2)
         form.addParallelSection(threads=0, mpi=0)    
     
     
@@ -101,32 +105,46 @@ class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
         # self._insertFunctionStep('createOutputStep')
         
         
-    #--------------------------- STEPS functions --------------------------------------------   
-    
-    def convertInputStep(self, deformationFile, inputId):
-        pass
-        # """ Iterate through the images and write the
-        # plain deformation.txt file that will serve as
-        # input for dimensionality reduction.
-        # """
-        # inputSet = self.getInputParticles()
-        # f = open(deformationFile, 'w')
-        #
-        # for particle in inputSet:
-        #     f.write(' '.join(particle._xmipp_nmaDisplacements))
-        #     f.write('\n')
-        # f.close()
-    
-    def performDeepHEMNMAStep(self, deformationsFile, method, extraParams,
-                          rows, reducedDim):
+    #--------------------------- STEPS functions --------------------------------------------
+    def copy_parameters(self, md_file):
+
+        self.imgsFn = self._getExtraPath('images.xmd')
+        md = md.MetaData(self.imgsFn)
+        rot = []
+        tilt = []
+        psi = []
+        nma = []
+        shift_x = []
+        shift_y = []
+        imgPath = []
+        for objId in md:
+            imgPath.append(self._getExtraPath('images.xmd')+mdImgs.getValue(md.MDL_IMAGE, objId))
+            rot.append(mdImgs.getValue(md.MDL_ANGLE_ROT, objId))
+            tilt.append(mdImgs.getValue(md.MDL_ANGLE_TILT, objId))
+            psi.append(mdImgs.getValue(md.MDL_ANGLE_PSI, objId))
+            shift_x.append(mdImgs.getValue(md.MDL_SHIFT_X, objId))
+            shift_y.append(mdImgs.getValue(md.MDL_SHIFT_Y, objId))
+            nma.append(mdImgs.getValue(md.MDL_NMA, objId))
+        images_Path = np.array(img_Path)
+        euler_angles = np.column_stack((rot, tilt, psi), dtype='float32')
+        shifts = np.column_stack((shift_x, shift_y), dtype='float32')
+        amplitudes = np.array(nma, dtype='float32')
+        return images_path, euler_angles, shifts, amplitudes
+
+    def performDeepHEMNMAStep(self, params):
         import continuousflex
         script_path = continuousflex.__path__[0] + '/protocols/utilities/deep_hemnma.py'
-        string = ' '
-        self.runJob()
+        command = "python " + script_path + str(params)
+        check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
+                   env=None, cwd=None)
 
-        pass
+    def create_single_particle_path(self):
+        self.writeModesMetaData()
+        # Write a metadata with the normal modes information
+        # to launch the nma alignment programs
+        writeSetOfParticles(self.inputParticles.get(), self.imgsFn)
 
-        
+
     def createOutputStep(self):
         pass
 
