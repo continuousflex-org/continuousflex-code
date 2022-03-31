@@ -120,7 +120,7 @@ class FlexProtConvertPdb(em.protocols.ProtInitialVolume):
         self.runJob(program, args)
 
     def createOutput(self):
-        volume = em.Volume()
+        volume = em.objects.Volume()
         volume.setSamplingRate(self.sampling.get())
         volume.setFileName(self._getVolName())
         self._defineOutputs(outputVolume=volume)
