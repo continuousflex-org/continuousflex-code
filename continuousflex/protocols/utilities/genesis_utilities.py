@@ -289,9 +289,9 @@ class PDBMol:
                 if self.resNum[chain_idx[i]] != past_resNum:
                     if self.resNum[chain_idx[i]] != past_resNum+1:
                         print("ERROR : non sequential residue number in one segment")
-                    # past_resNum = self.resNum[chain_idx[i]]
-                    # resNum += 1
-                # self.resNum[chain_idx[i]] = resNum
+                    past_resNum = self.resNum[chain_idx[i]]
+                    resNum += 1
+                self.resNum[chain_idx[i]] = resNum
                 self.atomNum[chain_idx[i]] = i + 1
 
     def allatoms2ca(self):
@@ -456,7 +456,7 @@ def generateGROTOP(inputPDB, outputPrefix, forcefield, smog_dir, nucleicChoice):
     moltmp.alias_atom("C5'", "C5*")
     moltmp.alias_atom("C5M", "C7")
     moltmp.add_terminal_res()
-    # moltmp.atom_res_reorder()
+    moltmp.atom_res_reorder()
     moltmp.save(inputPDB)
 
     # Run Smog2
