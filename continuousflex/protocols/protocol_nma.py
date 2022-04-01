@@ -241,8 +241,6 @@ class FlexProtNMA(FlexProtNMABase):
         cleanPath("vec_ani.txt")
         moveFile('vec_ani.pkl', 'extra/vec_ani.pkl')
 
-        os.system("cp %s %s"%(fhIn, self._getExtraPath("diagrtb.eigenfacs")))
-
         self._leaveWorkingDir()
         
     def animateModesStep(self, numberOfModes,amplitude,nFrames,downsample,

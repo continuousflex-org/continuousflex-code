@@ -26,6 +26,7 @@ from pwem.tests.workflows import TestWorkflow
 from pyworkflow.tests import setupTestProject, DataSet
 
 from continuousflex.protocols.protocol_genesis import *
+from continuousflex.protocols import FlexProtNMA, NMA_CUTOFF_ABS
 from continuousflex.viewers.viewer_genesis import *
 import os
 import multiprocessing
@@ -54,6 +55,14 @@ class testGENESIS(TestWorkflow):
                                          pdbFile=self.ds.getFile('4ake_aa_pdb'))
         protPdb4ake.setObjLabel('Input PDB (4AKE All-Atom)')
         self.launchProtocol(protPdb4ake)
+
+
+        # Launch NMA for PDB imported
+        protNMA = self.newProtocol(FlexProtNMA,
+                                    cutoffMode=NMA_CUTOFF_ABS)
+        protNMA.inputStructure.set(protPdb4ake.outputPdb)
+        protNMA.setObjLabel('NMA')
+        self.launchProtocol(protNMA)
 
 
         protGenesisMin = self.newProtocol(ProtGenesis,
@@ -113,6 +122,7 @@ class testGENESIS(TestWorkflow):
           nbupdate_period=10,
           nm_number=6,
           nm_mass=1.0,
+          inputModes=protNMA.outputModes,
 
           implicitSolvent=IMPLICIT_SOLVENT_GBSA,
           electrostatics=ELECTROSTATICS_CUTOFF,
@@ -175,6 +185,13 @@ class testGENESIS(TestWorkflow):
         protPdb4ake.setObjLabel('Input PDB (4AKE C-Alpha only)')
         self.launchProtocol(protPdb4ake)
 
+        # Launch NMA for PDB imported
+        protNMA = self.newProtocol(FlexProtNMA,
+                                    cutoffMode=NMA_CUTOFF_ABS)
+        protNMA.inputStructure.set(protPdb4ake.outputPdb)
+        protNMA.setObjLabel('NMA')
+        self.launchProtocol(protNMA)
+
         protGenesisMin = self.newProtocol(ProtGenesis,
             inputPDB = protPdb4ake.outputPdb,
             forcefield = FORCEFIELD_CAGO,
@@ -218,6 +235,7 @@ class testGENESIS(TestWorkflow):
                                               nbupdate_period=10,
                                               nm_number=6,
                                               nm_mass=1.0,
+                                              inputModes=protNMA.outputModes,
 
                                               implicitSolvent=IMPLICIT_SOLVENT_NONE,
                                               electrostatics=ELECTROSTATICS_CUTOFF,
@@ -288,6 +306,7 @@ class testGENESIS(TestWorkflow):
                                                   nbupdate_period=10,
                                                   nm_number=6,
                                                   nm_mass=1.0,
+                                                  inputModes=protNMA.outputModes,
                                                   exchange_period=100, # 100
                                                   nreplica = 4,
 

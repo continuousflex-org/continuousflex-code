@@ -143,25 +143,15 @@ class ProtGenesis(EMProtocol):
                       help="Number of normal modes for NMMD. 10 should work in most cases. Avoid "
                            " using too much NM (>50).",
                       condition="simulationType==2 or simulationType==4")
+        group.addParam('inputModes', params.PointerParam, pointerClass = "SetOfNormalModes", label='Input Modes', default=None,
+                      help="Input set of normal modes", condition="simulationType==2 or simulationType==4")
+        group.addParam('nm_dt', params.FloatParam, label='NM time step', default=0.001,
+                      help="TODO", condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
         group.addParam('nm_mass', params.FloatParam, default=10.0, label='NM mass',
                       help="Mass value of Normal modes for NMMD", condition="simulationType==2 or simulationType==4",
                       expertLevel=params.LEVEL_ADVANCED)
-        group.addParam('nm_limit', params.FloatParam, default=1000.0, label='NM amplitude threshold',
-                      help="Threshold of normal mode amplitude above which the normal modes are updated",
-                      condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
-        group.addParam('elnemo_cutoff', params.FloatParam, default=8.0, label='NMA cutoff (A)',
-                      help="Cutoff distance for elastic network model", condition="simulationType==2 or simulationType==4",
-                      expertLevel=params.LEVEL_ADVANCED)
-        group.addParam('elnemo_rtb_block', params.IntParam, default=10, label='NMA Number of residue RTB',
-                      help="Number of residue per RTB block in the NMA computation",
-                      condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
-        group.addParam('nm_file', params.FileParam, label='NM File', default="",
-                      help="TODO", condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
         group.addParam('nm_init', params.FileParam, label='NM init', default=None,
                       help="TODO", condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
-        group.addParam('nm_dt', params.FloatParam, label='NM time step', default=None,
-                      help="TODO", condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
-
         group = form.addGroup('REMD parameters', condition="simulationType==3 or simulationType==4")
         group.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
                       help="Number of MD steps between replica exchanges", condition="simulationType==3 or simulationType==4")
@@ -717,16 +707,7 @@ class ProtGenesis(EMProtocol):
             s += "\n[NMMD] \n" #-----------------------------------------------------------
             s+= "nm_number = %i \n" % self.nm_number.get()
             s+= "nm_mass = %f \n" % self.nm_mass.get()
-            s+= "nm_limit = %f \n" % self.nm_limit.get()
-            s+= "elnemo_cutoff = %f \n" % self.elnemo_cutoff.get()
-            s+= "elnemo_rtb_block = %i \n" % self.elnemo_rtb_block.get()
-            s+= "elnemo_path = %s \n" %  Plugin.getVar("NMA_HOME")
-            if self.nm_file.get() != "":
-                s += "nm_file = %s \n" % self.nm_file.get()
-            elif self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD :
-                s+= "nm_prefix = %s_remd{} \n" % outputPrefix
-            else:
-                s += "nm_prefix = %s \n" % outputPrefix
+            s += "nm_file = %s \n" % self.getNormalModeFile(outputPrefix)
             if self.nm_init.get() is not None and self.nm_init.get() != "":
                 s += "nm_init = %s \n" % " ".join([ str(i) for i in np.loadtxt(self.nm_init.get())[indexFit]])
             if self.nm_dt.get() is None:
@@ -1121,6 +1102,20 @@ class ProtGenesis(EMProtocol):
             return self.restartProt.get().getForceField()
         else:
             return self.forcefield.get()
+
+    def getNormalModeFile(self, prefix):
+        nm_file = prefix+".nma"
+        with open(nm_file, "w") as f:
+            for i in range(self.inputModes.get().getSize()):
+                if i >= 6:
+                    print(self.inputModes.get()[i+1].getModeFile())
+                    f.write(" VECTOR    %i       VALUE  0.0\n" % (i + 1))
+                    f.write(" -----------------------------------\n")
+                    nm_vec = np.loadtxt(self.inputModes.get()[i+1].getModeFile())
+                    for j in range(nm_vec.shape[0]):
+                        f.write(" %e   %e   %e\n" % (nm_vec[j, 0], nm_vec[j, 1], nm_vec[j, 2]))
+
+        return nm_file
 
     def convertReusOutputDcd(self):
 
