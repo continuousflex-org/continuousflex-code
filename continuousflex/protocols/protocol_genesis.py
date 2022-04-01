@@ -840,11 +840,13 @@ class ProtGenesis(EMProtocol):
 
 
         if self.getForceField() == FORCEFIELD_CAGO:
-            input = PDBMol(self.getInputPDBprefix(i) + ".pdb")
+            input = PDBMol(self.getInputPDBprefix() + ".pdb")
             for i in range(self.getNumberOfSimulation()):
-                output = PDBMol(j + ".pdb")
-                input.coords = output.coords
-                input.save(j + ".pdb")
+                outputPrefix = self.getOutputPrefixAll(i)
+                for j in outputPrefix:
+                    output = PDBMol(j + ".pdb")
+                    input.coords = output.coords
+                    input.save(j + ".pdb")
 
         # CREATE a output PDB
         if (self.simulationType.get() != SIMULATION_REMD  and self.simulationType.get() != SIMULATION_RENMMD )\
