@@ -449,21 +449,26 @@ class ProtGenesis(EMProtocol):
         """
 
         # SETUP MPI parameters
+        print("//////////////////////////////////////////test1")
         numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
+        print("//////////////////////////////////////////test2")
 
         cmds = []
         n_parallel = numParallelFit if indexLinearFit < numLinearFit else numLastIter
         for i in range(n_parallel):
             indexFit = i + indexLinearFit * numParallelFit
             prefix = self.getOutputPrefix(indexFit)
+            print("//////////////////////////////////////////test3")
 
             # Create INP file
             self.createGenesisInputFile(inputPDB=self.getInputPDBprefix(indexFit) + ".pdb",
                            outputPrefix=prefix, indexFit=indexFit)
+            print("//////////////////////////////////////////test4")
 
             # Create Genesis command
             genesis_cmd = self.getGenesisCmd(prefix=prefix)
             cmds.append(genesis_cmd)
+        print("//////////////////////////////////////////test5")
 
         # Run Genesis
         runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
