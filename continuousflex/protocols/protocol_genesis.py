@@ -412,6 +412,7 @@ class ProtGenesis(EMProtocol):
         :param str volPrefix: ouput volume prefix
         :return None:
         """
+        print("//////////////////////////////////////////test0")
 
         # Convert data to mrc
         pre, ext = os.path.splitext(os.path.basename(fnInput))
