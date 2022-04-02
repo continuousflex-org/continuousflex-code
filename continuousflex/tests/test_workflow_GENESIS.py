@@ -57,14 +57,7 @@ class testGENESIS(TestWorkflow):
         self.launchProtocol(protPdb4ake)
 
 
-        # Launch NMA for PDB imported
-        protNMA = self.newProtocol(FlexProtNMA,
-                                    cutoffMode=NMA_CUTOFF_ABS)
-        protNMA.inputStructure.set(protPdb4ake.outputPdb)
-        protNMA.setObjLabel('NMA')
-        self.launchProtocol(protNMA)
-
-
+        # Energy min
         protGenesisMin = self.newProtocol(ProtGenesis,
             inputPDB = protPdb4ake.outputPdb,
             forcefield = FORCEFIELD_CHARMM,
@@ -109,6 +102,14 @@ class testGENESIS(TestWorkflow):
         print("//////////////////////////////////////////////\n\n")
 
         assert(potential_ene[0] > potential_ene[-1])
+
+
+        # Launch NMA for energy min PDB
+        protNMA = self.newProtocol(FlexProtNMA,
+                                    cutoffMode=NMA_CUTOFF_ABS)
+        protNMA.inputStructure.set(protGenesisMin.outputPDB)
+        protNMA.setObjLabel('NMA')
+        self.launchProtocol(protNMA)
 
         protGenesisFitNMMD = self.newProtocol(ProtGenesis,
           restartChoice=True,
@@ -185,12 +186,6 @@ class testGENESIS(TestWorkflow):
         protPdb4ake.setObjLabel('Input PDB (4AKE C-Alpha only)')
         self.launchProtocol(protPdb4ake)
 
-        # Launch NMA for PDB imported
-        protNMA = self.newProtocol(FlexProtNMA,
-                                    cutoffMode=NMA_CUTOFF_ABS)
-        protNMA.inputStructure.set(protPdb4ake.outputPdb)
-        protNMA.setObjLabel('NMA')
-        self.launchProtocol(protNMA)
 
         protGenesisMin = self.newProtocol(ProtGenesis,
             inputPDB = protPdb4ake.outputPdb,
@@ -217,6 +212,13 @@ class testGENESIS(TestWorkflow):
         protGenesisMin.setObjLabel('Energy Minimization CAGO')
         # Launch minimisation
         self.launchProtocol(protGenesisMin)
+
+        # Launch NMA for energy min PDB
+        protNMA = self.newProtocol(FlexProtNMA,
+                                    cutoffMode=NMA_CUTOFF_ABS)
+        protNMA.inputStructure.set(protGenesisMin.outputPDB)
+        protNMA.setObjLabel('NMA')
+        self.launchProtocol(protNMA)
 
         protGenesisFitNMMD = self.newProtocol(ProtGenesis,
 
