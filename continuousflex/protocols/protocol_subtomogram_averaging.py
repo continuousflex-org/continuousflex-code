@@ -25,8 +25,7 @@
 
 import os
 from pwem.protocols import ProtAnalysis3D
-from xmipp3.convert import writeSetOfVolumes, xmippToLocation, createItemMatrix, setXmippAttributes
-import pwem as em
+from xmipp3.convert import writeSetOfVolumes, xmippToLocation
 from pwem.objects import Volume
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
@@ -50,8 +49,11 @@ IMPORT_DYNAMO_TBL = 1
 IMPORT_TOMBOX_MTV = 2
 
 class FlexProtSubtomogramAveraging(ProtAnalysis3D):
-    """ Protocol for subtomogram averaging. """
-    # TODO: improve the help paragraph
+    """ Protocol for subtomogram averaging. This protocol has two modes of operation.
+     the first is to perform subtomogram averaging using Fast Rotational Matching.
+     The second mode is to import a previously performed alignment using this protocol, Dynamo, or Artiatomi.
+     If an alignment is imported, the rigid-body parameters will be used to re-create the average structure.
+     """
 
     _label = 'subtomogram averaging'
 
@@ -323,6 +325,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.outputMD)
 
+
     def adaptDynamoStep(self, dynamoTable):
         volumes_in = self.imgsFn
         volume_out = self.outputVolume
@@ -422,6 +425,36 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
 
         # Averaging based on the metadata:
         mdImgs = md.MetaData(md_out)
+
+        # if the volumes were aligned with angle_y=90 degrees, then rotate by 90 and inverse, then set angle y to 0
+        flag = None
+        try:
+            flag = mdImgs.getValue(md.MDL_ANGLE_Y, 1)
+        except:
+            pass
+
+        if flag == 90:
+            mdImgs = md.MetaData(self.imgsFn)
+            for objId in mdImgs:
+                rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+                tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+                psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+                x = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+                y = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+                z = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+                T = eulerAngles2matrix(rot, tilt, psi, x, y, z)
+                # Rotate 90 degrees (compensation for missing wedge)
+                T0 = eulerAngles2matrix(0, 90, 0, 0, 0, 0)
+                T = np.linalg.inv(np.matmul(T, T0))
+                rot, tilt, psi, x, y, z = matrix2eulerAngles(T)
+                mdImgs.setValue(md.MDL_ANGLE_ROT, rot, objId)
+                mdImgs.setValue(md.MDL_ANGLE_TILT, tilt, objId)
+                mdImgs.setValue(md.MDL_ANGLE_PSI, psi, objId)
+                mdImgs.setValue(md.MDL_SHIFT_X, x, objId)
+                mdImgs.setValue(md.MDL_SHIFT_Y, y, objId)
+                mdImgs.setValue(md.MDL_SHIFT_Z, z, objId)
+                mdImgs.setValue(md.MDL_ANGLE_Y, 0.0, objId)
+
         mdImgs.write(self._getExtraPath('final_md.xmd'))
         counter = 0
 
@@ -471,17 +504,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         return summary
 
     def _citations(self):
-        return []
+        return ['CHEN2013235']
 
     def _methods(self):
         pass
-
-    # --------------------------- UTILS functions --------------------------------------------
-    def _printWarnings(self, *lines):
-        """ Print some warning lines to 'warnings.xmd',
-        the function should be called inside the working dir."""
-        fWarn = open("warnings.xmd", 'w')
-        for l in lines:
-            print >> fWarn, l
-        fWarn.close()
-

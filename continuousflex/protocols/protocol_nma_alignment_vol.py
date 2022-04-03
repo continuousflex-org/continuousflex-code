@@ -44,8 +44,13 @@ WEDGE_MASK_THRE = 1
 
 
 class FlexProtAlignmentNMAVol(ProtAnalysis3D):
-    """ Protocol for flexible angular alignment. """
-    # TODO: improve the help statement
+    """ Protocol for rigid-body and elastic alignment for volumes using NMA. This protocol is the code module of HEMNMA-3D.
+     It will take as input a set of normal modes calculated for an input atomic or pseudoatomic structure, and a set of volumes (subtomograms) to analyze.
+     It fits the input structure using its modes (a subset of the modes need to be selected) into each one of the input volumes while simultaneously looking for rigid-body alignment, with
+     compensation for missing wedge artefacts.
+     The result of this protocol are rigid-body and elastic parameters for each input volume.
+     Those results will be fed for a dimensionality reduction method (nma dimred vol) for further processing.
+     """
     _label = 'nma alignment vol'
 
     # --------------------------- DEFINE param functions --------------------------------------------
@@ -220,6 +225,40 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.imgsFn)
 
+        # if the volumes were aligned with angle_y=90 degrees, then rotate by 90 and inverse, then set angle y to 0
+        mdImgs = md.MetaData(self.imgsFn)
+
+        flag = None
+        try:
+            flag = mdImgs.getValue(md.MDL_ANGLE_Y, 1)
+        except:
+            pass
+
+        if flag == 90:
+            mdImgs = md.MetaData(self.imgsFn)
+            for objId in mdImgs:
+                rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+                tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+                psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+                x = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+                y = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+                z = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+                T = eulerAngles2matrix(rot, tilt, psi, x, y, z)
+                # Rotate 90 degrees (compensation for missing wedge)
+                T0 = eulerAngles2matrix(0, 90, 0, 0, 0, 0)
+                T = np.linalg.inv(np.matmul(T, T0))
+                rot, tilt, psi, x, y, z = matrix2eulerAngles(T)
+                mdImgs.setValue(md.MDL_ANGLE_ROT, rot, objId)
+                mdImgs.setValue(md.MDL_ANGLE_TILT, tilt, objId)
+                mdImgs.setValue(md.MDL_ANGLE_PSI, psi, objId)
+                mdImgs.setValue(md.MDL_SHIFT_X, x, objId)
+                mdImgs.setValue(md.MDL_SHIFT_Y, y, objId)
+                mdImgs.setValue(md.MDL_SHIFT_Z, z, objId)
+                mdImgs.setValue(md.MDL_ANGLE_Y, 0.0, objId)
+            mdImgs.write(self.imgsFn)
+
+
+
     def performNmaStep(self, atomsFn, modesFn):
         sampling = self.inputVolumes.get().getSamplingRate()
         trustRegionScale = self.trustRegionScale.get()
@@ -340,18 +379,6 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         pass
 
     # --------------------------- UTILS functions --------------------------------------------
-    def _printWarnings(self, *lines):
-        """ Print some warning lines to 'warnings.xmd',
-        the function should be called inside the working dir."""
-        fWarn = open("warnings.xmd", 'w')
-        for l in lines:
-            print >> fWarn, l
-        fWarn.close()
-
-    def _getLocalModesFn(self):
-        modesFn = self.inputModes.get().getFileName()
-        return self._getBasePath(modesFn)
-
     def _updateParticle(self, item, row):
         setXmippAttributes(item, row, md.MDL_ANGLE_ROT, md.MDL_ANGLE_TILT, md.MDL_ANGLE_PSI, md.MDL_SHIFT_X,
                            md.MDL_SHIFT_Y, md.MDL_SHIFT_Z, md.MDL_FLIP, md.MDL_NMA, md.MDL_COST, md.MDL_MAXCC)

@@ -24,7 +24,7 @@
 # **************************************************************************
 
 
-from pyworkflow.protocol.params import PointerParam, FileParam, IntParam
+from pyworkflow.protocol.params import PointerParam, FileParam
 from pwem.protocols import BatchProtocol
 from pwem.objects import Volume, SetOfVolumes
 from xmipp3.convert import writeSetOfVolumes
@@ -43,7 +43,6 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
     def _defineParams(self, form):
         form.addHidden('inputNmaDimred', PointerParam, pointerClass='EMObject')
         form.addHidden('sqliteFile', FileParam)
-        form.addHidden('angleYflag', IntParam)
 
     #--------------------------- INSERT steps functions --------------------------------------------
 
@@ -80,7 +79,6 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
             id_org = md_file_org.getValue(md.MDL_ITEM_ID, objID)
             for j in md_file_nma:
                 id_nma = md_file_nma.getValue(md.MDL_ITEM_ID, j)
-                #print(id_nma)
                 if id_org == id_nma:
                     displacements = md_file_nma.getValue(md.MDL_NMA, j)
                     md_file_org.setValue(md.MDL_NMA, displacements, objID)
@@ -90,13 +88,10 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
 
 
     def averagingStep(self):
-        flag = self.angleYflag.get()
-
         volumesMd = self._getExtraPath('volumes.xmd')
         mdVols = md.MetaData(volumesMd)
 
         counter = 0
-        first = True
         for objId in mdVols:
             counter = counter + 1
             imgPath = mdVols.getValue(md.MDL_IMAGE, objId)
@@ -108,35 +103,15 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
             y_shift = mdVols.getValue(md.MDL_SHIFT_Y, objId)
             z_shift = mdVols.getValue(md.MDL_SHIFT_Z, objId)
 
-            # The flip one is used here to determine if we need to use the option --inverse
-            # with xmipp_transform_geometry
-            flip = mdVols.getValue(md.MDL_ANGLE_Y, objId)
-
             outputVol = self._getExtraPath('average.vol')
             tempVol = self._getExtraPath('temp.vol')
             extra = self._getExtraPath()
 
-            if flag == 0 :
-                if first:
-                    print("THERE IS NO COMPENSATION FOR THE MISSING WEDGE")
-                    first = False
-
-                params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
-                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
-
-            else:
-                if first:
-                    print("THERE IS A COMPENSATION FOR THE MISSING WEDGE")
-                    first = False
-                # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
-                params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
-                runProgram('xmipp_transform_geometry', params)
-                params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
-                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
-
+            params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                     ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
             runProgram('xmipp_transform_geometry', params)
 
-            if counter == 1 :
+            if counter == 1:
                 os.system("mv %(tempVol)s %(outputVol)s" % locals())
 
             else:
@@ -151,7 +126,6 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
     def createOutputStep(self, outputVol):
         vol = Volume()
         vol.setFileName(outputVol)
-        #outputParticles
         vol.setSamplingRate(self.OutputVolumes.getSamplingRate())
         self._defineOutputs(outputVol=vol)
 

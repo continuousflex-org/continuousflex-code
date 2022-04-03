@@ -25,14 +25,10 @@ import xmipp3.convert
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
 from pyworkflow.utils.path import makePath, copyFile, cleanPath
-from os.path import basename
 from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
-from .utilities.spider_files3 import save_volume #, open_volume
 from pyworkflow.utils import replaceBaseExt
-import numpy as np
 import farneback3d
 from .utilities.spider_files3 import *
-import time
 import os
 from os.path import basename, isfile
 from pwem.utils import runProgram
@@ -42,14 +38,19 @@ from joblib import Parallel, delayed
 import continuousflex
 from subprocess import check_call
 from pwem.emlib.image import ImageHandler
-import math
+from .convert import eulerAngles2matrix, matrix2eulerAngles
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
 
 
 class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
-    """ Protocol for subtomogram refine alignment. """
+    """ Protocol for refining subtomogram alignment and filling the missing wedge based on optical flow and Fast Rotational Matching (FRM).
+     The protocol takes as input a set of subtomograms, with their subtomogram averaging protocol.
+     It uses this global subtomogrm average to fill the missing wedge in Fourier space (the missing wedge is replaced by the corresponding region from the global average).
+     Optical flow is used to match the global average with each of the missing wedge filled and aligned subtomograms (matched subtomograms are generated).
+     Rigid-body alignment is performed using FRM from the matched subtomogram, and the rigid-body alignment for the input subtomograms is updated.
+     Few iterations are usually sufficient (1-5), and the rigid-body alignment will be refined"""
     _label = 'refine subtomogram alignment'
 
     # --------------------------- DEFINE param functions --------------------------------------------
@@ -371,15 +372,12 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                 # print('xmipp_transform_geometry',params)
                 runProgram('xmipp_transform_geometry', params)
             # Now the STA is aligned, add the missing wedge region to the subtomogram:
-            # v = open_volume(new_imgPath)
             v = ImageHandler().read(new_imgPath).getData()
             I = fft(v)
             I = fftshift(I)
-            # v_ave = open_volume(tempdir + '/temp.vol')
             v_ave = ImageHandler().read(tempdir + '/temp.vol').getData()
             Iave = fft(v_ave)
             Iave = fftshift((Iave))
-            # Mask = open_volume(fnmask)
             Mask = ImageHandler().read(fnmask).getData()
 
             Mask = np.ones(np.shape(Mask)) - Mask
@@ -394,7 +392,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
             # for debugging, save everything that was aligned in the first iteration
             if objId == 1:
-                # v_ave = open_volume(tempdir + '/temp.vol')
                 v_ave = ImageHandler().read(tempdir + '/temp.vol').getData()
                 save_volume(v_ave, self._getExtraPath('aligned_average_with_first_volume.spi'))
 
@@ -494,9 +491,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         winsize = self.winsize.get()
         poly_n = self.poly_n.get()
         poly_sigma = self.poly_sigma.get()
-        # TODO: the factor1 and 2 can be any value as long as we are using the subtomogram average (gray level values
-        # are similar. It is not sure if we use an external reference what this should be! This could be normalized in
-        #  future
         flags = self.flags.get()
         factor1 = self.factor1.get()
         factor2 = self.factor2.get()
@@ -548,7 +542,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             if(not(self.KeepFiles.get())):
                 cleanPath(self._getExtraPath() + '/estimated_volumes_' + str(num-1))
         estVol_root = self._getExtraPath() + '/estimated_volumes_' + str(num) + '/'
-        # reference = open_volume(self._getExtraPath('reference' + str(num) + '.spi'))
         reference = ImageHandler().read(self._getExtraPath('reference' + str(num) + '.spi')).getData()
         # recount the number of volumes:
         imgFn = self.imgsFn
@@ -627,8 +620,8 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             shifty_r = MD_refined.getValue(md.MDL_SHIFT_Y, objId)
             shiftz_r = MD_refined.getValue(md.MDL_SHIFT_Z, objId)
 
-            T_o = self.eulerAngles2matrix(rot_o, tilt_o, psi_o, shiftx_o, shifty_o, shiftz_o)
-            T_r = self.eulerAngles2matrix(rot_r, tilt_r, psi_r, shiftx_r, shifty_r, shiftz_r)
+            T_o = eulerAngles2matrix(rot_o, tilt_o, psi_o, shiftx_o, shifty_o, shiftz_o)
+            T_r = eulerAngles2matrix(rot_r, tilt_r, psi_r, shiftx_r, shifty_r, shiftz_r)
 
             # 3- multiply the matrices
             if self.getAngleY() == 90:
@@ -641,7 +634,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                 # have missing wedge correction)
                 T = np.matmul(T_o, T_r)
 
-            rot_i, tilt_i, psi_i, x_i, y_i, z_i = self.matrix2eulerAngles(T)
+            rot_i, tilt_i, psi_i, x_i, y_i, z_i = matrix2eulerAngles(T)
 
             # Populate the metadata
             name_i = MD_original.getValue(md.MDL_IMAGE, objId)
@@ -744,11 +737,8 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
     # --------------------------- UTILS functions --------------------------------------------
     def read_optical_flow(self, path_flowx, path_flowy, path_flowz):
-        # x = open_volume(path_flowx)
         x = ImageHandler().read(path_flowx).getData()
-        # y = open_volume(path_flowy)
         y = ImageHandler().read(path_flowy).getData()
-        # z = open_volume(path_flowz)
         z = ImageHandler().read(path_flowz).getData()
 
         l = np.shape(x)
@@ -776,6 +766,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             print >> fWarn, l
         fWarn.close()
 
+    # AngleY should never be 90 from now on. However, it can stay here in order someone imports an old STA alignment
     def getAngleY(self):
         AlignmentParameters = self.AlignmentParameters.get()
         MetaDataFile = self.MetaDataFile.get()
@@ -793,63 +784,3 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
     def getVolumeDimesion(self):
         return self.inputVolumes.get().getDimensions()[0]
-
-    def matrix2eulerAngles(self, A):
-        abs_sb = np.sqrt(A[0, 2] * A[0, 2] + A[1, 2] * A[1, 2])
-        if (abs_sb > 16 * np.exp(-5)):
-            gamma = math.atan2(A[1, 2], -A[0, 2])
-            alpha = math.atan2(A[2, 1], A[2, 0])
-            if (abs(np.sin(gamma)) < np.exp(-5)):
-                sign_sb = np.sign(-A[0, 2] / np.cos(gamma))
-            else:
-                if np.sin(gamma) > 0:
-                    sign_sb = np.sign(A[1, 2])
-                else:
-                    sign_sb = -np.sign(A[1, 2])
-            beta = math.atan2(sign_sb * abs_sb, A[2, 2])
-        else:
-            if (np.sign(A[2, 2]) > 0):
-                alpha = 0
-                beta = 0
-                gamma = math.atan2(-A[1, 0], A[0, 0])
-            else:
-                alpha = 0
-                beta = np.pi
-                gamma = math.atan2(A[1, 0], -A[0, 0])
-        gamma = np.rad2deg(gamma)
-        beta = np.rad2deg(beta)
-        alpha = np.rad2deg(alpha)
-        return alpha, beta, gamma, A[0, 3], A[1, 3], A[2, 3]
-
-
-    def eulerAngles2matrix(self, alpha, beta, gamma, shiftx, shifty, shiftz):
-        A = np.empty([4, 4])
-        A.fill(2)
-        A[3, 3] = 1
-        A[3, 0:3] = 0
-        A[0, 3] = float(shiftx)
-        A[1, 3] = float(shifty)
-        A[2, 3] = float(shiftz)
-        alpha = float(alpha)
-        beta = float(beta)
-        gamma = float(gamma)
-        sa = np.sin(np.deg2rad(alpha))
-        ca = np.cos(np.deg2rad(alpha))
-        sb = np.sin(np.deg2rad(beta))
-        cb = np.cos(np.deg2rad(beta))
-        sg = np.sin(np.deg2rad(gamma))
-        cg = np.cos(np.deg2rad(gamma))
-        cc = cb * ca
-        cs = cb * sa
-        sc = sb * ca
-        ss = sb * sa
-        A[0, 0] = cg * cc - sg * sa
-        A[0, 1] = cg * cs + sg * ca
-        A[0, 2] = -cg * sb
-        A[1, 0] = -sg * cc - cg * sa
-        A[1, 1] = -sg * cs + cg * ca
-        A[1, 2] = sg * sb
-        A[2, 0] = sc
-        A[2, 1] = ss
-        A[2, 2] = cb
-        return A

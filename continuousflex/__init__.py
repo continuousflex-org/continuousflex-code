@@ -38,6 +38,7 @@ class Plugin(pwem.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
     _pathVars = [CONTINUOUSFLEX_HOME]
     _supportedVersions = [VV]
+    _url = CONTINUOUSFLEX_URL
 
     @classmethod
     def _defineVariables(cls):
