@@ -131,5 +131,7 @@ def matrix2eulerAngles(A):
 
 
 def l2(Vec1, Vec2):
-    value = (Vec1[0]-Vec2[0])**2 + (Vec1[1]-Vec2[1])**2 + (Vec1[2]-Vec2[2])**2
+    Vec1 = np.array(Vec1)
+    Vec2 = np.array(Vec2)
+    value = np.inner(Vec1-Vec2, Vec1-Vec2)
     return np.sqrt(value)

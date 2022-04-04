@@ -287,7 +287,6 @@ class FlexAlignmentNMAVolViewer(ProtocolViewer):
             label.append('mode ' + str(i))
             dist.append(np.array(A - B))
             counter +=1
-        print(label)
         plt.title('histogram of normal mode amplitude distances')
         plt.hist(dist, bins=100, label=label)
         plt.legend(loc='upper right')
