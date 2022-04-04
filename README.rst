@@ -50,6 +50,8 @@ If VMD is installed but does not work, you may run the command "scipion3 config"
 
 Note: GENESIS is not installed by default in continuousflex. To install GENESIS, you can use the Plugin Manager, or run the command line "scipion3 installb genesis"
 
+Note: Matlab with its image processing toolbox is optional. It will only be needed if missing-wedge correction using Monte Carlo or volume denoising using BM4D are to be used
+
 Supported versions
 ------------------
 
