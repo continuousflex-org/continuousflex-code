@@ -128,3 +128,8 @@ def matrix2eulerAngles(A):
     beta  = np.rad2deg(beta)
     alpha = np.rad2deg(alpha)
     return alpha, beta, gamma, A[0,3], A[1,3], A[2,3]
+
+
+def l2(Vec1, Vec2):
+    value = (Vec1[0]-Vec2[0])**2 + (Vec1[1]-Vec2[1])**2 + (Vec1[2]-Vec2[2])**2
+    return np.sqrt(value)
