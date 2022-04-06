@@ -31,10 +31,8 @@ visualization program.
 
 from os.path import basename, join, exists, isfile
 import numpy as np
-
-from pyworkflow.utils.path import cleanPath, makePath, cleanPattern
+from pyworkflow.utils.path import cleanPath, makePath
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
-
 from pyworkflow.protocol.params import StringParam, LabelParam
 from pwem.objects import SetOfParticles
 from pwem.viewers import VmdView
