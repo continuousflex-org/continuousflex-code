@@ -23,15 +23,15 @@
 # *
 # **************************************************************************
 
-
+from os.path import isfile
 from pyworkflow.protocol.params import PointerParam, FileParam
 from pwem.protocols import BatchProtocol
-from pwem.objects import Volume, SetOfVolumes
+from pwem.objects import Volume, SetOfVolumes, AtomStruct
 from xmipp3.convert import writeSetOfVolumes
 import pwem.emlib.metadata as md
 import os
 from pwem.utils import runProgram
-
+import numpy as np
 
 
 class FlexBatchProtNMAClusterVol(BatchProtocol):
@@ -52,6 +52,7 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
 
         self._insertFunctionStep('convertInputStep', volumesMd)
         self._insertFunctionStep('averagingStep')
+        self._insertFunctionStep('centroidPdbStep')
         self._insertFunctionStep('createOutputStep', outputVol)
 
     #--------------------------- STEPS functions --------------------------------------------
@@ -123,11 +124,49 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
         os.system("rm -f %(tempVol)s" % locals())
 
 
+    def centroidPdbStep(self):
+        volumesMd = self._getExtraPath('volumes.xmd')
+        md_file = md.MetaData(volumesMd)
+        deformations = []
+        for j in md_file:
+            deformations.append(md_file.getValue(md.MDL_NMA, j))
+        ampl = np.mean(np.array(deformations), axis= 0)
+        print(self.getFnPDB())
+
+        fnPDB, pseudo = self.getFnPDB()
+        fnModeList = self.getFnModes()
+        fnOutPDB = self._getExtraPath('centroid.pdb')
+        params = " --pdb " + fnPDB
+        params += " --nma " + fnModeList
+        params += " -o " + fnOutPDB
+        params += " --deformations " + ' '.join(str(i) for i in ampl)
+        runProgram('xmipp_pdb_nma_deform', params)
+
+
     def createOutputStep(self, outputVol):
         vol = Volume()
         vol.setFileName(outputVol)
         vol.setSamplingRate(self.OutputVolumes.getSamplingRate())
+        atm = AtomStruct()
+        fnPDB, pseudo = self.getFnPDB()
+        fnOutPDB = self._getExtraPath('centroid.pdb')
+        atm.setPseudoAtoms(pseudo)
+        atm.setFileName(fnOutPDB)
+        atm.setVolume(vol)
+        self._defineOutputs(centroidPDB=atm)
         self._defineOutputs(outputVol=vol)
+    #--------------------------- Utility functions -----------------------------------------
+    def getFnPDB(self):
+        # This functions returns the path of the structure, false if is atomic, true if pseudoatomic
+        path = self.inputNmaDimred.get().inputNMA.get()._getExtraPath('atoms.pdb')
+        if isfile(path):
+            return path, False
+        else:
+            path = self.inputNmaDimred.get().inputNMA.get()._getExtraPath('pseudoatoms.pdb')
+            return path, True
+
+    def getFnModes(self):
+        return self.inputNmaDimred.get().inputNMA.get()._getExtraPath('modes.xmd')
 
     #--------------------------- INFO functions --------------------------------------------
     def _summary(self):
@@ -143,4 +182,3 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
 
     def _methods(self):
         return []
-
