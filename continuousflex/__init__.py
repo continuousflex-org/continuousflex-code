@@ -138,6 +138,13 @@ class Plugin(pwem.Plugin):
                        neededProgs=['mpif90'],
                        target="genesis", default=False)
 
+        try:
+            env.addPipModule('pycuda', version='2020.1', default=True)
+            env.addPipModule('farneback3d', version='0.1.3', default=True)
+        except:
+            print('Installation of PyCuda and Farneback-3D was not successful,'
+                  ' you will not be able to use Cuda related programs')
+
 
 files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol': 'volumes/AK_LP10.vol',
                     'precomputed_atomic': 'gold/images_WS_atoms.xmd',
