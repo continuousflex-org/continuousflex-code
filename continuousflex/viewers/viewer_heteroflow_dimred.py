@@ -46,7 +46,6 @@ from pwem.viewers.viewer_chimera import Chimera
 
 from joblib import load, dump
 from continuousflex.protocols.utilities.spider_files3 import open_volume, save_volume
-import farneback3d
 import matplotlib.pyplot as plt
 from pwem.emlib.image import ImageHandler
 
@@ -352,6 +351,7 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         browser.show()
 
     def _generateAnimation(self):
+        import farneback3d
         prot = self.protocol
         # This is not getting the file correctly, we are workingaround it:
         # projectorFile = prot.getProjectorFile()
