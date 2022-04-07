@@ -27,7 +27,6 @@ import pyworkflow.protocol.params as params
 from pyworkflow.utils.path import makePath, copyFile, cleanPath
 from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
 from pyworkflow.utils import replaceBaseExt
-import farneback3d
 from .utilities.spider_files3 import *
 import os
 from os.path import basename, isfile
@@ -39,6 +38,7 @@ import continuousflex
 from subprocess import check_call
 from pwem.emlib.image import ImageHandler
 from .convert import eulerAngles2matrix, matrix2eulerAngles
+from pyworkflow.utils import getListFromRangeString
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
@@ -141,10 +141,17 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
         form.addSection(label='combined rigid-body & elastic alignment')
         group = form.addGroup('Optical flow parameters', condition='Alignment_refine')
-        group.addParam('N_GPU', params.IntParam, default=3, important=True, allowsNull=True,
+        group.addParam('N_GPU', params.IntParam, default=1, important=True, allowsNull=True,
                               label = 'Parallel processes on GPU',
                               help='This parameter indicates the number of volumes that will be processed in parallel'
                                    ' (independently). The more powerful your GPU, the higher the number you can choose.')
+        group.addParam('GPU_list', params.NumericRangeParam,
+                       label="GPU id(s)",
+                       help='Select the GPU id(s) that will be used for optical flow calculation.'
+                            'Examples: '
+                            'You can select a list like 0-4, and it will take the GPUs 0 1 2 3 4'
+                            'You can also combine different selections like 1, 3-5 and it will take 1, 3, 4, 5',
+                       default='0')
         group.addParam('pyr_scale', params.FloatParam, default=0.5,
                       label='pyr_scale', allowsNull=True,
                        help='parameter specifying the image scale to build pyramids for each image (pyr_scale < 1). '
@@ -501,8 +508,11 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         # This is a spherical mask with maximum radius
         mask_size = int(self.getVolumeDimesion()//2)
         # Parallel processing (finding multiple optical flows at the same time)
+        GPUids = np.array(getListFromRangeString(self.GPU_list.get()))
+        gpu_ps = np.tile(GPUids, mdImgs.size())
         global segment
         def segment(objId):
+            gpu_p = gpu_ps[objId-1]
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             # getting a copy converted to spider format to solve the problem with stacks or mrc files
             tmp = self._getTmpPath('tmp_' + str(objId) + '.spi')
@@ -516,9 +526,9 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             if (isfile(path_flowx)):
                 return
             else:
-                args = " %s %s %f %d %d %d %d %f %d %d %s %s %s" % (path_vol0, path_vol_i, pyr_scale, levels, winsize,
+                args = " %s %s %f %d %d %d %d %f %d %d %s %s %s %d" % (path_vol0, path_vol_i, pyr_scale, levels, winsize,
                                                                    iterations, poly_n, poly_sigma, factor1, factor2,
-                                                                   path_flowx, path_flowy, path_flowz)
+                                                                   path_flowx, path_flowy, path_flowz, gpu_p)
                 script_path = continuousflex.__path__[0] + '/protocols/utilities/optflow_run.py'
                 command = "python " + script_path + args
                 check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
@@ -537,6 +547,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
 
     def warpByFlow(self, num):
+        import farneback3d
         makePath(self._getExtraPath() + '/estimated_volumes_' + str(num))
         if num != 1:
             if(not(self.KeepFiles.get())):
