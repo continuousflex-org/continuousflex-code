@@ -1,25 +1,38 @@
-import os
 import torch.nn as nn
 from torchvision import transforms
 import torch.optim as optim
 from torch.utils.data import DataLoader
-import argparse
-from data import cryodata
-from models import deephemnma
+from continuousflex.protocols.utilities.processing_dh.data import cryodata
+from continuousflex.protocols.utilities.processing_dh.models import deephemnma
 import numpy as np
 import torch
 from torch.utils.data.sampler import SubsetRandomSampler
-from models import loss
-from utils import read_pdb
 from torch.utils.tensorboard import SummaryWriter
+import sys
 
-def train(imgs, amplitudes, angles, shifts, epochs=400, batch_size=2, lr=1e-4, flag='all', mode='train', device='cuda'):
+def train(imgs_path, epochs=400, batch_size=2, lr=1e-4, flag=0, device=0, mode='train'):
+
     num_epochs = epochs
     random_seed = 42
     validation_split = .2
     shuffle_dataset = True
+    FLAG = ''
+    if flag==0:
+        FLAG = 'nma'
+    elif flag==1:
+        FLAG = 'ang'
+    elif flag==2:
+        FLAG = 'shf'
+    else:
+        FLAG = 'all'
+    DEVICE = ''
+    if device==0:
+        DEVICE = 'cuda'
+    else:
+        DEVICE = 'cpu'
 
-    dataset = cryodata(imgs, amplitudes, angles, shifts, flag=flag, mode = mode,  transform=transforms.ToTensor())
+
+    dataset = cryodata(imgs_path, flag=FLAG, mode = mode, transform=transforms.ToTensor())
 
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
@@ -37,17 +50,17 @@ def train(imgs, amplitudes, angles, shifts, epochs=400, batch_size=2, lr=1e-4, f
     train_loader = DataLoader(dataset, batch_size=batch_size, sampler=train_sampler)
     validation_loader = DataLoader(dataset, batch_size=batch_size, sampler=valid_sampler)
 
-    if args.flag=='nma':
-        model = deephemnma(4).to('cuda:0')
+    if FLAG=='nma':
+        model = deephemnma(3).to(DEVICE)
 
-    elif args.flag=='ang':
-        model = deephemnma(4).to('cuda:0')
-    else:
-        model = deephemnma(2).to('cuda:0')
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-5)
-    #optimizer = torch.optim.RMSprop(model.parameters(), lr=args.lr, weight_decay=1e-5)
-    #print(next(iter(train_loader)))
+    elif FLAG=='ang':
+        model = deephemnma(4).to(DEVICE)
+    elif FLAG=='shf':
+        model = deephemnma(2).to(DEVICE)
+    elif FLAG=='all':
+        model = deephemnma(9).to(DEVICE)
 
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10)
     criterion = nn.L1Loss()
     writer = SummaryWriter('./scalars')
@@ -57,8 +70,8 @@ def train(imgs, amplitudes, angles, shifts, epochs=400, batch_size=2, lr=1e-4, f
         running_loss = 0.0
 
         for img, params in train_loader:
-            pred_params = model(img.to('cuda:0'), 'train')
-            l = criterion(params.to('cuda:0'), pred_params)
+            pred_params = model(img.to(DEVICE), 'train')
+            l = criterion(params.to(DEVICE), pred_params)
             optimizer.zero_grad()
             l.backward()
             optimizer.step()
@@ -69,8 +82,8 @@ def train(imgs, amplitudes, angles, shifts, epochs=400, batch_size=2, lr=1e-4, f
         valid_loss = 0.0
         with torch.no_grad():
             for img, params in validation_loader:
-                pred_params = model(img.to('cuda:0'), 'validation')
-                l = criterion(params.to('cuda:0'), pred_params)
+                pred_params = model(img.to(DEVICE), 'validation')
+                l = criterion(params.to(DEVICE), pred_params)
                 valid_loss += pred_params.shape[0] * l.item()
 
         print('epoch [{}/{}], train loss:{:.4f}, validation loss:{:.4f}'
@@ -78,8 +91,12 @@ def train(imgs, amplitudes, angles, shifts, epochs=400, batch_size=2, lr=1e-4, f
         writer.add_scalar('Loss/train', epoch_loss / len(train_loader.dataset), epoch+1)
         writer.add_scalar('Loss/validation', valid_loss / len(validation_loader.dataset), epoch+1)
         scheduler.step(epoch_loss)
-        torch.save(model.state_dict(), './resnet_based.pth')
+        torch.save(model.state_dict(), './weights.pth')
 
 if __name__ == '__main__':
-
-    train(args)
+    train(sys.argv[0],
+          int(sys.argv[1]),
+          int(sys.argv[2]),
+          float(sys.argv[3]),
+          int(sys.argv[4]),
+          int(sys.argv[5]))

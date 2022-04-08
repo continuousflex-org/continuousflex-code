@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 from . import ResNet, mlp, Bottleneck, BasicBlock
-from utils import projectPDB_NP, normalize, torch_normalize, quater2euler
+#from utils import projectPDB_NP, normalize, torch_normalize, quater2euler
 
 
 
@@ -26,7 +26,7 @@ class deephemnma(nn.Module):
         elif mode == 'inference':
             return mlp
     """
-    def forward(self, x, pdb, mode = 'train'):
+    def forward(self, x, mode = 'train'):
         resnet = self.resnet(x)
         flat = torch.flatten(resnet, start_dim=1)
         mlp = self.mlp(flat)

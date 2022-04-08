@@ -12,10 +12,17 @@ import matplotlib.pyplot as plt
 #import mrcfile
 from tqdm import tqdm
 import torch
+from pwem.emlib.image import ImageHandler
 
+"""
 def spi2array(f_name) -> object:
     spi_image = Image.open(f_name, 'r')
     spi_array = np.array(spi_image, dtype='float32')
+    spi_array = normalize(spi_array)
+    return spi_array
+"""
+def spi2array(f_name) -> object:
+    spi_array = ImageHandler().read(f_name).getData()
     spi_array = normalize(spi_array)
     return spi_array
 
@@ -60,6 +67,7 @@ def torch_normalize(spi_array):
     _max = torch.max(spi_array)
     spi_array = (spi_array - _min) / (_max - _min)
     return spi_array
+
 """
 def mrc_stack_reader(path):
     mrc = mrcfile.mmap(path, mode='r+')

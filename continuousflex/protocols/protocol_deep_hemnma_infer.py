@@ -24,30 +24,53 @@
 # **************************************************************************
 
 
-from pyworkflow.object import String
 from pyworkflow.protocol.params import (PointerParam, StringParam, EnumParam,
                                         IntParam, LEVEL_ADVANCED)
 import pyworkflow.protocol.params as params
 from pwem.protocols import ProtAnalysis3D
-from pwem.utils import runProgram
+from subprocess import check_call
+import sys
+import continuousflex
 
 
+OPTION_NMA = 0
+OPTION_ANGLES = 1
+OPTION_SHFITS = 2
+OPTION_ALL = 3
 
+DEVICE_CUDA = 0
+DEVICE_CPU = 1
 
 class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
     """ This protocol is DeepHEMNMA
     """
     _label = 'deep hemnma infer'
     
-    def __init__(self, **kwargs):
-        ProtAnalysis3D.__init__(self, **kwargs)
-        self.mappingFile = String()
-    
     #--------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
+        form.addParam('analyze_option', params.EnumParam, label='set the parameter to predict',
+                      display=params.EnumParam.DISPLAY_COMBO,
+                      choices=['predict  normal mode amplitudes',
+                               'predict on angles',
+                               'predict on shifts',
+                               'predict on shifts and angles',
+                               ], default=OPTION_NMA,
+                      help='select a set of parameter to predict')
+        group = form.addGroup('Train on conformational variability',
+                              condition='analyze_option == %d or analyze_option == %d' % (OPTION_NMA, OPTION_ALL))
+        group.addParam('inputNMA', PointerParam, pointerClass='FlexProtAlignmentNMA',
+                       label="Previous HEMNMA run",
+                       help='Select a previous run of the NMA image alignment.', allowsNull=True)
+        group = form.addGroup('Train on rigid-body variability ',
+                              condition='analyze_option == %d or analyze_option == %d' % (OPTION_SHFITS, OPTION_ANGLES))
+        form.addParam('device_option', params.EnumParam, label='set the device for training',
+                      display=params.EnumParam.DISPLAY_COMBO,
+                      choices=['train on GPUs',
+                               'tain on CPUs'], default=DEVICE_CUDA,
+                      help='set a device to run the training on')
         form.addParam('trained_model', params.PointerParam, pointerClass='FlexProtDeepHEMNMATrain',
-                      label = 'Trained model', help='TODO')
+                      label = 'Trained model', help='import the training weights')
         form.addParam('inputParticles', PointerParam, pointerClass='SetOfParticles',
                       label="Inference set",
                       help='TODO')
@@ -91,8 +114,16 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
         #     f.write('\n')
         # f.close()
     
-    def performDeepHEMNMAStep(self, deformationsFile, method, extraParams,
-                          rows, reducedDim):
+    def performDeepHEMNMAStep(self):
+        weights = self.trained_model.get()
+        batch_size = self.batch_size.get()
+        mode = self.analyze_option.get()
+        device = self.device_option.get()
+        self.imgsFn = self.inputParticles.get()._getExtraPath('images.xmd')
+        params = " %s %s %d %d %d" % (self.imgsFn, weights, batch_size, mode, device)
+        script_path = continuousflex.__path__[0]+'/protocols/utilities/deep_hemnma_infer.py'
+        command = "python " + script_path + params
+        check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr, env=None, cwd=None)
         pass
 
         
