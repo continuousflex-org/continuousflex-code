@@ -56,10 +56,10 @@ def infer(imgs_path, weights_path, batch_size=2, flag=0, device=0, mode='inferen
             i+=1
 
 if __name__ == '__main__':
-    infer(sys.argv[0],
-          sys.argv[1],
-          int(sys.argv[2]),
+    infer(sys.argv[1],
+          sys.argv[2],
           int(sys.argv[3]),
           int(sys.argv[4]),
-          sys.argv[5])
+          int(sys.argv[5]),
+          sys.argv[6])
     sys.exit()

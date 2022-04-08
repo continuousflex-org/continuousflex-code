@@ -94,9 +94,10 @@ def train(imgs_path, epochs=400, batch_size=2, lr=1e-4, flag=0, device=0, mode='
         torch.save(model.state_dict(), './weights.pth')
 
 if __name__ == '__main__':
-    train(sys.argv[0],
-          int(sys.argv[1]),
+
+    train(sys.argv[1],
           int(sys.argv[2]),
-          float(sys.argv[3]),
-          int(sys.argv[4]),
-          int(sys.argv[5]))
+          int(sys.argv[3]),
+          float(sys.argv[4]),
+          int(sys.argv[5]),
+          int(sys.argv[6]))
