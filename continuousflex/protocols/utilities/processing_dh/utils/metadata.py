@@ -5,7 +5,6 @@ contains only the normal modes amplitudes
 """
 
 import re
-import pandas as pd
 import numpy as np
 from math import cos, sin, radians
 from .euler2quaternion import eul2quat
@@ -31,19 +30,6 @@ def read_file(path):
     for i in range(head):
         file_list.pop(0)
     return file_list, column_names
-
-
-def create_data_frame(file_list: list, column_names: list):
-    for i in range(len(file_list)):
-        file_list[i] = file_list[i].replace('\n', ' ')
-        file_list[i] = list(filter(None, re.split("\s|'", file_list[i])))
-        for k in range(1, len(file_list[0])):
-            file_list[i][k] = float(file_list[i][k])
-    for j in range(len(column_names)):
-        column_names[j] = column_names[j].replace('\n', ' ')
-    df = pd.DataFrame(file_list, columns=column_names)
-    df.iloc[:, 1:] = df.iloc[:, 1:].astype('float64')
-    return df
 
 
 def create_array(path, flag='nma'):
