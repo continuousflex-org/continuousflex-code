@@ -10,7 +10,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 import sys
 
-def train(imgs_path, epochs=400, batch_size=2, lr=1e-4, flag=0, device=0, mode='train'):
+def train(imgs_path, output_path, epochs=400, batch_size=2, lr=1e-4, flag=0, device=0, mode='train'):
 
     num_epochs = epochs
     random_seed = 42
@@ -63,7 +63,7 @@ def train(imgs_path, epochs=400, batch_size=2, lr=1e-4, flag=0, device=0, mode='
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10)
     criterion = nn.L1Loss()
-    writer = SummaryWriter('./scalars')
+    writer = SummaryWriter(output_path+'scalars')
     for epoch in range(num_epochs):
 
         epoch_loss = 0.0
@@ -91,13 +91,13 @@ def train(imgs_path, epochs=400, batch_size=2, lr=1e-4, flag=0, device=0, mode='
         writer.add_scalar('Loss/train', epoch_loss / len(train_loader.dataset), epoch+1)
         writer.add_scalar('Loss/validation', valid_loss / len(validation_loader.dataset), epoch+1)
         scheduler.step(epoch_loss)
-        torch.save(model.state_dict(), './weights.pth')
+        torch.save(model.state_dict(), output_path+'weights.pth')
 
 if __name__ == '__main__':
-
     train(sys.argv[1],
-          int(sys.argv[2]),
+          sys.argv[2],
           int(sys.argv[3]),
-          float(sys.argv[4]),
-          int(sys.argv[5]),
-          int(sys.argv[6]))
+          int(sys.argv[4]),
+          float(sys.argv[5]),
+          int(sys.argv[6]),
+          int(sys.argv[7]))

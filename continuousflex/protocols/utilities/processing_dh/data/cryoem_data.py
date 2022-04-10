@@ -26,9 +26,14 @@ class cryodata(Dataset):
             shift_y.append(mdImgs.getValue(md.MDL_SHIFT_Y, objId))
             nma.append(mdImgs.getValue(md.MDL_NMA, objId))
         self.images_Path = imgPath
+        rot_ = torch.tensor(rot)
+        tilt_ = torch.tensor(tilt)
+        psi_ = torch.tensor(psi)
+        shiftx = torch.tensor(shift_x)
+        shifty = torch.tensor(shift_y)
         if mode == 'train':
-            self.angles = torch.column_stack((rot, tilt, psi), dtype=torch.float32)
-            self.shifts = torch.column_stack((shift_x, shift_y), dtype=torch.float32)
+            self.angles = torch.column_stack((rot_, tilt_, psi_), dtype=torch.float32)
+            self.shifts = torch.column_stack((shiftx, shifty), dtype=torch.float32)
             self.amplitudes = torch.tensor(nma, dtype=torch.float32)
         else:
             pass
