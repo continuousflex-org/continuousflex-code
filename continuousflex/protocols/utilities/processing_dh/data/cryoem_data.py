@@ -32,8 +32,8 @@ class cryodata(Dataset):
         shiftx = torch.tensor(shift_x)
         shifty = torch.tensor(shift_y)
         if mode == 'train':
-            self.angles = torch.column_stack((rot_, tilt_, psi_), dtype=torch.float32)
-            self.shifts = torch.column_stack((shiftx, shifty), dtype=torch.float32)
+            self.angles = torch.column_stack((rot_, tilt_, psi_))
+            self.shifts = torch.column_stack((shiftx, shifty))
             self.amplitudes = torch.tensor(nma, dtype=torch.float32)
         else:
             pass
