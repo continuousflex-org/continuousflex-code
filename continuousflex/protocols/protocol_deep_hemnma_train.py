@@ -95,7 +95,7 @@ class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
         device = self.device_option.get()
         imgsFn = self.inputNMA.get()._getExtraPath('images.xmd')
 
-        params = " %s %s %d %d %f %d %d" % (imgsFn,self.inputNMA.get()._getExtraPath(), epochs, batch_size, lr, mode, device)
+        params = " %s %s %d %d %f %d %d" % (imgsFn, self._getExtraPath(), epochs, batch_size, lr, mode, device)
         script_path = continuousflex.__path__[0]+'/protocols/utilities/deep_hemnma.py'
         command = "python " + script_path + params
         check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr, env=None, cwd=None)

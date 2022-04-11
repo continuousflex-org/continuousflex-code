@@ -18,7 +18,7 @@ class cryodata(Dataset):
         shift_y = []
         imgPath = []
         for objId in mdImgs:
-            imgPath.append(self.path + mdImgs.getValue(md.MDL_IMAGE, objId))
+            imgPath.append(mdImgs.getValue(md.MDL_IMAGE, objId))
             rot.append(mdImgs.getValue(md.MDL_ANGLE_ROT, objId))
             tilt.append(mdImgs.getValue(md.MDL_ANGLE_TILT, objId))
             psi.append(mdImgs.getValue(md.MDL_ANGLE_PSI, objId))

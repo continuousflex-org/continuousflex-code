@@ -35,7 +35,7 @@ import sys
 
 
 class FlexDeepHEMNMAViewer(EmProtocolViewer):
-    """ Visualization of results from the HeteroFlow protocol
+    """ Visualization of results from the deepHEMNMA protocol
     """
     _label = 'viewer deepHEMNMA'
     _targets = [FlexProtDeepHEMNMATrain]
@@ -47,17 +47,15 @@ class FlexDeepHEMNMAViewer(EmProtocolViewer):
 
     def _defineParams(self, form):
         form.addSection(label='Visualization')
-        group = form.addGroup('Training')
-        group.addParam('displaycurves', LabelParam,
+        form.addParam('displaycurves', LabelParam,
                       label="Display training curves",
                       help="Display the training and validation losses")
 
 
     def _getVisualizeDict(self):
-        return {'displaycures': self._viewcurves,
-                }
+        return {'displaycures': self._viewcurves}
 
-    def _viewcurves(self, paramName):
-        logdir = self.inputNMA.get()._getExtraPath('scalars/')
+    def _viewcurves(self):
+        logdir = self.self.protocol._getExtraPath('scalars/')
         command = "tensorboard --logidr " + logdir
         check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr, env=None, cwd=None)

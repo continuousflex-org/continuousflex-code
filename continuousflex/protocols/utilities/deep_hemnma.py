@@ -33,7 +33,9 @@ def train(imgs_path, output_path, epochs=400, batch_size=2, lr=1e-4, flag=0, dev
 
 
     dataset = cryodata(imgs_path, flag=FLAG, mode = mode, transform=transforms.ToTensor())
-
+    print("****************************************************")
+    print(output_path)
+    print("****************************************************")
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor((1-validation_split) * dataset_size))
@@ -49,21 +51,21 @@ def train(imgs_path, output_path, epochs=400, batch_size=2, lr=1e-4, flag=0, dev
     print('the validation set size is: {} images'.format(len(valid_sampler)))
     train_loader = DataLoader(dataset, batch_size=batch_size, sampler=train_sampler)
     validation_loader = DataLoader(dataset, batch_size=batch_size, sampler=valid_sampler)
-
+    im, p = next(iter(train_loader))
     if FLAG=='nma':
-        model = deephemnma(3).to(DEVICE)
+        model = deephemnma(p.shape[1]).to(DEVICE)
 
     elif FLAG=='ang':
-        model = deephemnma(4).to(DEVICE)
+        model = deephemnma(p.shape[1]).to(DEVICE)
     elif FLAG=='shf':
-        model = deephemnma(2).to(DEVICE)
+        model = deephemnma(p.shape[1]).to(DEVICE)
     elif FLAG=='all':
-        model = deephemnma(9).to(DEVICE)
+        model = deephemnma(p.shape[1]).to(DEVICE)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10)
     criterion = nn.L1Loss()
-    writer = SummaryWriter(output_path+'scalars')
+    writer = SummaryWriter(output_path+'/scalars')
     for epoch in range(num_epochs):
 
         epoch_loss = 0.0
@@ -91,7 +93,7 @@ def train(imgs_path, output_path, epochs=400, batch_size=2, lr=1e-4, flag=0, dev
         writer.add_scalar('Loss/train', epoch_loss / len(train_loader.dataset), epoch+1)
         writer.add_scalar('Loss/validation', valid_loss / len(validation_loader.dataset), epoch+1)
         scheduler.step(epoch_loss)
-        torch.save(model.state_dict(), output_path+'weights.pth')
+        torch.save(model.state_dict(), output_path+'/weights.pth')
 
 if __name__ == '__main__':
     train(sys.argv[1],

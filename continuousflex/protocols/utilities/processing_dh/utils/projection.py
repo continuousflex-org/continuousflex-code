@@ -1,6 +1,5 @@
 import numpy as np
 from struct import pack
-import cv2
 import torch
 import multiprocessing as multiprocessing
 

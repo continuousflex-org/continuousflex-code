@@ -9,7 +9,6 @@ class deephemnma(nn.Module):
     def __init__(self, output):
         super(deephemnma, self).__init__()
         self.output = output
-
         self.resnet = ResNet(BasicBlock, [3, 4, 6, 3])
         self.mlp = mlp(output)
     """
