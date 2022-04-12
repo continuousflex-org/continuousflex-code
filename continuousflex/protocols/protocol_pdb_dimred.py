@@ -33,7 +33,6 @@ import numpy as np
 import glob
 from sklearn import decomposition
 from joblib import dump
-from vtkmodules.vtkCommonCore import reference
 
 from .utilities.genesis_utilities import dcd2numpyArr
 from .utilities.pdb_handler import ContinuousFlexPDBHandler
