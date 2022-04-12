@@ -56,5 +56,5 @@ class FlexDeepHEMNMAViewer(ProtocolViewer):
 
     def _viewcurves(self, paramName):
         logdir = self.protocol._getExtraPath('scalars/')
-        command = "tensorboard --logidr " + logdir
+        command = "tensorboard --logdir " + logdir
         check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr, env=None, cwd=None)
