@@ -28,6 +28,7 @@ from pyworkflow.tests import setupTestProject, DataSet
 from continuousflex.protocols.protocol_genesis import *
 from continuousflex.protocols import FlexProtNMA, NMA_CUTOFF_ABS, FlexProtSynthesizeImages
 from continuousflex.viewers.viewer_genesis import *
+from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
 import os
 import multiprocessing
 
@@ -157,26 +158,25 @@ class testGENESIS(TestWorkflow):
         # Get the CC from the log file
         cc = readLogFile(log_file)["RESTR_CVS001"]
 
-        # Get the RMSD from the dcd file
-        matchingAtoms = matchPDBatoms([PDBMol(protGenesisFitNMMD.getInputPDBprefix() + ".pdb")
-                                          , PDBMol(self.ds.getFile('1ake_pdb'))])
-        rmsd = rmsdFromDCD(outputPrefix = protGenesisFitNMMD.getOutputPrefix(),
-                           inputPDB = protGenesisFitNMMD.getInputPDBprefix()+".pdb",
-                           targetPDB=self.ds.getFile('1ake_pdb'),
-                           idx=matchingAtoms,
-                           align=False)
+        # Get the RMSD
+        inp = ContinuousFlexPDBHandler(protGenesisFitNMMD.getInputPDBprefix() + ".pdb")
+        ref = ContinuousFlexPDBHandler(self.ds.getFile('1ake_pdb'))
+        out = ContinuousFlexPDBHandler(protGenesisFitNMMD.getOutputPrefix()+".pdb")
+        matchingAtoms = inp.matchPDBatoms(reference_pdb=ref)
+        rmsd_inp = inp.getRMSD(reference_pdb=ref,idx_matching_atoms=matchingAtoms,align=True)
+        rmsd_out = out.getRMSD(reference_pdb=ref,idx_matching_atoms=matchingAtoms,align=True)
 
         # Assert that the CC is increasing and  the RMSD is decreasing
         print("\n\n//////////////////////////////////////////////")
         print(protGenesisFitNMMD.getObjLabel())
         print("Initial CC : %.2f"%cc[0])
         print("Final CC : %.2f"%cc[-1])
-        print("Initial rmsd : %.2f Ang"%rmsd[0])
-        print("Final rmsd : %.2f Ang"%rmsd[-1])
+        print("Initial rmsd : %.2f Ang"%rmsd_inp)
+        print("Final rmsd : %.2f Ang"%rmsd_out)
         print("//////////////////////////////////////////////\n\n")
 
         assert(cc[0] < cc[-1])
-        assert(rmsd[0] > rmsd[-1])
+        assert(rmsd_inp >rmsd_out)
         # assert(rmsd[-1] < 3.0)
 
     def test2_EmfitVolumeCAGO(self):
@@ -268,25 +268,24 @@ class testGENESIS(TestWorkflow):
         # Get the CC from the log file
         cc = readLogFile(log_file)["RESTR_CVS001"]
 
-        # Get the RMSD from the dcd file
-        matchingAtoms = matchPDBatoms([PDBMol(protGenesisFitNMMD.getInputPDBprefix() + ".pdb")
-                                          , PDBMol(self.ds.getFile('1ake_pdb'))])
-        rmsd = rmsdFromDCD(outputPrefix = protGenesisFitNMMD.getOutputPrefix(),
-                           inputPDB = protGenesisFitNMMD.getInputPDBprefix()+".pdb",
-                           targetPDB=self.ds.getFile('1ake_pdb'),
-                           idx=matchingAtoms,
-                           align=False)
+        # Get the RMSD
+        inp = ContinuousFlexPDBHandler(protGenesisFitNMMD.getInputPDBprefix() + ".pdb")
+        ref = ContinuousFlexPDBHandler(self.ds.getFile('1ake_pdb'))
+        out = ContinuousFlexPDBHandler(protGenesisFitNMMD.getOutputPrefix()+".pdb")
+        matchingAtoms = inp.matchPDBatoms(reference_pdb=ref)
+        rmsd_inp = inp.getRMSD(reference_pdb=ref,idx_matching_atoms=matchingAtoms,align=True)
+        rmsd_out = out.getRMSD(reference_pdb=ref,idx_matching_atoms=matchingAtoms,align=True)
 
         # Assert that the CC is increasing and  the RMSD is decreasing
         print("\n\n//////////////////////////////////////////////")
         print(protGenesisFitNMMD.getObjLabel())
         print("Initial CC : %.2f"%cc[0])
         print("Final CC : %.2f"%cc[-1])
-        print("Initial rmsd : %.2f Ang"%rmsd[0])
-        print("Final rmsd : %.2f Ang"%rmsd[-1])
+        print("Initial rmsd : %.2f Ang"%rmsd_inp)
+        print("Final rmsd : %.2f Ang"%rmsd_out)
         print("//////////////////////////////////////////////\n\n")
         assert (cc[0] < cc[-1])
-        assert (rmsd[0] > rmsd[-1])
+        assert (rmsd_inp > rmsd_out)
 
 
         # Need at least 4 cores
@@ -344,33 +343,30 @@ class testGENESIS(TestWorkflow):
             cc1 = readLogFile(log_file1)["RESTR_CVS001"]
             cc2 = readLogFile(log_file2)["RESTR_CVS001"]
 
-
-            # Get the RMSD from the dcd file
-            matchingAtoms = matchPDBatoms([PDBMol(protGenesisFitREUS.getInputPDBprefix() + ".pdb")
-                                                  ,PDBMol(self.ds.getFile('1ake_pdb'))])
-            rmsd1 = rmsdFromDCD(outputPrefix=outPref[0],
-                               inputPDB=protGenesisFitREUS.getInputPDBprefix() + ".pdb",
-                               targetPDB=self.ds.getFile('1ake_pdb'),
-                               align=False, idx=matchingAtoms)
-            rmsd2 = rmsdFromDCD(outputPrefix=outPref[0],
-                                inputPDB=protGenesisFitREUS.getInputPDBprefix() + ".pdb",
-                                targetPDB=self.ds.getFile('1ake_pdb'),
-                                align=False, idx=matchingAtoms)
+            # Get the RMSD
+            ref = ContinuousFlexPDBHandler(self.ds.getFile('1ake_pdb'))
+            inp = ContinuousFlexPDBHandler(protGenesisFitREUS.getInputPDBprefix() + ".pdb")
+            out1 = ContinuousFlexPDBHandler(outPref[0] + ".pdb")
+            out2 = ContinuousFlexPDBHandler(outPref[1] + ".pdb")
+            matchingAtoms = inp.matchPDBatoms(reference_pdb=ref)
+            rmsd_inp = inp.getRMSD(reference_pdb=ref, idx_matching_atoms=matchingAtoms, align=True)
+            rmsd_out2 = out2.getRMSD(reference_pdb=ref, idx_matching_atoms=matchingAtoms, align=True)
+            rmsd_out1 = out1.getRMSD(reference_pdb=ref, idx_matching_atoms=matchingAtoms, align=True)
 
             # Assert that the CCs are increasing
             print("\n\n//////////////////////////////////////////////")
             print(protGenesisFitREUS.getObjLabel())
             print("Initial CC : [%.2f , %.2f]" % (cc1[0],cc2[0]))
             print("Final CC :[%.2f , %.2f]" % (cc1[-1],cc2[-1]))
-            print("Initial rmsd : [%.2f , %.2f] Ang" % (rmsd1[0],rmsd2[0]))
-            print("Final rmsd : [%.2f , %.2f] Ang" % (rmsd1[-1],rmsd2[-1]))
+            print("Initial rmsd : [%.2f , %.2f] Ang" % (rmsd_inp,rmsd_inp))
+            print("Final rmsd : [%.2f , %.2f] Ang" % (rmsd_out1,rmsd_out2))
             print("//////////////////////////////////////////////\n\n")
 
             assert (cc1[0] < cc1[-1])
             assert (cc2[0] < cc2[-1])
-            assert (rmsd1[0] > rmsd1[-1])
+            assert (rmsd_inp> rmsd_out1)
             # assert (rmsd1[-1] < 3.0)
-            assert (rmsd2[0] > rmsd2[-1])
+            assert (rmsd_inp > rmsd_out2)
             # assert (rmsd2[-1] < 3.0)
 
 

@@ -42,7 +42,8 @@ from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVol
 from continuousflex.protocols.data import Point, Data, PathData
 from pwem.viewers import VmdView
 from pyworkflow.utils.path import cleanPath, makePath
-from continuousflex.protocols.utilities.genesis_utilities import PDBMol,save_dcd
+from continuousflex.protocols.utilities.genesis_utilities import save_dcd
+from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
 from pyworkflow.gui.browser import FileBrowserWindow
 
 import os
@@ -248,14 +249,14 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                 deformations = [X[np.argmin(np.sum((Y - p) ** 2, axis=1))] for p in trajectoryPoints]
 
         # Generate DCD trajectory
-        initPDB = PDBMol(prot.getPDBRef())
+        initPDB = ContinuousFlexPDBHandler(prot.getPDBRef())
         initdcdcp = initPDB.copy()
         coords_list = []
         for i in range(NUM_POINTS_TRAJECTORY):
             coords_list.append(deformations[i].reshape((initdcdcp.n_atoms, 3)))
         save_dcd(mol=initdcdcp, coords_list=coords_list, prefix=animationRoot)
         initdcdcp.coords = coords_list[0]
-        initdcdcp.save(animationRoot+".pdb")
+        initdcdcp.write_pdb(animationRoot+".pdb")
 
         # Generate the vmd script
         vmdFn = animationRoot + '.vmd'

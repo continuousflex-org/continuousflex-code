@@ -33,8 +33,10 @@ import numpy as np
 import glob
 from sklearn import decomposition
 from joblib import dump
+from vtkmodules.vtkCommonCore import reference
 
-from .utilities.genesis_utilities import PDBMol, alignMol, matchPDBatoms, dcd2numpyArr
+from .utilities.genesis_utilities import dcd2numpyArr
+from .utilities.pdb_handler import ContinuousFlexPDBHandler
 
 DIMRED_PCA = 0
 DIMRED_LTSA = 1
@@ -159,10 +161,10 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                       condition='alignPDBs',
                       label="Alignement Reference PDB",
                       help='Reference PDB to align the PDBs with')
-
-        form.addParam('generatePDBs', params.BooleanParam, default=False,
-                      label="Generate PDBs ?", help="TODO")
-        # form.addParallelSection(threads=0, mpi=8)
+        form.addParam('matchingType', params.EnumParam, label="Match structures ?", default=0,
+                      choices=['Both structures are the same', 'Match chain name/residue num/atom name',
+                               'Match segment name/residue num/atom name'],
+                      help="Method to match atoms in the current and the reference structures")
 
         # --------------------------- INSERT steps functions --------------------------------------------
     def _insertAllSteps(self):
@@ -177,9 +179,14 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         # Align PDBS if needed
         if self.pdbSource.get() != PDB_SOURCE_TRAJECT:
             if self.alignPDBs.get():
-                ref = PDBMol(self.alignRefPDB.get().getFileName())
-                mol = PDBMol(inputFiles[0])
-                idx = matchPDBatoms([ref, mol])
+                ref = ContinuousFlexPDBHandler(self.alignRefPDB.get().getFileName())
+                mol = ContinuousFlexPDBHandler(inputFiles[0])
+                if self.matchingType.get() == 1:
+                    idx_matching_atoms = mol.matchPDBatoms(reference_pdb=ref, matchingType=0)
+                elif self.matchingType.get() == 2:
+                    idx_matching_atoms = mol.matchPDBatoms(reference_pdb=ref, matchingType=1)
+                else:
+                    idx_matching_atoms = None
 
         # Get pdbs coordinates
         pdbs_matrix = []
@@ -194,17 +201,18 @@ class FlexProtDimredPdb(ProtAnalysis3D):
             else:
                 try :
                     # Read PDBs
-                    mol = PDBMol(pdbfn)
-                    pdbs_matrix.append(mol.coords.flatten())
+                    mol = ContinuousFlexPDBHandler(pdbfn)
 
                     # Align PDBs
                     if self.alignPDBs.get():
-                        alignMol(mol1=ref, mol2=mol, idx=idx)
+                        mol= mol.alignMol(reference_pdb=ref, idx_matching_atoms=idx_matching_atoms)
+
+                    pdbs_matrix.append(mol.coords.flatten())
+
                 except RuntimeError:
                     print("Warning : Can not read PDB file %s "%pdbfn)
 
         self.pdbs_matrix = np.array(pdbs_matrix)
-
 
 
     def performDimred(self):
@@ -219,11 +227,6 @@ class FlexProtDimredPdb(ProtAnalysis3D):
             Y = pca.fit_transform(self.pdbs_matrix)
             np.savetxt(self.getOutputMatrixFile(),Y)
             dump(pca,self._getExtraPath('pca_pickled.joblib'))
-
-            # if self.generatePDBs.get():
-            #     ref = PDBMol(self.getPDBRef())
-            #     for i in range():
-
 
         else:
             np.savetxt(self._getExtraPath('pdbs_mat.txt'), self.pdbs_matrix, fmt="%s")
