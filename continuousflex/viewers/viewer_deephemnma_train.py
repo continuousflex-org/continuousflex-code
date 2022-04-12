@@ -25,7 +25,6 @@ This module implement the wrappers aroung Xmipp CL2D protocol
 visualization program.
 """
 from continuousflex.protocols.protocol_deep_hemnma_train import FlexProtDeepHEMNMATrain
-from pwem.viewers import EmProtocolViewer
 from pyworkflow.protocol.params import LabelParam, IntParam, EnumParam, StringParam
 from pyworkflow.viewer import ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO
 import numpy as np
@@ -34,7 +33,7 @@ import sys
 
 
 
-class FlexDeepHEMNMAViewer(EmProtocolViewer):
+class FlexDeepHEMNMAViewer(ProtocolViewer):
     """ Visualization of results from the deepHEMNMA protocol
     """
     _label = 'viewer deepHEMNMA'
@@ -53,9 +52,9 @@ class FlexDeepHEMNMAViewer(EmProtocolViewer):
 
 
     def _getVisualizeDict(self):
-        return {'displaycures': self._viewcurves}
+        return {'displaycurves': self._viewcurves}
 
-    def _viewcurves(self):
-        logdir = self.self.protocol._getExtraPath('scalars/')
+    def _viewcurves(self, paramName):
+        logdir = self.protocol._getExtraPath('scalars/')
         command = "tensorboard --logidr " + logdir
         check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr, env=None, cwd=None)
