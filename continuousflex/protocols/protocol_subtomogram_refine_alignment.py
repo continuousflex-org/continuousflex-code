@@ -39,6 +39,7 @@ from subprocess import check_call
 from pwem.emlib.image import ImageHandler
 from .convert import eulerAngles2matrix, matrix2eulerAngles
 from pyworkflow.utils import getListFromRangeString
+import multiprocessing
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
@@ -203,7 +204,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                       help='The maximum shift is a number between 1 and half the size of your volume. '
                            'It represents the maximum distance searched in x,y and z directions.')
 
-        form.addParallelSection(threads=0, mpi=5)
+        form.addParallelSection(threads=0, mpi=multiprocessing.cpu_count()//2-1)
 
 
     # --------------------------- INSERT steps functions --------------------------------------------
