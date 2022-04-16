@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Ilyes Hamitouche            (ilyes.hamitouche@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -27,9 +27,9 @@ visualization program.
 from continuousflex.protocols.protocol_deep_hemnma_train import FlexProtDeepHEMNMATrain
 from pyworkflow.protocol.params import LabelParam, IntParam, EnumParam, StringParam
 from pyworkflow.viewer import ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO
-import numpy as np
 from subprocess import check_call
 import sys
+import tkinter.messagebox as mb
 
 
 
@@ -56,5 +56,6 @@ class FlexDeepHEMNMAViewer(ProtocolViewer):
 
     def _viewcurves(self, paramName):
         logdir = self.protocol._getExtraPath('scalars/')
-        command = "tensorboard --logdir " + logdir
+        command = "tensorboard --port=6006 --logdir " + logdir +'&'
         check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr, env=None, cwd=None)
+        mb.showinfo('Visualize errors', 'Open http://localhost:6006/ in your browser to visualize training curves')

@@ -35,3 +35,4 @@ from .viewer_image_synthesize import FlexProtSynthesizeImageViewer
 from .viewer_heteroflow_dimred import FlexDimredHeteroFlowViewer
 from .viewer_heteroflow import FlexHeteroFlowViewer
 from .viewer_deephemnma_train import FlexDeepHEMNMAViewer
+from .viewer_deephemnma_infer import FlexDeepHEMNMAinferViewer

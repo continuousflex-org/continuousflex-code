@@ -28,9 +28,9 @@ def quater2euler(arr):
     else:
         pass 
     
-    euler = [torch.rad2deg(torch.atan2(2*((qy*qz)-(qw*qx)),2*((qx*qz)+(qw*qy)))),
-             torch.rad2deg(torch.acos(torch.tensor(tilt))),
-             torch.rad2deg(torch.atan2(2*((qy*qz)+(qw*qx)),-2*((qx*qz)-(qw*qy))))]
+    euler = [degrees(atan2(2*((qy*qz)-(qw*qx)),2*((qx*qz)+(qw*qy)))),
+             degrees(acos(tilt)),
+             degrees(atan2(2*((qy*qz)+(qw*qx)),-2*((qx*qz)-(qw*qy))))]
     
     return euler
 

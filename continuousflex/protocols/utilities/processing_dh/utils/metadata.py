@@ -8,7 +8,7 @@ import re
 import numpy as np
 from math import cos, sin, radians
 from .euler2quaternion import eul2quat
-
+import torch
 
 def header(path):
     num_chars = 20
@@ -55,39 +55,28 @@ def create_array(path, flag='nma'):
     data_array=np.reshape(file_list,(len(file_list),columns))
     img_names=data_array[:,img_index]
     nm_amplitudes = data_array[:, nma_index: nma_index+num_modes].astype('float32') 
-    angles = data_array[:, [rot_index, tilt_index, psi_index]].astype('float32') 
+    nm_amplitudes, nma_min, nma_max = min_max(nm_amplitudes)
+    angles = data_array[:, [rot_index, tilt_index, psi_index]].astype('float32')
     shifts = data_array[:, [shiftx_index, shifty_index]].astype('float32')
+    shifts, shf_min, shf_max = min_max(shifts)
     quaternions = np.zeros((angles.shape[0], 4), dtype='float32')
     for i in range(len(angles)):
         quaternions[i,:] = eul2quat(angles, i)
     if flag=='nma':
-        return nm_amplitudes, img_names 
+        return nm_amplitudes, nma_min, nma_max, img_names
     elif flag=='ang':
         return quaternions, img_names
     elif flag=='shf':
-        return shifts, img_names
+        return shifts, shf_min, shf_max, img_names
     else:
         raise ValueError('Unknown flag, you must select nma for Normal mode amplitudes, ang for euler angles, shf for shifts (X and Y)')
 
 
-def min_max(arr, params=False, num_modes: int = 3):
-    _min = []
-    _max = []
-
-    num_params = 0
-    if params:
-        num_params = num_modes + 5
-    else:
-        num_params = num_modes
-    for i in range(num_params):
-        _min.append(np.min(arr[:, i]))
-        _max.append(np.max(arr[:, i]))
-    for i in range(num_params):
-        for j in range(len(arr)):
-            tmp = arr[j, i]
-            arr[j, i] = (tmp - _min[i]) / (_max[i] - _min[i])
-
-    return arr, _min, _max
+def min_max(arr):
+    _min = torch.min(arr, dim=0)
+    _max = torch.max(arr, dim=0)
+    arr = (arr - _min[0]) / (_max[0] - _min[0])
+    return arr, _min[0], _max[0]
 
 
 def standardization(arr, params: bool = False, num_modes: int = 3):
@@ -107,7 +96,7 @@ def standardization(arr, params: bool = False, num_modes: int = 3):
             arr[j, i] = (tmp-_mean[i])/_mu[i]
     return arr, _mean, _mu
 
-def reverse_min_max(arr, _max, _min, params=False, num_modes: int = 3):
+def reverse_min_max(arr, _min, _max):
     """
     This function rescale back the target values to its original range
     it rescaled it back and put it in a list then reshape it to an array
@@ -115,26 +104,16 @@ def reverse_min_max(arr, _max, _min, params=False, num_modes: int = 3):
     Parameters
     ----------
     arr : numpy array float32
-        a numpy array for example (3500,3).
+        a numpy array for example (100,3).
 
     Returns
     -------
     rescaled_output : numpy array float32
         rescaled_output: a numpy array of the same shape as input for
-        example (3500, 3).
+        example (100, 3).
 
     """
-    num_params = 0
-    if params:
-        num_params = num_modes + 5
-    else:
-        num_params = num_modes
-    rescaled_list = []
-    for i in range(len(arr)):
-        for j in range(num_params):
-            rescaled_list.append((arr[i][j] * (_max[j] - _min[j])) + _min[j])
-    rescaled_output = np.array(rescaled_list).reshape((len(arr), num_params))
-    return rescaled_output
+    return (arr * (_max - _min)) + _min
 
 def reverse_standardization(arr, _mean, _mu, params: bool = False, num_modes:int =3):
     num_params = 0

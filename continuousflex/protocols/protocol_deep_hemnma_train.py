@@ -53,11 +53,11 @@ class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
         form.addSection(label='Input')
         form.addParam('analyze_option', params.EnumParam, label='set the parameter to train on',
                       display=params.EnumParam.DISPLAY_COMBO,
-                      choices=['train on normal mode amplitudes',
-                               'tain on angles',
-                               'train on shifts',
-                               'tain on shifts and angles',
-                               ], default = OPTION_NMA,
+                      choices=['Train on Normal Mode Amplitudes',
+                               'Train on Angles',
+                               'Train on Shifts',
+                               'Train on All parameters',
+                               ], default = OPTION_ALL,
                       help='select a set of parameter to train on')
         group = form.addGroup('Train on conformational variability', condition='analyze_option == %d or analyze_option == %d'% (OPTION_NMA, OPTION_ALL))
         group.addParam('inputNMA', PointerParam, pointerClass='FlexProtAlignmentNMA',

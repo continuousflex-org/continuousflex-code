@@ -32,7 +32,7 @@ def train(imgs_path, output_path, epochs=400, batch_size=2, lr=1e-4, flag=0, dev
         DEVICE = 'cpu'
 
 
-    dataset = cryodata(imgs_path, flag=FLAG, mode = mode, transform=transforms.ToTensor())
+    dataset = cryodata(imgs_path, output_path, flag=FLAG, mode = mode, transform=transforms.ToTensor())
     print("****************************************************")
     print(output_path)
     print("****************************************************")

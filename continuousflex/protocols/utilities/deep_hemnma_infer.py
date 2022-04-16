@@ -3,14 +3,15 @@ from torchvision import transforms
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from continuousflex.protocols.utilities.processing_dh.data import cryodata
+from continuousflex.protocols.utilities.processing_dh.utils import quater2euler, reverse_min_max
 from continuousflex.protocols.utilities.processing_dh.models import deephemnma
 import numpy as np
 import torch
-from torch.utils.data.sampler import SubsetRandomSampler
-from torch.utils.tensorboard import SummaryWriter
+from pathlib import Path
 import sys
+import pwem.emlib.metadata as md
 
-def infer(imgs_path, weights_path, batch_size=2, flag=0, device=0, mode='inference'):
+def infer(imgs_path, weights_path, output_path, num_modes, batch_size=2, flag=0, device=0, mode='inference'):
     FLAG = ''
     if flag==0:
         FLAG = 'nma'
@@ -27,7 +28,7 @@ def infer(imgs_path, weights_path, batch_size=2, flag=0, device=0, mode='inferen
         DEVICE = 'cpu'
 
 
-    dataset = cryodata(imgs_path, flag=FLAG, mode = mode, transform=transforms.ToTensor())
+    dataset = cryodata(imgs_path, weights_path, flag=FLAG, mode = mode, transform=transforms.ToTensor())
 
     dataset_size = len(dataset)
     print('the train set size is: {} images'.format(dataset_size))
@@ -52,14 +53,47 @@ def infer(imgs_path, weights_path, batch_size=2, flag=0, device=0, mode='inferen
         i = 0
         for img, params in data_loader:
             pred_params = model(img.to(DEVICE), mode)
-            predictions[i * batch_size:(i + 1) * batch_size, :] = pred_params.detach()
+            predictions[i * batch_size:(i + 1) * batch_size, :] = pred_params.cpu()
             i+=1
 
+
+    if FLAG=='nma':
+        min_max_nma = np.loadtxt(str(Path(weights_path).parent) + '/min_max_nma.txt')
+        nma = reverse_min_max(predictions, min_max_nma[0], min_max_nma[1])
+    elif FLAG=='ang':
+        angles = predictions
+        euler_angles = []
+        for i in range(len(angles)):
+            euler_angles.append(quater2euler(angles))
+        euler_angles = np.array(euler_angles)
+    elif FLAG=='shf':
+        min_max_shf = np.loadtxt(str(Path(weights_path).parent) + '/min_max_shf.txt')
+        shifts = reverse_min_max(predictions, min_max_shf[0], min_max_shf[1])
+    elif FLAG=='all':
+        min_max_nma = np.loadtxt(str(Path(weights_path).parent) + '/min_max_nma.txt')
+        min_max_shf = np.loadtxt(str(Path(weights_path).parent) + '/min_max_shf.txt')
+        nma = reverse_min_max(predictions[:,:num_modes], min_max_nma[0], min_max_nma[1])
+        angles = predictions[:,num_modes:num_modes+4]
+        shifts = reverse_min_max(predictions[:,num_modes+4:], min_max_shf[0], min_max_shf[1])
+        euler_angles = []
+        for i in range(len(angles)):
+            euler_angles.append(quater2euler(angles[i]))
+        euler_angles = np.array(euler_angles)
+        mdImgs = md.MetaData(imgs_path)
+        imgPath = []
+        for objId in mdImgs:
+            imgPath.append(mdImgs.getValue(md.MDL_IMAGE, objId))
+        with open(output_path+'/images.xmd', 'w') as f:
+            f.write('# XMIPP_STAR_1 * \n # \ndata_noname\nloop_\n _image\n _enabled\n _angleRot\n _angleTilt\n _anglePsi\n _shiftX\n _shiftY\n _nmaDisplacements\n')
+            for i in range(euler_angles.shape[0]):
+                f.write(imgPath[i]+"                    1 {:>12.6} {:>12.6} {:>12.6} {:>12.6} {:>12.6} '{:>12.6} {:>12.6} {:>12.6}'".format(
+                    euler_angles[i, 0], euler_angles[i, 1], euler_angles[i, 2], shifts[i, 0],
+                        shifts[i, 1], nma[i,0], nma[i,1], nma[i,2]) + '\n')
 if __name__ == '__main__':
     infer(sys.argv[1],
           sys.argv[2],
-          int(sys.argv[3]),
+          sys.argv[3],
           int(sys.argv[4]),
           int(sys.argv[5]),
-          sys.argv[6])
-    sys.exit()
+          int(sys.argv[6]),
+          int(sys.argv[7]))
