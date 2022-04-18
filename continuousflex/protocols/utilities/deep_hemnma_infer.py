@@ -37,7 +37,7 @@ def infer(imgs_path, weights_path, output_path, num_modes, batch_size=2, flag=0,
 
     if FLAG=='nma':
         model = deephemnma(3).to(DEVICE)
-        predictions = np.zeros((dataset_size, 3), dtype='float32')
+        predictions = np.zeros((dataset_size, num_modes), dtype='float32')
     elif FLAG=='ang':
         model = deephemnma(4).to(DEVICE)
         predictions = np.zeros((dataset_size, 4), dtype='float32')
@@ -46,7 +46,7 @@ def infer(imgs_path, weights_path, output_path, num_modes, batch_size=2, flag=0,
         predictions = np.zeros((dataset_size, 2), dtype='float32')
     elif FLAG=='all':
         model = deephemnma(9).to(DEVICE)
-        predictions = np.zeros((dataset_size, 9), dtype='float32')
+        predictions = np.zeros((dataset_size, 6+num_modes), dtype='float32')
 
     model.load_state_dict(torch.load(weights_path))
     with torch.no_grad():
@@ -84,11 +84,11 @@ def infer(imgs_path, weights_path, output_path, num_modes, batch_size=2, flag=0,
         for objId in mdImgs:
             imgPath.append(mdImgs.getValue(md.MDL_IMAGE, objId))
         with open(output_path+'/images.xmd', 'w') as f:
-            f.write('# XMIPP_STAR_1 * \n # \ndata_noname\nloop_\n _image\n _enabled\n _angleRot\n _angleTilt\n _anglePsi\n _shiftX\n _shiftY\n _nmaDisplacements\n')
+            f.write('# XMIPP_STAR_1 * \n # \ndata_noname\nloop_\n _image\n _enabled\n _angleRot\n _angleTilt\n _anglePsi\n _shiftX\n _shiftY\n _nmaDisplacements\n _cost\n _itemId\n')
             for i in range(euler_angles.shape[0]):
-                f.write(imgPath[i]+"                    1 {:>12.6} {:>12.6} {:>12.6} {:>12.6} {:>12.6} '{:>12.6} {:>12.6} {:>12.6}'".format(
+                f.write(imgPath[i]+"                    1 {:>12.6} {:>12.6} {:>12.6} {:>12.6} {:>12.6} '{:>12.6} {:>12.6} {:>12.6}'   0.55  {}".format(
                     euler_angles[i, 0], euler_angles[i, 1], euler_angles[i, 2], shifts[i, 0],
-                        shifts[i, 1], nma[i,0], nma[i,1], nma[i,2]) + '\n')
+                        shifts[i, 1], nma[i,0], nma[i,1], nma[i,2], i+1) + '\n')
 if __name__ == '__main__':
     infer(sys.argv[1],
           sys.argv[2],

@@ -4,7 +4,7 @@ class mlp(nn.Module):
     def __init__(self, output):
         super(mlp, self).__init__()
 
-        hidden_dims = [8192,1000,512, 128]
+        hidden_dims = [512,1000, 512, 128]
         modules = []
         for i in range(len(hidden_dims)-1):
             modules.append(nn.Sequential(nn.Linear(hidden_dims[i], hidden_dims[i+1]),

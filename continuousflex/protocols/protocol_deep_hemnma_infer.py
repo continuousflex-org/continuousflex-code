@@ -31,6 +31,12 @@ from pwem.protocols import ProtAnalysis3D
 from subprocess import check_call
 import sys
 import continuousflex
+from pyworkflow.utils.path import copyFile
+import pwem as em
+import pwem.emlib.metadata as md
+from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
+                            getImageLocation, createItemMatrix,
+                            setXmippAttributes)
 
 
 OPTION_NMA = 0
@@ -97,11 +103,13 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
     
     def performDeepHEMNMAStep(self):
         weights = self.trained_model.get()._getExtraPath('weights.pth')
+        #copyFile(self.inputParticles.get('atoms.pdb'), self._getExtraPath('atoms.pdb'))
+        #copyFile(self.inputParticles.get('modes.pdb'), self._getExtraPath('modes.pdb'))
         batch_size = self.batch_size.get()
         mode = self.analyze_option.get()
         device = self.device_option.get()
         num_modes = self.num_modes.get()
-        self.imgsFn = self._getExtraPath('inference.xmd')
+        self.imgsFn = self._getExtraPath('particles.xmd')
         print("*****************************************")
         print(self.imgsFn)
         print("*****************************************")
@@ -113,9 +121,16 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
 
         
     def createOutputStep(self):
-        pass
+        inputSet = self.inputParticles.get()
+        partSet = self._createSetOfParticles()
+        partSet.copyItems(inputSet,
+                          updateItemCallback=self._updateParticle,
+                          itemDataIterator=md.iterRows(self.imgsFn, sortByLabel=md.MDL_ITEM_ID))
+
+        self._defineOutputs(outputParticles=partSet)
+
     def convertInputStep(self):
-        xmipp3.convert.writeSetOfParticles(self.inputParticles.get(), self._getExtraPath('inference.xmd'))
+        xmipp3.convert.writeSetOfParticles(self.inputParticles.get(), self._getExtraPath('particles.xmd'))
     #--------------------------- INFO functions --------------------------------------------
     def _summary(self):
         summary = []
@@ -152,3 +167,7 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
     
     def getProjectorFile(self):
         return self.mappingFile.get()
+    def _updateParticle(self, item, row):
+        setXmippAttributes(item, row, md.MDL_ANGLE_ROT, md.MDL_ANGLE_TILT, md.MDL_ANGLE_PSI, md.MDL_SHIFT_X,
+                           md.MDL_SHIFT_Y, md.MDL_FLIP, md.MDL_NMA, md.MDL_COST)
+        createItemMatrix(item, row, align=em.ALIGN_PROJ)
