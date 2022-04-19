@@ -112,6 +112,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                       label='Radius')
         form.addParam('alpha', FloatParam, default=None, allowsNull=True,
                         label='Transparancy')
+        form.addParam("dataSet", StringParam, default= "", label="Data set label")
         form.addParam('displayPcaSingularValues', LabelParam,
                       label="Display PCA singular values",
                       help="The values should help you see how many dimensions are in the data ")
@@ -154,6 +155,9 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         pass
 
     def getData(self):
+
+        dataSet = self.dataSet.get().split(";")
+        n_data = len(dataSet)
         data = Data()
         pdb_matrix = np.loadtxt(self.protocol.getOutputMatrixFile())
         for i in range(pdb_matrix.shape[0]):
