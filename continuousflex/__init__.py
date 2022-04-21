@@ -38,6 +38,7 @@ class Plugin(pwem.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
     _pathVars = [CONTINUOUSFLEX_HOME]
     _supportedVersions = [VV]
+    _url = CONTINUOUSFLEX_URL
 
     @classmethod
     def _defineVariables(cls):
@@ -45,6 +46,7 @@ class Plugin(pwem.Plugin):
         cls._defineEmVar(NMA_HOME,'nma')
         cls._defineEmVar(GENESIS_HOME, 'genesis/nmmd')
         cls._defineVar(VMD_HOME,'/usr/local/lib/vmd')
+        cls._defineVar(MATLAB_HOME, '~/programs/Matlab')
 
     #   @classmethod
     #   def getEnviron(cls):
