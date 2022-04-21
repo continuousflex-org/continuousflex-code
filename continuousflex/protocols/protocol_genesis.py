@@ -230,7 +230,7 @@ class ProtGenesis(EMProtocol):
         # Experiments =================================================================================================
         form.addSection(label='EM data')
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
-                      choices=['None', 'Volume (s)', 'Image (s)'], important=True,
+                      choices=['None', 'Volume'], important=True,
                       help="Type of cryo-EM data to be processed")
 
         group = form.addGroup('Fitting parameters', condition="EMfitChoice!=0")
@@ -254,7 +254,7 @@ class ProtGenesis(EMProtocol):
         # Volumes
         group = form.addGroup('Volume Parameters', condition="EMfitChoice==1")
         group.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
-                      label="Input volume (s)", help='Select the target EM density volume',
+                      label="Input volume", help='Select the target EM density volume',
                       condition="EMfitChoice==1", important=True)
         group.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
                       help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==1")
