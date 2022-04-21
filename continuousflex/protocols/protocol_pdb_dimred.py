@@ -37,28 +37,10 @@ from joblib import dump
 from .utilities.genesis_utilities import dcd2numpyArr
 from .utilities.pdb_handler import ContinuousFlexPDBHandler
 
-DIMRED_PCA = 0
-DIMRED_LTSA = 1
-DIMRED_DM = 2
-DIMRED_LLTSA = 3
-DIMRED_LPP = 4
-DIMRED_KPCA = 5
-DIMRED_PPCA = 6
-DIMRED_LE = 7
-DIMRED_HLLE = 8
-DIMRED_SPE = 9
-DIMRED_NPE = 10
-DIMRED_SKLEAN_PCA = 11
-
 PDB_SOURCE_SUBTOMO = 0
 PDB_SOURCE_PATTERN = 1
 PDB_SOURCE_OBJECT = 2
 PDB_SOURCE_TRAJECT = 3
-
-# Values to be passed to the program
-DIMRED_VALUES = ['PCA', 'LTSA', 'DM', 'LLTSA', 'LPP', 'kPCA', 'pPCA', 'LE', 'HLLE', 'SPE', 'NPE', 'sklearn_PCA','None']
-DIMRED_MAPPINGS = [DIMRED_PCA, DIMRED_LLTSA, DIMRED_LPP, DIMRED_PPCA, DIMRED_NPE]
-
 
 class FlexProtDimredPdb(ProtAnalysis3D):
     """ Protocol for applying dimentionality reduction on PDB files. """
