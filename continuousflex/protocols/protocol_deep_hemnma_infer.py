@@ -123,6 +123,8 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
     def createOutputStep(self):
         inputSet = self.inputParticles.get()
         partSet = self._createSetOfParticles()
+        partSet.copyInfo(inputSet)
+        self.imgsFn = self._getExtraPath('images.xmd')
         partSet.copyItems(inputSet,
                           updateItemCallback=self._updateParticle,
                           itemDataIterator=md.iterRows(self.imgsFn, sortByLabel=md.MDL_ITEM_ID))
@@ -167,6 +169,8 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
     
     def getProjectorFile(self):
         return self.mappingFile.get()
+
+
     def _updateParticle(self, item, row):
         setXmippAttributes(item, row, md.MDL_ANGLE_ROT, md.MDL_ANGLE_TILT, md.MDL_ANGLE_PSI, md.MDL_SHIFT_X,
                            md.MDL_SHIFT_Y, md.MDL_FLIP, md.MDL_NMA, md.MDL_COST)

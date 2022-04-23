@@ -139,7 +139,7 @@ class FlexDeepHEMNMAinferViewer(ProtocolViewer):
 
             for modeNumber in components:
                 found = False
-                md = MetaData(self.protocol._getExtraPath('modes.xmd'))
+                md = MetaData(self.protocol.trained_model.get().inputNMA.get()._getExtraPath('modes.xmd'))
                 for i, objId in enumerate(md):
                     modeId = md.getValue(MDL_ORDER, objId)
                     if modeNumber == modeId:
