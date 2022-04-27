@@ -6,3 +6,4 @@ torchvision==0.11.2
 tensorboard==2.8.0
 tqdm
 #scikit-image
+mrcfile

@@ -103,7 +103,6 @@ keywords = ""
   doi= {https://doi.org/10.1002/pro.3772}
 }
 
-
 @article{moebel2020monte,
   title={A Monte Carlo framework for missing wedge restoration and noise removal in cryo-electron tomography},
   author={Moebel, Emmanuel and Kervrann, Charles},
@@ -112,6 +111,49 @@ keywords = ""
   pages={100013},
   year={2020},
   publisher={Elsevier}
+}
+
+@article{vuillemot2022NMMD,
+title = {NMMD: Efficient Cryo-EM Flexible Fitting Based on Simultaneous Normal Mode and Molecular Dynamics atomic displacements},
+journal = {Journal of Molecular Biology},
+volume = {434},
+number = {7},
+pages = {167483},
+year = {2022},
+issn = {0022-2836},
+doi = {https://doi.org/10.1016/j.jmb.2022.167483},
+url = {https://www.sciencedirect.com/science/article/pii/S0022283622000523},
+author = {Rémi Vuillemot and Osamu Miyashita and Florence Tama and Isabelle Rouiller and Slavica Jonic}
+}
+
+@article{kobayashi2017genesis,
+author = {Kobayashi, Chigusa and Jung, Jaewoon and Matsunaga, Yasuhiro and Mori, Takaharu and Ando, Tadashi and Tamura, Koichi and Kamiya, Motoshi and Sugita, Yuji},
+title = {GENESIS 1.1: A hybrid-parallel molecular dynamics simulator with enhanced sampling algorithms on multiple computational platforms},
+journal = {Journal of Computational Chemistry},
+volume = {38},
+number = {25},
+pages = {2193-2206},
+keywords = {molecular dynamics, string method, replica exchange molecular dynamics, graphics processing unit, multiple time step integration},
+doi = {https://doi.org/10.1002/jcc.24874},
+url = {https://onlinelibrary.wiley.com/doi/abs/10.1002/jcc.24874},
+eprint = {https://onlinelibrary.wiley.com/doi/pdf/10.1002/jcc.24874},
+abstract = {GENeralized-Ensemble SImulation System (GENESIS) is a software package for molecular dynamics (MD) simulation of biological systems. It is designed to extend limitations in system size and accessible time scale by adopting highly parallelized schemes and enhanced conformational sampling algorithms. In this new version, GENESIS 1.1, new functions and advanced algorithms have been added. The all-atom and coarse-grained potential energy functions used in AMBER and GROMACS packages now become available in addition to CHARMM energy functions. The performance of MD simulations has been greatly improved by further optimization, multiple time-step integration, and hybrid (CPU + GPU) computing. The string method and replica-exchange umbrella sampling with flexible collective variable choice are used for finding the minimum free-energy pathway and obtaining free-energy profiles for conformational changes of a macromolecule. These new features increase the usefulness and power of GENESIS for modeling and simulation in biological research. © 2017 Wiley Periodicals, Inc.},
+year = {2017}
+}
+
+@article{CHEN2013235,
+title = {Fast and accurate reference-free alignment of subtomograms},
+journal = {Journal of Structural Biology},
+volume = {182},
+number = {3},
+pages = {235-245},
+year = {2013},
+issn = {1047-8477},
+doi = {https://doi.org/10.1016/j.jsb.2013.03.002},
+url = {https://www.sciencedirect.com/science/article/pii/S1047847713000737},
+author = {Yuxiang Chen and Stefan Pfeffer and Thomas Hrabe and Jan Michael Schuller and Friedrich Förster},
+keywords = {Cryo-electron tomography, Subtomogram averaging, Spherical harmonics},
+abstract = {In cryoelectron tomography alignment and averaging of subtomograms, each dnepicting the same macromolecule, improves the resolution compared to the individual subtomogram. Major challenges of subtomogram alignment are noise enhancement due to overfitting, the bias of an initial reference in the iterative alignment process, and the computational cost of processing increasingly large amounts of data. Here, we propose an efficient and accurate alignment algorithm via a generalized convolution theorem, which allows computation of a constrained correlation function using spherical harmonics. This formulation increases computational speed of rotational matching dramatically compared to rotation search in Cartesian space without sacrificing accuracy in contrast to other spherical harmonic based approaches. Using this sampling method, a reference-free alignment procedure is proposed to tackle reference bias and overfitting, which also includes contrast transfer function correction by Wiener filtering. Application of the method to simulated data allowed us to obtain resolutions near the ground truth. For two experimental datasets, ribosomes from yeast lysate and purified 20S proteasomes, we achieved reconstructions of approximately 20Å and 16Å, respectively. The software is ready-to-use and made public to the community.}
 }
 
 """
