@@ -366,8 +366,6 @@ class testGENESIS(TestWorkflow):
             assert (rmsd_inp > rmsd_out2)
             # assert (rmsd2[-1] < 3.0)
 
-
-
     # def test3_MDCHARMM(self):
     #     # Import PDB
     #     protPdbIonize = self.newProtocol(ProtImportPdb, inputPdbData=1,
