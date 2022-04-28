@@ -68,7 +68,7 @@ class ProtGenesis(EMProtocol):
                        help='Provide a GENESIS protocol to restart.', condition="restartChoice" ,important=True)
 
         form.addParam('inputPDB', params.PointerParam,
-                      pointerClass='AtomStruct,SetOfAtomStructs,SetOfPDBs', label="Input PDB (s)",
+                      pointerClass='AtomStruct', label="Input PDB",
                       help='Select the input PDB.', important=True, condition="not restartChoice" )
         form.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
                       default=False, help="Center the input PDBs with the center of mass", condition="not restartChoice" )
@@ -230,7 +230,7 @@ class ProtGenesis(EMProtocol):
         # Experiments =================================================================================================
         form.addSection(label='EM data')
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
-                      choices=['None', 'Volume (s)', 'Image (s)'], important=True,
+                      choices=['None', 'Volume'], important=True,
                       help="Type of cryo-EM data to be processed")
 
         group = form.addGroup('Fitting parameters', condition="EMfitChoice!=0")
@@ -253,8 +253,8 @@ class ProtGenesis(EMProtocol):
 
         # Volumes
         group = form.addGroup('Volume Parameters', condition="EMfitChoice==1")
-        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
-                      label="Input volume (s)", help='Select the target EM density volume',
+        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume",
+                      label="Input volume", help='Select the target EM density volume',
                       condition="EMfitChoice==1", important=True)
         group.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
                       help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==1")
