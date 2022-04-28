@@ -42,8 +42,8 @@ import pyworkflow.utils as pwutils
 from pyworkflow.utils import runCommand
 
 class ProtGenesis(EMProtocol):
-    """ Protocol to perform MD simulation using GENESIS. """
-    _label = 'Genesis'
+    """ Protocol to perform MD/NMMD simulation based on GENESIS. """
+    _label = 'MD-NMMD-Genesis'
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
