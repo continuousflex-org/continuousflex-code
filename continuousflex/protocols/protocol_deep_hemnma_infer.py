@@ -30,6 +30,7 @@ import pyworkflow.protocol.params as params
 from pwem.protocols import ProtAnalysis3D
 from subprocess import check_call
 import sys
+from os.path import isfile
 import continuousflex
 from pyworkflow.utils.path import copyFile
 import pwem as em
@@ -88,18 +89,15 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
     #--------------------------- STEPS functions --------------------------------------------   
     
     def convertInputStep(self):
-        pass
-        # """ Iterate through the images and write the
-        # plain deformation.txt file that will serve as
-        # input for dimensionality reduction.
-        # """
-        # inputSet = self.getInputParticles()
-        # f = open(deformationFile, 'w')
-        #
-        # for particle in inputSet:
-        #     f.write(' '.join(particle._xmipp_nmaDisplacements))
-        #     f.write('\n')
-        # f.close()
+        xmipp3.convert.writeSetOfParticles(self.inputParticles.get(), self._getExtraPath('particles.xmd'))
+        # copy atoms or pseudoatoms file from HEMNMA
+        file = self.trained_model.get().inputNMA.get()._getExtraPath('atoms.pdb')
+        if isfile(file):
+            copyFile(file, self._getExtraPath('atoms.pdb'))
+        else:
+            copyFile(self.trained_model.get().inputNMA.get()._getExtraPath('pseudoatoms.pdb'), self._getExtraPath('pseudoatoms.pdb'))
+
+
     
     def performDeepHEMNMAStep(self):
         weights = self.trained_model.get()._getExtraPath('weights.pth')
@@ -110,9 +108,6 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
         device = self.device_option.get()
         num_modes = self.num_modes.get()
         self.imgsFn = self._getExtraPath('particles.xmd')
-        print("*****************************************")
-        print(self.imgsFn)
-        print("*****************************************")
         params = " %s %s %s %d %d %d %d" % (self.imgsFn, weights, self._getExtraPath(), num_modes, batch_size, mode, device)
         script_path = continuousflex.__path__[0]+'/protocols/utilities/deep_hemnma_infer.py'
         command = "python " + script_path + params
@@ -125,14 +120,20 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
         partSet = self._createSetOfParticles()
         partSet.copyInfo(inputSet)
         self.imgsFn = self._getExtraPath('images.xmd')
+        copyFile(self.imgsFn, self._getExtraPath('infer.xmd'))
         partSet.copyItems(inputSet,
                           updateItemCallback=self._updateParticle,
                           itemDataIterator=md.iterRows(self.imgsFn, sortByLabel=md.MDL_ITEM_ID))
-
+        partSet.copyItems(self.trained_model.get().inputNMA.get().outputParticles)
         self._defineOutputs(outputParticles=partSet)
+        # Lets write a metadata that combines both of these training and inference sets:
+        fn_train = self.trained_model.get().inputNMA.get()._getExtraPath('images.xmd')
+        fn_infer = self._getExtraPath('infer.xmd')
+        fn_combined = self._getExtraPath('images.xmd')
+        args = '-i %(fn_train)s -o %(fn_combined)s --set union %(fn_infer)s' % locals()
+        self.runJob('xmipp_metadata_utilities', args)
 
-    def convertInputStep(self):
-        xmipp3.convert.writeSetOfParticles(self.inputParticles.get(), self._getExtraPath('particles.xmd'))
+
     #--------------------------- INFO functions --------------------------------------------
     def _summary(self):
         summary = []

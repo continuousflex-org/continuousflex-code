@@ -175,10 +175,11 @@ class FlexDeepHEMNMAinferViewer(ProtocolViewer):
             else:
                 self.getData().YIND = modeList[1]
                 if dim == 2:
-                    plotter.plotArray2D("Normal-mode amplitudes: %s vs %s" % tuple(baseList), *baseList)
+                    # plotter.plotArray2D("Normal-mode amplitudes: %s vs %s" % tuple(baseList), *baseList)
+                    plotter.plotArray2D_xy("Normal-mode amplitudes: %s vs %s" % tuple(baseList), *baseList)
                 elif dim == 3:
                     self.getData().ZIND = modeList[2]
-                    plotter.plotArray3D("Normal-mode amplitudes: %s %s %s" % tuple(baseList), *baseList)
+                    plotter.plotArray3D_xyz("Normal-mode amplitudes: %s %s %s" % tuple(baseList), *baseList)
             views.append(plotter)
 
         return views
@@ -193,5 +194,6 @@ class FlexDeepHEMNMAinferViewer(ProtocolViewer):
             pointData = list(map(float, particle._xmipp_nmaDisplacements))
             data.addPoint(Point(pointId=particle.getObjId(),
                                 data=pointData,
-                                weight=particle._xmipp_cost.get()))
+                                # weight=particle._xmipp_cost.get()))
+                                weight=0))
         return data
