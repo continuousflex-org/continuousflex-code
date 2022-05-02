@@ -32,7 +32,7 @@ import mrcfile
 from pwem.emlib.image import ImageHandler
 from pwem.utils import runProgram
 from pyworkflow.utils import getListFromRangeString
-
+import multiprocessing
 
 from .utilities.genesis_utilities import *
 from .utilities.pdb_handler import ContinuousFlexPDBHandler
@@ -294,7 +294,7 @@ class ProtGenesis(EMProtocol):
         group.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
                       help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==2")
 
-        form.addParallelSection(threads=1, mpi=1)
+        form.addParallelSection(threads=multiprocessing.cpu_count()//2-1, mpi=multiprocessing.cpu_count()//2-1)
         # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):

@@ -33,6 +33,7 @@ from pwem.utils import runProgram
 from pwem import Domain
 from .convert import eulerAngles2matrix, matrix2eulerAngles
 import numpy as np
+import multiprocessing
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -156,7 +157,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         line.addParam('frm_maxshift', params.IntParam, default=10,
                       label='Maximum shift search (in pixels)',
                       help='')
-        form.addParallelSection(threads=0, mpi=5)
+        form.addParallelSection(threads=0, mpi=multiprocessing.cpu_count()//2-1)
 
     # --------------------------- INSERT steps functions --------------------------------------------
 
