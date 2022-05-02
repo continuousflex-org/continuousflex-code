@@ -84,6 +84,7 @@ class TestDeepHEMNMA1(TestWorkflow):
                                       chooseAtRandom=True,
                                       nElements=3)
         protSubset1.inputFullSet.set(protImportParts.outputParticles)
+        # protSubset1.inputFullSet.set(protResizeParts.outputParticles)
         self.launchProtocol(protSubset1)
 
 
@@ -91,6 +92,7 @@ class TestDeepHEMNMA1(TestWorkflow):
                                          objLabel='Inference set',
                                          chooseAtRandom=False,
                                          setOperation=1)
+        # protSubset2.inputFullSet.set(protResizeParts.outputParticles)
         protSubset2.inputFullSet.set(protImportParts.outputParticles)
         protSubset2.inputSubSet.set(protSubset1.outputParticles)
         self.launchProtocol(protSubset2)
@@ -116,51 +118,48 @@ class TestDeepHEMNMA1(TestWorkflow):
 
 
 
-class TestDeepHEMNMA2(TestWorkflow):
-    @classmethod
-    def setUpClass(cls):
-        setupTestProject(cls)
-        cls.dataset = DataSet.getDataSet('relion_tutorial')
-        cls.vol = cls.dataset.getFile('volume')
-
-    def testXmippProjMatching(self):
-        print("Import Particles")
-        protImportParts = self.newProtocol(ProtImportParticles,
-                                           objLabel='Particles from scipion',
-                                           importFrom=ProtImportParticles.IMPORT_FROM_SCIPION,
-                                           sqliteFile=self.dataset.getFile('import/case2/particles.sqlite'),
-                                           magnification=50000,
-                                           samplingRate=7.08,
-                                           haveDataBeenPhaseFlipped=True
-                                           )
-        self.launchProtocol(protImportParts)
-        self.assertIsNotNone(protImportParts.getFiles(), "There was a problem with the import")
-
-        protSubset1 = self.newProtocol(ProtSubSet,
-                                      objLabel='Training set',
-                                      chooseAtRandom=True,
-                                      nElements=100)
-        protSubset1.inputFullSet.set(protImportParts.outputParticles)
-        self.launchProtocol(protSubset1)
-
-
-        protSubset2 = self.newProtocol(ProtSubSet,
-                                         objLabel='Inference set',
-                                         chooseAtRandom=False,
-                                         setOperation=1)
-        protSubset2.inputFullSet.set(protImportParts.outputParticles)
-        protSubset2.inputSubSet.set(protSubset1.outputParticles)
-        self.launchProtocol(protSubset2)
-
-        protTrain = self.newProtocol(FlexProtDeepHEMNMATrain)
-        protTrain.analyze_option.set(2) #angles and shifts
-        protTrain.inputParticles.set(protSubset1.outputParticles)
-        self.launchProtocol(protTrain)
-
-        protInfer = self.newProtocol(FlexProtDeepHEMNMAInfer)
-        protInfer.trained_model.set(protTrain) #angles and shifts
-        protInfer.inputParticles.set(protSubset2.outputParticles)
-        self.launchProtocol(protInfer)
-
-
-
+# class TestDeepHEMNMA2(TestWorkflow):
+#     @classmethod
+#     def setUpClass(cls):
+#         setupTestProject(cls)
+#         cls.dataset = DataSet.getDataSet('relion_tutorial')
+#         cls.vol = cls.dataset.getFile('volume')
+#
+#     def testXmippProjMatching(self):
+#         print("Import Particles")
+#         protImportParts = self.newProtocol(ProtImportParticles,
+#                                            objLabel='Particles from scipion',
+#                                            importFrom=ProtImportParticles.IMPORT_FROM_SCIPION,
+#                                            sqliteFile=self.dataset.getFile('import/case2/particles.sqlite'),
+#                                            magnification=50000,
+#                                            samplingRate=7.08,
+#                                            haveDataBeenPhaseFlipped=True
+#                                            )
+#         self.launchProtocol(protImportParts)
+#         self.assertIsNotNone(protImportParts.getFiles(), "There was a problem with the import")
+#
+#         protSubset1 = self.newProtocol(ProtSubSet,
+#                                       objLabel='Training set',
+#                                       chooseAtRandom=True,
+#                                       nElements=100)
+#         protSubset1.inputFullSet.set(protImportParts.outputParticles)
+#         self.launchProtocol(protSubset1)
+#
+#
+#         protSubset2 = self.newProtocol(ProtSubSet,
+#                                          objLabel='Inference set',
+#                                          chooseAtRandom=False,
+#                                          setOperation=1)
+#         protSubset2.inputFullSet.set(protImportParts.outputParticles)
+#         protSubset2.inputSubSet.set(protSubset1.outputParticles)
+#         self.launchProtocol(protSubset2)
+#
+#         protTrain = self.newProtocol(FlexProtDeepHEMNMATrain)
+#         protTrain.analyze_option.set(2) #angles and shifts
+#         protTrain.inputParticles.set(protSubset1.outputParticles)
+#         self.launchProtocol(protTrain)
+#
+#         protInfer = self.newProtocol(FlexProtDeepHEMNMAInfer)
+#         protInfer.trained_model.set(protTrain) #angles and shifts
+#         protInfer.inputParticles.set(protSubset2.outputParticles)
+#         self.launchProtocol(protInfer)

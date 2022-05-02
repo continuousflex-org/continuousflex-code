@@ -32,6 +32,7 @@ from pwem.protocols import ProtAnalysis3D
 from subprocess import check_call
 import sys
 import continuousflex
+from pyworkflow import BETA
 
 OPTION_NMA = 0
 OPTION_ANGLES = 1
@@ -46,7 +47,8 @@ class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
     """ DeepHEMNMA protocol, a neural network that learns the rigid-body parameters and the normal mode
         amplitudes estimated by HEMNMA protocol.
     """
-    _label = 'deephemnma train'
+    _label = 'deep hemnma train'
+    _devStatus = BETA
 
     #--------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):

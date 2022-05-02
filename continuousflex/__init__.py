@@ -127,14 +127,21 @@ class Plugin(pwem.Plugin):
                        commands=[('git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; '
                                   './configure LDFLAGS=-L%s ;'
                                   'make install;' % (target_branch,env.getLibFolder()), "bin/atdyn")],
-                       neededProgs=['mpif90'],default=True)
+                       neededProgs=['mpif90'], default=True)
 
-        try:
-            env.addPipModule('pycuda', version='2020.1', default=True)
-            env.addPipModule('farneback3d', version='0.1.3', default=True)
-        except:
-            print('Installation of PyCuda and Farneback-3D was not successful,'
-                  ' you will not be able to use Cuda related programs')
+        env.addPackage('DeepLearning', version='1.0',
+                       tar='void.tgz',
+                       buildDir='DeepLearning',
+                       commands=[('pip install -U torch==1.10.1 torchvision==0.11.2 tensorboard==2.8.0 tqdm==4.64.0'
+                                  ' && touch DeepLearning_Installed','DeepLearning_Installed')],
+                       default=True)
+
+        env.addPackage('OpticalFlow', version='1.0',
+                       tar='void.tgz',
+                       commands=[('pip install -U pycuda==2020.1 farneback3d==0.1.3 && touch OpticalFlow_Installed',
+                                  'OpticalFlow_Installed')],
+                       neededProgs=[''],
+                       default=True)
 
 
 files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol': 'volumes/AK_LP10.vol',

@@ -38,6 +38,7 @@ import pwem.emlib.metadata as md
 from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
                             getImageLocation, createItemMatrix,
                             setXmippAttributes)
+from pyworkflow import BETA
 
 
 OPTION_NMA = 0
@@ -52,6 +53,8 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
     """ This protocol is DeepHEMNMA
     """
     _label = 'deep hemnma infer'
+    _devStatus = BETA
+
     
     #--------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
