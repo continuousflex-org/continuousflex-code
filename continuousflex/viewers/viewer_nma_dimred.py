@@ -364,7 +364,7 @@ class FlexDimredNMAViewer(ProtocolViewer):
         if prot.getDataChoice() == 'NMAs':
             pdb = prot.getInputPdb()
             pdbFile = pdb.getFileName()
-            modesFn = prot.inputNMA.get()._getExtraPath('modes.xmd')
+            modesFn = prot.getInputModes()
             for i, d in enumerate(deformations):
                 atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i + 1)
                 cmd = '-o %s --pdb %s --nma %s --deformations ' % (atomsFn, pdbFile, modesFn)

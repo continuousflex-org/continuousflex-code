@@ -31,7 +31,7 @@ from pwem.convert import cifToPdb
 from pyworkflow.utils.path import makePath, copyFile
 from pyworkflow.protocol import params
 from pwem.utils import runProgram
-
+from continuousflex.protocols import FlexProtAlignmentNMA
 
 import numpy as np
 import glob
@@ -77,7 +77,7 @@ class FlexProtDimredNMA(ProtAnalysis3D):
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
-        form.addParam('inputNMA', PointerParam, pointerClass='FlexProtAlignmentNMA',
+        form.addParam('inputNMA', PointerParam, pointerClass='FlexProtAlignmentNMA, FlexProtDeepHEMNMAInfer',
                       label="Conformational distribution",
                       help='Select a previous run of the NMA alignment.')
 
@@ -178,7 +178,7 @@ class FlexProtDimredNMA(ProtAnalysis3D):
             pdbfn = self._getExtraPath('pdb_file.pdb')
             self.copyinputPdb(input_pdbfn, pdbfn)
             # use the deformations to generate deformed versions of the pdb:
-            selected_nma_modes = self.inputNMA.get()._getExtraPath('modes.xmd')
+            selected_nma_modes = self.getInputModes()
             nma_amplfn = self._getExtraPath('nma_amplitudes.txt')
             f = open(nma_amplfn, 'w')
             for particle in inputSet:
@@ -264,6 +264,11 @@ class FlexProtDimredNMA(ProtAnalysis3D):
         return []
 
     # --------------------------- UTILS functions --------------------------------------------
+    def getInputModes(self):
+        if isinstance(self.inputNMA, FlexProtAlignmentNMA):
+            return self.inputNMA.get()._getExtraPath('modes.xmd')
+        else:
+            return self.inputNMA.get().trained_model.get().inputNMA.get()._getExtraPath('modes.xmd')
 
     def getInputParticles(self):
         """ Get the output particles of the input NMA protocol. """
@@ -274,7 +279,11 @@ class FlexProtDimredNMA(ProtAnalysis3D):
         return self.inputNMA.get()._getExtraPath('images.xmd')
 
     def getInputPdb(self):
-        return self.inputNMA.get().getInputPdb()
+        if isinstance(self.inputNMA, FlexProtAlignmentNMA):
+            return self.inputNMA.get().getInputPdb()
+        else:
+            return self.inputNMA.get().trained_model.get().inputNMA.get().getInputPdb()
+
 
     def getOutputMatrixFile(self):
         return self._getExtraPath('output_matrix.txt')
