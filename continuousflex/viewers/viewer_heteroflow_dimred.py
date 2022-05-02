@@ -46,7 +46,6 @@ from pwem.viewers.viewer_chimera import Chimera
 
 from joblib import load, dump
 from continuousflex.protocols.utilities.spider_files3 import open_volume, save_volume
-
 import matplotlib.pyplot as plt
 from pwem.emlib.image import ImageHandler
 

@@ -44,7 +44,7 @@ class Plugin(pwem.Plugin):
     def _defineVariables(cls):
         cls._defineEmVar(CONTINUOUSFLEX_HOME, 'xmipp')
         cls._defineEmVar(NMA_HOME,'nma')
-        cls._defineEmVar(GENESIS_HOME, 'genesis-1.4.0')
+        cls._defineEmVar(GENESIS_HOME, 'MD-NMMD-Genesis-1.0')
         cls._defineVar(VMD_HOME,'/usr/local/lib/vmd')
         cls._defineVar(MATLAB_HOME, '~/programs/Matlab')
 
@@ -121,22 +121,20 @@ class Plugin(pwem.Plugin):
                                   % env.getLibFolder(), 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
-        if os.path.exists(env.getEmFolder() + '/genesis.tgz'):
-            os.system('rm ' + env.getEmFolder() + '/genesis.tgz')
-
         target_branch = "nmmd"
-        env.addPackage('genesis', version='1.4.0', deps=[lapack],
-                       url='https://github.com/mms29/nmmd/archive/%s.tar.gz' %target_branch,
-                       tar='genesis.tgz',
-                       createBuildDir=True,
-                       buildDir='genesis',
-                       commands=[('tar -xf ../genesis.tgz -C .;'
-                                  'mv nmmd-%s/* .;'
-                                  'rm -r nmmd-%s;'
+        env.addPackage('MD-NMMD-Genesis', version='1.0', deps=[lapack],
+                       buildDir='MD-NMMD-Genesis', tar="void.tgz",
+                       commands=[('git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; '
                                   './configure LDFLAGS=-L%s ;'
-                                  'make install;' % (target_branch,target_branch,env.getLibFolder()), "bin/atdyn")],
-                       neededProgs=['mpif90'],
-                       target="genesis", default=False)
+                                  'make install;' % (target_branch,env.getLibFolder()), "bin/atdyn")],
+                       neededProgs=['mpif90'],default=True)
+
+        try:
+            env.addPipModule('pycuda', version='2020.1', default=True)
+            env.addPipModule('farneback3d', version='0.1.3', default=True)
+        except:
+            print('Installation of PyCuda and Farneback-3D was not successful,'
+                  ' you will not be able to use Cuda related programs')
 
 
 files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol': 'volumes/AK_LP10.vol',
