@@ -128,11 +128,14 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         for pdbfn in inputFiles:
             if self.pdbSource.get() == PDB_SOURCE_TRAJECT:
                 traj_arr= dcd2numpyArr(pdbfn)
+                mol = ContinuousFlexPDBHandler(self.getPDBRef())
                 traj_arr.shape
                 for i in range(self.dcd_start.get(),
                                self.dcd_end.get() if self.dcd_end.get()!= -1 else traj_arr.shape[0],
                                self.dcd_step.get()):
                     pdbs_matrix.append(traj_arr[i].flatten())
+                    mol.coords=traj_arr[i]
+                    mol.write_pdb(self._getExtraPath("%s_traj.pdb"%str(i+1).zfill(5)))
             else:
                 try :
                     # Read PDBs
