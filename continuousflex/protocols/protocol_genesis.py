@@ -469,9 +469,18 @@ class ProtGenesis(EMProtocol):
             cmds.append(genesis_cmd)
 
         # Run Genesis
-        runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
+        if numMpiPerFit >1 :
+            runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
                         numberOfThreads=self.numberOfThreads.get(), hostConfig=self._stepsExecutor.hostConfig,
                         raiseError=self.raiseError.get())
+        else:
+            py_script = buildParallelScript(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
+                            numberOfThreads=self.numberOfThreads.get(), hostConfig=self._stepsExecutor.hostConfig,
+                            raiseError=self.raiseError.get())
+            py_scrit_file = self._getExtraPath("%i_mpi_script.py"%indexLinearFit)
+            with open(py_scrit_file, "w")as f:
+                f.write(py_script)
+            self.runJob("python", py_scrit_file, env=self.getGenesisEnv())
 
     def runParallelGenesisRBFitting(self,indexLinearFit):
 
