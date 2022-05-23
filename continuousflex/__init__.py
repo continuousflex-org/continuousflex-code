@@ -121,7 +121,7 @@ class Plugin(pwem.Plugin):
                                   % env.getLibFolder(), 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
-        target_branch = "nmmd_image_merge"
+        target_branch = "merge_genesis_1.4"
         env.addPackage('MD-NMMD-Genesis', version='1.0', deps=[lapack],
                        buildDir='MD-NMMD-Genesis', tar="void.tgz",
                        commands=[('git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; '
