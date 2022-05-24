@@ -97,9 +97,12 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                       label="Alignement Reference PDB",
                       help='Reference PDB to align the PDBs with')
         form.addParam('matchingType', params.EnumParam, label="Match structures ?", default=0,
-                      choices=['Both structures are the same', 'Match chain name/residue num/atom name',
+                      choices=['All structures are matching', 'Match chain name/residue num/atom name',
                                'Match segment name/residue num/atom name'],
-                      help="Method to match atoms in the trajectory coordinates and the reference PDB")
+                      help="Method to find atomic coordinates correspondence between the trajectory "
+                           "coordinates and the reference PDB. The method will select the matching atoms"
+                           " and sort them in the corresponding order. If the structures in the files are"
+                           " already matching, choose All structures are matching")
 
         # --------------------------- INSERT steps functions --------------------------------------------
     def _insertAllSteps(self):
