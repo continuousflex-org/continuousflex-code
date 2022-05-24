@@ -7,6 +7,7 @@ import sys
 from subprocess import Popen
 import re
 
+
 from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
 
 
@@ -329,6 +330,8 @@ if rank == %i:
         else:
             print(err_msg)
             """ % (i, commands[i], commands[i], "True" if raiseError else "False")
+
+
     py_script +=\
     """
 exit(0)
@@ -548,3 +551,7 @@ def dcd2numpyArr(filename):
     print("\t Done \n")
 
     return np.array(dcd_list)
+
+def existsCommand(name):
+    from shutil import which
+    return which(name) is not None

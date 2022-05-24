@@ -64,12 +64,11 @@ class ProtGenesis(EMProtocol):
         form.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
                       default=False, help="Center the input PDBs with the center of mass", condition="not restartChoice" )
 
-        group = form.addGroup('Execution Inputs',expertLevel=params.LEVEL_ADVANCED)
-        group.addParam('parallelFit', params.BooleanParam, label="Parallelize over the EM data ?", default=False,
-                      help="Run parallel simulations for each input EM data based on the number of MPI specified. "
-                           "Otherwise, parallelize each simulation internally, i.e. each simulation is run linearly"
-                           "with internal parallelization. Running parallel simulation should be prefered when analysing "
-                           "multiple EM data. Running parallel simulation is not available for REUS."
+        group = form.addGroup('Execution Parameters',expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('disableParallelSim', params.BooleanParam, label="Disable parallelisation over the EM data ?", default=False,
+                      help="Disabel parallel processing of simualtions over EM input data. Instead, each simulation is run linearly"
+                           "with internal parallelization with the specified number of MPI. Running parallel simulation is activated by default "
+                           " when using multiple EM data. Running parallel simulation is not available for REUS."
                            "",expertLevel=params.LEVEL_ADVANCED)
         group.addParam('raiseError', params.BooleanParam, label="Stop execution if fails ?", default=True,
                       help="Stop execution if GENESIS program fails",expertLevel=params.LEVEL_ADVANCED)
@@ -308,10 +307,12 @@ class ProtGenesis(EMProtocol):
         self._insertFunctionStep("createINPs")
 
         # RUN simulation
-        if self.parallelFit.get():
-            self._insertFunctionStep('setupSimuationParallel')
-            for i in range((self.getNumberOfSimulation()//self.numberOfMpi.get()) + 1):
-                self._insertFunctionStep("runSimulationParallel", i)
+        if not self.disableParallelSim.get() and  \
+            (self.simulationType.get() != SIMULATION_REMD and self.simulationType.get() != SIMULATION_RENMMD) and \
+            self.getNumberOfSimulation() >1 :
+            if not existsCommand("parallel") :
+                raise RuntimeError("GNU parallel command not found")
+            self._insertFunctionStep("runSimulationParallel")
         else:
             for i in range(self.getNumberOfSimulation()):
                 self._insertFunctionStep("runSimulation", i)
@@ -438,34 +439,30 @@ class ProtGenesis(EMProtocol):
                            outputPrefix=self.getOutputPrefix(i), indexFit=i)
 
     def runSimulation(self, index):
-        genesis_cmd =self.getGenesisCmd(prefix= self.getOutputPrefix(index))
-        programname, params = genesis_cmd.split(" ", 1)
-        self.runJob(programname,params, env=self.getGenesisEnv())
+        programname = "atdyn" if self.md_program.get() == PROGRAM_ATDYN else "spdyn"
+        outpref= self.getOutputPrefix(index)
+        params = "%s_INP > %s.log" % (outpref,outpref)
+        env = self.getGenesisEnv()
+        env.set("OMP_NUM_THREADS",str(self.numberOfThreads.get()))
 
-    def runSimulationParallel(self,index):
+        self.runJob(programname,params, env=env)
+
+    def runSimulationParallel(self):
         """
         Run multiple GENESIS simulations in parallel
-        :param int index:  current number of linear fitting
         :return None:
         """
-        py_scrit_file = self._getExtraPath("%i_mpi_script.py" % index)
-        self.runJob("python", py_scrit_file, env=self.getGenesisEnv())
+        env = self.getGenesisEnv()
+        env.set("OMP_NUM_THREADS",str(self.numberOfThreads.get()))
+        programPath = os.path.join( Plugin.getVar("GENESIS_HOME"), 'bin')
+        programname = "atdyn" if self.md_program.get() == PROGRAM_ATDYN else "spdyn"
+        extradir = self._getExtraPath()
 
-    def setupSimuationParallel(self):
-        nsim =  self.getNumberOfSimulation()
-        nmpi = self.numberOfMpi.get()
-        nlinear =nmpi// nmpi
-        for i in range(nlinear + 1):
-            cmds = []
-            for j in range(nmpi):
-                index =  i * nmpi + j
-                if index< nsim:
-                    prefix = self.getOutputPrefix(index)
-                    genesis_cmd = self.getGenesisCmd(prefix=prefix)
-                    cmds.append(genesis_cmd)
+        cmd = "seq -f \"%%05g\" 1 %i | parallel -P %i \"%s/%s %s/{}_output_INP > %s/{}_output.log \" " % (
+        self.getNumberOfSimulation(),self.numberOfMpi.get(), programPath, programname, extradir, extradir)
 
-            with open(self._getExtraPath("%i_mpi_script.py"%i), "w")as f:
-                f.write(buildParallelScript(cmds,  numberOfThreads=self.numberOfThreads.get(), raiseError=self.raiseError.get()))
+        print(cmd)
+        runCommand(cmd, env=env)
 
 
     def createGenesisInputFile(self,inputPDB, outputPrefix, indexFit):
@@ -865,14 +862,15 @@ class ProtGenesis(EMProtocol):
         :param int index: Index of the simulation
         :return list: angle_rot, angle_tilt, angle_psi, shift_x, shift_y
         """
-        mdImg = md.MetaData(self._getExtraPath("%s_current_angles.xmd" % str(index + 1).zfill(5)))
+        mdImg = md.MetaData(self.imageAngleShift.get())
+        idx = int(index + 1)
 
         return [
-            mdImg.getValue(md.MDL_ANGLE_ROT, 1),
-            mdImg.getValue(md.MDL_ANGLE_TILT, 1),
-            mdImg.getValue(md.MDL_ANGLE_PSI, 1),
-            mdImg.getValue(md.MDL_SHIFT_X, 1),
-            mdImg.getValue(md.MDL_SHIFT_Y, 1),
+            mdImg.getValue(md.MDL_ANGLE_ROT, idx),
+            mdImg.getValue(md.MDL_ANGLE_TILT, idx),
+            mdImg.getValue(md.MDL_ANGLE_PSI, idx),
+            mdImg.getValue(md.MDL_SHIFT_X, idx),
+            mdImg.getValue(md.MDL_SHIFT_Y, idx),
         ]
 
     def getGenesisEnv(self):
@@ -884,20 +882,6 @@ class ProtGenesis(EMProtocol):
         environ.set('PATH', os.path.join(Plugin.getVar("GENESIS_HOME"), 'bin'),
                     position=pwutils.Environ.BEGIN)
         return environ
-
-    def getGenesisCmd(self, prefix):
-        """
-        Get GENESIS cmd to run
-        :param str prefix: prefix of the simulation
-        :return str : GENESIS commadn to run
-        """
-        cmd=""
-        if self.md_program.get() == PROGRAM_ATDYN:
-            cmd +=  "atdyn %s " % ("%s_INP" % prefix)
-        else:
-            cmd += "spdyn %s " % ("%s_INP" % prefix)
-        cmd += "  > %s.log" % prefix
-        return cmd
 
     def getRestartFile(self, index=0):
         """
@@ -926,7 +910,6 @@ class ProtGenesis(EMProtocol):
         with open(nm_file, "w") as f:
             for i in range(self.inputModes.get().getSize()):
                 if i >= 6:
-                    print(self.inputModes.get()[i+1].getModeFile())
                     f.write(" VECTOR    %i       VALUE  0.0\n" % (i + 1))
                     f.write(" -----------------------------------\n")
                     nm_vec = np.loadtxt(self.inputModes.get()[i+1].getModeFile())
