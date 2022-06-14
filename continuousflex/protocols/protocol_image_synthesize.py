@@ -657,7 +657,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
         runProgram('xmipp_metadata_selfile_create', command)
         # now creating the output set of images as output:
         partSet = self._createSetOfParticles('images')
-        xmipp3.convert.readSetOfParticles(out_mdfn, partSet)
+        xmipp3.convert.readSetOfParticles(self._getExtraPath('GroundTruth.xmd'), partSet)
         if (self.refVolume.get()):
             sr = self.refVolume.get().getSamplingRate()
         else:

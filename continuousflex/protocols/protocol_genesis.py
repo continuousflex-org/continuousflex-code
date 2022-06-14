@@ -43,6 +43,8 @@ from xmipp3 import Plugin
 import pyworkflow.utils as pwutils
 from pyworkflow.utils import runCommand, buildRunCommand
 
+from xmipp3.convert import writeSetOfParticles
+
 class ProtGenesis(EMProtocol):
     """ Protocol to perform MD/NMMD simulation based on GENESIS. """
     _label = 'MD-NMMD-Genesis'
@@ -281,15 +283,11 @@ class ProtGenesis(EMProtocol):
 
         # Images
         group = form.addGroup('Image Parameters', condition="EMfitChoice==2")
-        group.addParam('inputImage', params.PointerParam, pointerClass="Particle, SetOfParticles",
-                      label="Input image (s)", help='Select the target EM density map',
+        group.addParam('inputImage', params.PointerParam, pointerClass="SetOfParticles",
+                      label="Input images ", help='Select the target EM density map',
                       condition="EMfitChoice==2", important=True)
         group.addParam('image_size', params.IntParam, default=64, label='Image Size',
                       help="TODO", condition="EMfitChoice==2")
-
-        group.addParam('imageAngleShift', params.FileParam, label="Rigid body parameters (.xmd)",
-                      condition="EMfitChoice==2",
-                      help='Xmipp metadata file of rigid body parameters for each image (3 euler angles, 2 shift)')
         group.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
                       help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==2")
 
@@ -892,16 +890,23 @@ class ProtGenesis(EMProtocol):
         :param int index: Index of the simulation
         :return list: angle_rot, angle_tilt, angle_psi, shift_x, shift_y
         """
-        mdImg = md.MetaData(self.imageAngleShift.get())
-        idx = int(index + 1)
+        imgXmd = self._getExtraPath("inputEM.xmd")
+        if not os.path.exists(imgXmd):
+            writeSetOfParticles(self.inputImage.get(), imgXmd)
+        mdImg = md.MetaData(imgXmd)
 
-        return [
+        idx = int(index + 1)
+        params =  [
             mdImg.getValue(md.MDL_ANGLE_ROT, idx),
             mdImg.getValue(md.MDL_ANGLE_TILT, idx),
             mdImg.getValue(md.MDL_ANGLE_PSI, idx),
             mdImg.getValue(md.MDL_SHIFT_X, idx),
             mdImg.getValue(md.MDL_SHIFT_Y, idx),
         ]
+        if any([i is None for i in params]):
+            raise RuntimeError("Can not find angles or shifts")
+        return params
+
 
     def getGenesisEnv(self):
         """
