@@ -27,7 +27,12 @@ from pwem.convert import cifToPdb
 from pyworkflow.utils.path import makePath, copyFile
 from pyworkflow.protocol import params
 from pwem.utils import runProgram
+from pwem.emlib import MetaData, MDL_ENABLED, MDL_NMA_MODEFILE,MDL_ORDER
+from pwem.objects import SetOfNormalModes, AtomStruct
+from .convert import rowToMode
+from xmipp3.base import XmippMdRow
 
+from umap import UMAP
 
 import numpy as np
 import glob
@@ -41,6 +46,9 @@ PDB_SOURCE_SUBTOMO = 0
 PDB_SOURCE_PATTERN = 1
 PDB_SOURCE_OBJECT = 2
 PDB_SOURCE_TRAJECT = 3
+
+REDUCE_METHOD_PCA = 0
+REDUCE_METHOD_UMAP = 1
 
 class FlexProtDimredPdb(ProtAnalysis3D):
     """ Protocol for applying dimentionality reduction on PDB files. """
@@ -85,8 +93,9 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                       condition='pdbSource == 3',
                       label="trajectory Reference PDB",
                       help='Reference PDB of the trajectory')
+        form.addParam('method', params.EnumParam, label="Reduction method", default=REDUCE_METHOD_PCA,
+                      choices=['PCA', 'UMAP'],help="")
 
-        form.addSection(label='Principal Component Analysis')
         form.addParam('reducedDim', IntParam, default=2,
                       label='Number of Principal Components')
         form.addParam('alignPDBs', params.BooleanParam, default=False,
@@ -108,7 +117,9 @@ class FlexProtDimredPdb(ProtAnalysis3D):
     def _insertAllSteps(self):
         self._insertFunctionStep('readInputFiles')
         self._insertFunctionStep('performDimred')
-        self._insertFunctionStep('createOutputStep')
+
+        if self.method.get() == REDUCE_METHOD_PCA:
+            self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
     def readInputFiles(self):
@@ -158,13 +169,49 @@ class FlexProtDimredPdb(ProtAnalysis3D):
 
     def performDimred(self):
 
-        pca = decomposition.PCA(n_components=self.reducedDim.get())
-        Y = pca.fit_transform(self.pdbs_matrix)
+        if self.method.get() == REDUCE_METHOD_PCA:
+            pca = decomposition.PCA(n_components=self.reducedDim.get())
+            Y = pca.fit_transform(self.pdbs_matrix)
+            dump(pca, self._getExtraPath('pca_pickled.joblib'))
+
+            pathPC = self._getPath("modes")
+            pdb = ContinuousFlexPDBHandler(self.getPDBRef())
+            pdb.coords = pca.mean_.reshape(self.pdbs_matrix.shape[1] // 3, 3)
+            pdb.write_pdb(self._getPath("atoms.pdb"))
+            makePath(pathPC)
+            matrix = pca.components_.reshape(self.reducedDim.get(),self.pdbs_matrix.shape[1]//3,3)
+            self.writePrincipalComponents(prefix=pathPC, matrix = matrix)
+
+        elif self.method.get() == REDUCE_METHOD_UMAP:
+            umap = UMAP(n_components=self.reducedDim.get(), n_neighbors=15, n_epochs=1000).fit(self.pdbs_matrix)
+            Y = umap.transform(self.pdbs_matrix)
+            dump(umap, self._getExtraPath('pca_pickled.joblib'))
+
         np.savetxt(self.getOutputMatrixFile(),Y)
-        dump(pca,self._getExtraPath('pca_pickled.joblib'))
 
     def createOutputStep(self):
-        pass
+            # Metadata
+            mdOut = MetaData()
+            for i in range(self.reducedDim.get()):
+                objId = mdOut.addObject()
+                modefile = self._getPath("modes", "vec.%d" % (i + 1))
+                mdOut.setValue(MDL_NMA_MODEFILE, modefile, objId)
+                mdOut.setValue(MDL_ORDER, i + 1, objId)
+                mdOut.setValue(MDL_ENABLED, 1, objId)
+            mdOut.write(self._getPath("modes.xmd"))
+
+            # Sqlite object
+            pcSet =SetOfNormalModes(filename=self._getPath("modes.sqlite"))
+            row = XmippMdRow()
+            for objId in mdOut:
+                row.readFromMd(mdOut, objId)
+                pcSet.append(rowToMode(row))
+
+            pdb = AtomStruct(self._getPath("atoms.pdb"))
+            self._defineOutputs(outputMean=pdb)
+
+            pcSet.setPdb(pdb)
+            self._defineOutputs(outputPCA=pcSet)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
@@ -213,3 +260,9 @@ class FlexProtDimredPdb(ProtAnalysis3D):
 
     def getDeformationFile(self):
         return self._getExtraPath('pdbs_mat.txt')
+
+    def writePrincipalComponents(self, prefix, matrix):
+        for i in range(self.reducedDim.get()):
+            with open("%s/vec.%i"%(prefix,i+1), "w") as f:
+                    for j in range(matrix.shape[1]):
+                        f.write(" %e   %e   %e\n" % (matrix[i,j, 0], matrix[i,j, 1], matrix[i,j, 1]))

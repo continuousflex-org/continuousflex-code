@@ -25,11 +25,12 @@
 from os.path import basename
 import numpy as np
 from pwem.emlib import MetaData, MDL_ORDER
-from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam
+from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.utils import replaceBaseExt, replaceExt
 
-from continuousflex.protocols.data import Point, Data
+
+from pwem.objects.data import SetOfParticles,SetOfVolumes
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 from continuousflex.protocols import FlexProtDimredPdb
 import xmipp3
@@ -38,14 +39,15 @@ from pwem.viewers import ObjectView
 import matplotlib.pyplot as plt
 
 from joblib import load
-from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVol
-from continuousflex.viewers.nma_gui import TrajectoriesWindow
+from continuousflex.viewers.nma_gui import TrajectoriesWindow, ClusteringWindow
 from continuousflex.protocols.data import Point, Data, PathData
 from pwem.viewers import VmdView
 from pyworkflow.utils.path import cleanPath, makePath
 from continuousflex.protocols.utilities.genesis_utilities import save_dcd
 from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
 from pyworkflow.gui.browser import FileBrowserWindow
+from continuousflex.protocols.protocol_pdb_dimred import REDUCE_METHOD_PCA, REDUCE_METHOD_UMAP
+from pyworkflow.utils import runCommand
 
 import os
 
@@ -73,55 +75,74 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
     def _defineParams(self, form):
         form.addSection(label='Visualization')
         form.addParam('displayTrajectories', LabelParam,
-                      label='Display PCA trajectories',
+                      label='Open trajectories tool ?',
                       help='Open a GUI to visualize the PCA space'
                            ' to draw and adjust trajectories.')
-        form.addParam('xlimits_mode', EnumParam,
+        form.addParam('displayClustering', LabelParam,
+                      label='Open clustering tool?',
+                      help='Open a GUI to visualize the images as points '
+                           'and select some of them to create clusters, and compute the 3D reconstructions from the '
+                           'clusters.')
+
+        form.addParam('animateClusterRec', LabelParam,
+                      label='Animate cluters with EM data',
+                      help="")
+        form.addParam('inputSet', PointerParam, pointerClass ='SetOfParticles,SetOfVolumes',
+                      label='Em data for cluster animation',  allowsNull=True,
+                      help="")
+
+        # form.addParam("dataSet", StringParam, default= "", label="Data set label")
+        form.addParam('displayPcaSingularValues', LabelParam,
+                      label="Display singular values",
+                      help="The values should help you see how many dimensions are in the data ",
+                      condition=self.protocol.method.get()==REDUCE_METHOD_PCA)
+
+
+        group = form.addGroup("Window parameters")
+        group.addParam('s', FloatParam, default=5, allowsNull=True,
+                       label='Radius')
+        group.addParam('alpha', FloatParam, default=0.5, allowsNull=True,
+                       label='Transparancy')
+        group.addParam('xlimits_mode', EnumParam,
                       choices=['Automatic (Recommended)', 'Set manually x-axis limits'],
                       default=X_LIMITS_NONE,
                       label='x-axis limits', display=EnumParam.DISPLAY_COMBO,
                       help='This allows you to use a specific range of x-axis limits')
-        form.addParam('xlim_low', FloatParam, default=None,
+        group.addParam('xlim_low', FloatParam, default=None,
                       condition='xlimits_mode==%d' % X_LIMITS,
                       label='Lower x-axis limit')
-        form.addParam('xlim_high', FloatParam, default=None,
+        group.addParam('xlim_high', FloatParam, default=None,
                       condition='xlimits_mode==%d' % X_LIMITS,
                       label='Upper x-axis limit')
-        form.addParam('ylimits_mode', EnumParam,
+        group.addParam('ylimits_mode', EnumParam,
                       choices=['Automatic (Recommended)', 'Set manually y-axis limits'],
                       default=Y_LIMITS_NONE,
                       label='y-axis limits', display=EnumParam.DISPLAY_COMBO,
                       help='This allows you to use a specific range of y-axis limits')
-        form.addParam('ylim_low', FloatParam, default=None,
+        group.addParam('ylim_low', FloatParam, default=None,
                       condition='ylimits_mode==%d' % Y_LIMITS,
                       label='Lower y-axis limit')
-        form.addParam('ylim_high', FloatParam, default=None,
+        group.addParam('ylim_high', FloatParam, default=None,
                       condition='ylimits_mode==%d' % Y_LIMITS,
                       label='Upper y-axis limit')
-        form.addParam('zlimits_mode', EnumParam,
+        group.addParam('zlimits_mode', EnumParam,
                       choices=['Automatic (Recommended)', 'Set manually z-axis limits'],
                       default=Z_LIMITS_NONE,
                       label='z-axis limits', display=EnumParam.DISPLAY_COMBO,
                       help='This allows you to use a specific range of z-axis limits')
-        form.addParam('zlim_low', FloatParam, default=None,
+        group.addParam('zlim_low', FloatParam, default=None,
                       condition='zlimits_mode==%d' % Z_LIMITS,
                       label='Lower z-axis limit')
-        form.addParam('zlim_high', FloatParam, default=None,
+        group.addParam('zlim_high', FloatParam, default=None,
                       condition='zlimits_mode==%d' % Z_LIMITS,
                       label='Upper z-axis limit')
-        form.addParam('s', FloatParam, default=None, allowsNull=True,
-                      label='Radius')
-        form.addParam('alpha', FloatParam, default=None, allowsNull=True,
-                        label='Transparancy')
-        # form.addParam("dataSet", StringParam, default= "", label="Data set label")
-        form.addParam('displayPcaSingularValues', LabelParam,
-                      label="Display PCA singular values",
-                      help="The values should help you see how many dimensions are in the data ")
 
 
     def _getVisualizeDict(self):
         return {
                 'displayTrajectories': self._displayTrajectories,
+                'displayClustering': self._displayClustering,
+                'animateClusterRec': self._animateClusterRec,
                 'displayPcaSingularValues': self.viewPcaSinglularValues,
                 }
 
@@ -147,6 +168,30 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                                                 alpha=self.alpha)
         return [self.trajectoriesWindow]
 
+    def _displayClustering(self, paramName):
+        index = 1
+        while(os.path.exists(self.protocol._getExtraPath("%s_cluster.xmd"%index))):
+            cleanPath(self.protocol._getExtraPath("%s_cluster.xmd"%index))
+            index+=1
+        self.clusterWindow = self.tkWindow(ClusteringWindow,
+                                           title='Clustering Tool',
+                                           dim=self.protocol.reducedDim.get(),
+                                           data=self.getData(),
+                                           callback=self._createCluster,
+                                           limits_mode=0,
+                                           LimitL=None,
+                                           LimitH=None,
+                                           xlim_low=self.xlim_low.get(),
+                                           xlim_high=self.xlim_high.get(),
+                                           ylim_low=self.ylim_low.get(),
+                                           ylim_high=self.ylim_high.get(),
+                                           zlim_low=self.zlim_low.get(),
+                                           zlim_high=self.zlim_high.get(),
+                                           s=self.s,
+                                           alpha=self.alpha)
+        return [self.clusterWindow]
+
+
     def viewPcaSinglularValues(self, paramName):
         pca = load(self.protocol._getExtraPath('pca_pickled.joblib'))
         fig = plt.figure('PCA singlular values')
@@ -156,7 +201,11 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         pass
 
     def getData(self):
+        if self._data is None:
+            self._data = self.loadData()
+        return self._data
 
+    def loadData(self):
         data = Data()
         pdb_matrix = np.loadtxt(self.protocol.getOutputMatrixFile())
 
@@ -218,6 +267,81 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         vmdFile.close()
 
         VmdView(' -e ' + vmdFn).show()
+
+    def _createCluster(self):
+        """ Create the cluster with the selected particles
+        from the cluster. This method will be called when
+        the button 'Create Cluster' is pressed.
+        """
+
+        cluster = md.MetaData()
+        for point in self.getData():
+            if point.getState() == Point.SELECTED:
+                cluster.setValue(md.MDL_ITEM_ID, int(point.getId()), cluster.addObject())
+
+        cluster_name = self.clusterWindow.getClusterName()
+        if cluster_name == "":
+            index = 1
+            while(os.path.exists(self.protocol._getExtraPath("%s_cluster.xmd"%index))):
+                index+=1
+            cluster_name = self.protocol._getExtraPath("%s_cluster.xmd"%index)
+
+        print("Write cluster to %s "%cluster_name)
+        cluster.write(cluster_name)
+
+
+    def _animateClusterRec(self, param):
+
+        # Find the list of files from input set
+        #TODO : find the xmipp way to get the file name of a stack
+        inputSet = self.inputSet.get()
+        inputFiles = inputSet.getFiles()
+        if len(inputFiles) == 1:
+            fname = inputFiles.pop()
+            inputFilesList = []
+            for i in range(inputSet.getSize()):
+                inputFilesList.append("%s@%s"%(str(i+1).zfill(6),fname))
+        else:
+            inputFilesList = []
+            for i in inputSet :
+                inputFilesList.append(i.getFileName())
+
+        # Write the input files to each cluster
+        clusterID = 1
+        while (os.path.exists(self.protocol._getExtraPath("%s_cluster.xmd" % clusterID))):
+            print("Cluster ID %i"% clusterID)
+            clusterName = self.protocol._getExtraPath("%s_cluster.xmd" % clusterID)
+            cluster = md.MetaData(clusterName)
+            for element in cluster:
+                elemID = cluster.getValue(md.MDL_ITEM_ID, element)
+                fname = inputFilesList[elemID-1]
+                cluster.setValue(md.MDL_IMAGE, fname, element)
+            cluster.write(clusterName)
+            clusterID += 1
+        numCluster = clusterID
+
+        # Reconstruct
+        if isinstance(inputSet, SetOfParticles):
+            pass
+
+        elif isinstance(inputSet, SetOfVolumes):
+            progname = "xmipp_image_operate "
+            for clusterID in range(1,numCluster):
+                clusterName = self.protocol._getExtraPath("%s_cluster.xmd" % clusterID)
+                tmpName = self.protocol._getExtraPath("%s_cluster_tmp.vol" % clusterID)
+                volName = self.protocol._getExtraPath("%s_cluster.vol" % clusterID)
+                cluster = md.MetaData(clusterName)
+
+                counter = 1
+                for element in cluster:
+                    elemName = cluster.getValue(md.MDL_IMAGE, element)
+                    if counter == 1:
+                        runCommand("xmipp_image_convert -i %s -o %s"%(elemName, tmpName))
+                    else:
+                        args = "-i %s --plus %s -o %s"%(tmpName, elemName,tmpName)
+                        runCommand(progname + args)
+                    counter+=1
+                runCommand("%s -i %s --divide %i -o %s" % (progname,tmpName, counter, volName))
 
     def _loadAnimation(self):
         browser = FileBrowserWindow("Select the animation folder (animation_NAME)",

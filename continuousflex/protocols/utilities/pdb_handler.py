@@ -3,6 +3,19 @@ import copy
 from Bio.SVDSuperimposer import SVDSuperimposer
 
 class ContinuousFlexPDBHandler:
+    
+    @classmethod
+    def read_coords(cls, pdb_file):
+        print("> Reading pdb file %s ..." % pdb_file)
+        coords = []
+        with open(pdb_file, "r") as f:
+            for line in f:
+                if 'ATOM' in line:
+                    coords.append([
+                            line[30:38],line[38:46],line[46:54]
+                        ])
+        return np.array(coords).astype(float)
+
     def __init__(self, pdb_file):
         """
         Contructor
