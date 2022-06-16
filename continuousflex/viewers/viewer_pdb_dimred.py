@@ -28,18 +28,22 @@ from pwem.emlib import MetaData, MDL_ORDER
 from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.utils import replaceBaseExt, replaceExt
+from pwem.viewers import ChimeraView
+from pyworkflow.viewer import Viewer
 
 
-from pwem.objects.data import SetOfParticles,SetOfVolumes
+from pwem.objects.data import SetOfParticles,SetOfVolumes, Class2D, ClassVol
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 from continuousflex.protocols import FlexProtDimredPdb
 import xmipp3
+from xmipp3.convert import writeSetOfVolumes, writeSetOfParticles, readSetOfVolumes, readSetOfParticles
 import pwem.emlib.metadata as md
 from pwem.viewers import ObjectView
 import matplotlib.pyplot as plt
+from pwem.emlib.image import ImageHandler
 
 from joblib import load
-from continuousflex.viewers.nma_gui import TrajectoriesWindow, ClusteringWindow
+from continuousflex.viewers.tk_dimred import ClusteringWindowDimred, TrajectoriesWindowDimred
 from continuousflex.protocols.data import Point, Data, PathData
 from pwem.viewers import VmdView
 from pyworkflow.utils.path import cleanPath, makePath
@@ -47,7 +51,7 @@ from continuousflex.protocols.utilities.genesis_utilities import save_dcd
 from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
 from pyworkflow.gui.browser import FileBrowserWindow
 from continuousflex.protocols.protocol_pdb_dimred import REDUCE_METHOD_PCA, REDUCE_METHOD_UMAP
-from pyworkflow.utils import runCommand
+
 
 import os
 
@@ -84,9 +88,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                            'and select some of them to create clusters, and compute the 3D reconstructions from the '
                            'clusters.')
 
-        form.addParam('animateClusterRec', LabelParam,
-                      label='Animate cluters with EM data',
-                      help="")
         form.addParam('inputSet', PointerParam, pointerClass ='SetOfParticles,SetOfVolumes',
                       label='Em data for cluster animation',  allowsNull=True,
                       help="")
@@ -142,18 +143,18 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         return {
                 'displayTrajectories': self._displayTrajectories,
                 'displayClustering': self._displayClustering,
-                'animateClusterRec': self._animateClusterRec,
                 'displayPcaSingularValues': self.viewPcaSinglularValues,
                 }
 
 
     def _displayTrajectories(self, paramName):
-        self.trajectoriesWindow = self.tkWindow(TrajectoriesWindow,
+        self.trajectoriesWindow = self.tkWindow(TrajectoriesWindowDimred,
                                                 title='Trajectories Tool',
                                                 dim=self.protocol.reducedDim.get(),
                                                 data=self.getData(),
                                                 callback=self._generateAnimation,
                                                 loadCallback=self._loadAnimation,
+                                                saveClusterCallback=self.saveClusterCallback,
                                                 numberOfPoints=NUM_POINTS_TRAJECTORY,
                                                 limits_mode=0,
                                                 LimitL=None,
@@ -173,14 +174,14 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         while(os.path.exists(self.protocol._getExtraPath("%s_cluster.xmd"%index))):
             cleanPath(self.protocol._getExtraPath("%s_cluster.xmd"%index))
             index+=1
-        self.clusterWindow = self.tkWindow(ClusteringWindow,
+        self.clusterWindow = self.tkWindow(ClusteringWindowDimred,
                                            title='Clustering Tool',
                                            dim=self.protocol.reducedDim.get(),
                                            data=self.getData(),
                                            callback=self._createCluster,
                                            limits_mode=0,
-                                           LimitL=None,
-                                           LimitH=None,
+                                           LimitL=0.0,
+                                           LimitH=1.0,
                                            xlim_low=self.xlim_low.get(),
                                            xlim_high=self.xlim_high.get(),
                                            ylim_low=self.ylim_low.get(),
@@ -220,7 +221,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         #
         # else:
         #
-        weights = [1.0 for i in range(pdb_matrix.shape[0])]
+        weights = [0.0 for i in range(pdb_matrix.shape[0])]
 
         for i in range(pdb_matrix.shape[0]):
             data.addPoint(Point(pointId=i+1, data=pdb_matrix[i, :],weight=weights[i]))
@@ -274,11 +275,14 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         the button 'Create Cluster' is pressed.
         """
 
+        # define metadata
         cluster = md.MetaData()
         for point in self.getData():
             if point.getState() == Point.SELECTED:
                 cluster.setValue(md.MDL_ITEM_ID, int(point.getId()), cluster.addObject())
+                point._weight = 0.5
 
+        # get name
         cluster_name = self.clusterWindow.getClusterName()
         if cluster_name == "":
             index = 1
@@ -286,62 +290,44 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                 index+=1
             cluster_name = self.protocol._getExtraPath("%s_cluster.xmd"%index)
 
+        # write metadata
         print("Write cluster to %s "%cluster_name)
         cluster.write(cluster_name)
 
 
-    def _animateClusterRec(self, param):
+    def saveClusterCallback(self):
+        # get cluster name
+        clusterName = "cluster_" + self.trajectoriesWindow.getClusterName()
 
-        # Find the list of files from input set
-        #TODO : find the xmipp way to get the file name of a stack
+        # get input metadata
         inputSet = self.inputSet.get()
-        inputFiles = inputSet.getFiles()
-        if len(inputFiles) == 1:
-            fname = inputFiles.pop()
-            inputFilesList = []
-            for i in range(inputSet.getSize()):
-                inputFilesList.append("%s@%s"%(str(i+1).zfill(6),fname))
-        else:
-            inputFilesList = []
-            for i in inputSet :
-                inputFilesList.append(i.getFileName())
 
-        # Write the input files to each cluster
-        clusterID = 1
-        while (os.path.exists(self.protocol._getExtraPath("%s_cluster.xmd" % clusterID))):
-            print("Cluster ID %i"% clusterID)
-            clusterName = self.protocol._getExtraPath("%s_cluster.xmd" % clusterID)
-            cluster = md.MetaData(clusterName)
-            for element in cluster:
-                elemID = cluster.getValue(md.MDL_ITEM_ID, element)
-                fname = inputFilesList[elemID-1]
-                cluster.setValue(md.MDL_IMAGE, fname, element)
-            cluster.write(clusterName)
-            clusterID += 1
-        numCluster = clusterID
+        classID=[]
+        for p in self.trajectoriesWindow.data:
+            classID.append(p._weight)
 
-        # Reconstruct
         if isinstance(inputSet, SetOfParticles):
-            pass
+            classSet = self.protocol._createSetOfClasses2D(inputSet, clusterName)
+        else:
+            classSet = self.protocol._createSetOfClasses3D(inputSet,clusterName)
 
-        elif isinstance(inputSet, SetOfVolumes):
-            progname = "xmipp_image_operate "
-            for clusterID in range(1,numCluster):
-                clusterName = self.protocol._getExtraPath("%s_cluster.xmd" % clusterID)
-                tmpName = self.protocol._getExtraPath("%s_cluster_tmp.vol" % clusterID)
-                volName = self.protocol._getExtraPath("%s_cluster.vol" % clusterID)
-                cluster = md.MetaData(clusterName)
+        classSet.classifyItems(
+            updateItemCallback=updateItemCallback,
+            updateClassCallback=None,
+            itemDataIterator=iter(itemDataIterator(classID)),
+            classifyDisabled=False,
+            iterParams=None,
+            doClone=True)
 
-                counter = 1
-                for element in cluster:
-                    elemName = cluster.getValue(md.MDL_IMAGE, element)
-                    if counter == 1:
-                        runCommand("xmipp_image_convert -i %s -o %s"%(elemName, tmpName))
-                    else:
-                        args = "-i %s --plus %s -o %s"%(tmpName, elemName,tmpName)
-                        runCommand(progname + args)
-                    counter+=1
-                runCommand("%s -i %s --divide %i -o %s" % (progname,tmpName, counter, volName))
+        # Run reconstruction
+        self.protocol._defineOutputs(**{clusterName : classSet})
+        from continuousflex.protocols.protocol_batch_cluster import FlexBatchProtClusterSet
+        project = self.protocol.getProject()
+        newProt = project.newProtocol(FlexBatchProtClusterSet)
+        newProt.setObjLabel(clusterName)
+        newProt.inputSet.set(getattr(self.protocol, clusterName))
+        project.launchProtocol(newProt)
+        project.getRunsGraph()
 
     def _loadAnimation(self):
         browser = FileBrowserWindow("Select the animation folder (animation_NAME)",
@@ -379,3 +365,50 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
         self.getTkRoot().after(500, _showVmd)
 
+class VolumeTrajectoryViewer(ProtocolViewer):
+    """ Visualization of a SetOfVolumes as a trajectory with ChimeraX
+    """
+    _label = 'Volume trajectory viewer'
+    _targets = [SetOfVolumes]
+
+    def _defineParams(self, form):
+        form.addSection(label='Visualization')
+        form.addParam('displayTrajectories', LabelParam,
+                      label='ChimeraX',
+                      help='Open the trajectory in ChimeraX.')
+    def _getVisualizeDict(self):
+        return {
+                'displayTrajectories': self._visualize,
+                }
+
+    def _visualize(self, obj, **kwargs):
+        """visualisation for volumes set"""
+        for i in self.protocol:
+            i.setSamplingRate(self.protocol.getSamplingRate())
+            vol = ImageHandler().read(i)
+            vol.write(self._getPath("VolumeTrajectoryViewer%i.vol"%i.getObjId()))
+        # Show Chimera
+        tmpChimeraFile = self._getPath("chimera.cxc")
+        print(tmpChimeraFile)
+        with open(tmpChimeraFile, "w") as f:
+            f.write("open %s vseries true \n" % os.path.abspath(self._getPath("VolumeTrajectoryViewer*.vol")))
+            # f.write("volume #1 style surface level 0.5")
+            f.write("vseries play #1 loop true maxFrameRate 7 direction oscillate \n")
+
+        cv = ChimeraView(tmpChimeraFile)
+        return [cv]
+
+
+def updateItemCallback(item, row):
+    item.setClassId(row)
+
+class itemDataIterator:
+    def __init__(self, classID):
+        self.classID = classID
+    def __iter__(self):
+        self.n = 0
+        return self
+    def __next__(self):
+        index = self.classID[self.n]
+        self.n += 1
+        return index
