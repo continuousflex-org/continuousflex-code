@@ -179,6 +179,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                                            dim=self.protocol.reducedDim.get(),
                                            data=self.getData(),
                                            callback=self._createCluster,
+                                           saveClusterCallback=self.saveClusterCallback,
                                            limits_mode=0,
                                            LimitL=0.0,
                                            LimitH=1.0,
@@ -295,21 +296,37 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         cluster.write(cluster_name)
 
 
-    def saveClusterCallback(self):
+    def saveClusterCallback(self, tkWindow):
         # get cluster name
-        clusterName = "cluster_" + self.trajectoriesWindow.getClusterName()
+        clusterName = "cluster_" + tkWindow.getClusterName()
 
         # get input metadata
         inputSet = self.inputSet.get()
 
         classID=[]
-        for p in self.trajectoriesWindow.data:
+        for p in tkWindow.data:
             classID.append(p._weight)
 
         if isinstance(inputSet, SetOfParticles):
             classSet = self.protocol._createSetOfClasses2D(inputSet, clusterName)
         else:
             classSet = self.protocol._createSetOfClasses3D(inputSet,clusterName)
+
+        def updateItemCallback(item, row):
+            item.setClassId(row)
+
+        class itemDataIterator:
+            def __init__(self, classID):
+                self.classID = classID
+
+            def __iter__(self):
+                self.n = 0
+                return self
+
+            def __next__(self):
+                index = self.classID[self.n]
+                self.n += 1
+                return index
 
         classSet.classifyItems(
             updateItemCallback=updateItemCallback,
@@ -383,32 +400,20 @@ class VolumeTrajectoryViewer(ProtocolViewer):
 
     def _visualize(self, obj, **kwargs):
         """visualisation for volumes set"""
+        volNames = ""
         for i in self.protocol:
             i.setSamplingRate(self.protocol.getSamplingRate())
             vol = ImageHandler().read(i)
-            vol.write(self._getPath("VolumeTrajectoryViewer%i.vol"%i.getObjId()))
+            volName = os.path.abspath(self._getPath("tmp%i.vol"%i.getObjId()))
+            vol.write(volName)
+            volNames += volName+" "
         # Show Chimera
         tmpChimeraFile = self._getPath("chimera.cxc")
         print(tmpChimeraFile)
         with open(tmpChimeraFile, "w") as f:
-            f.write("open %s vseries true \n" % os.path.abspath(self._getPath("VolumeTrajectoryViewer*.vol")))
+            f.write("open %s vseries true \n" % volNames)
             # f.write("volume #1 style surface level 0.5")
             f.write("vseries play #1 loop true maxFrameRate 7 direction oscillate \n")
 
         cv = ChimeraView(tmpChimeraFile)
         return [cv]
-
-
-def updateItemCallback(item, row):
-    item.setClassId(row)
-
-class itemDataIterator:
-    def __init__(self, classID):
-        self.classID = classID
-    def __iter__(self):
-        self.n = 0
-        return self
-    def __next__(self):
-        index = self.classID[self.n]
-        self.n += 1
-        return index
