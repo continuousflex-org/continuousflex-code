@@ -26,7 +26,7 @@ from pyworkflow.utils.path import createLink
 
 import pyworkflow.protocol.params as params
 from pwem.protocols import EMProtocol
-from pwem.objects.data import AtomStruct, SetOfAtomStructs, SetOfPDBs, SetOfVolumes,SetOfParticles
+from pwem.objects.data import AtomStruct, SetOfAtomStructs, SetOfPDBs, SetOfVolumes,SetOfParticles, Volume
 
 import numpy as np
 import mrcfile
@@ -43,11 +43,15 @@ from xmipp3 import Plugin
 import pyworkflow.utils as pwutils
 from pyworkflow.utils import runCommand, buildRunCommand
 
-from xmipp3.convert import writeSetOfParticles
+from xmipp3.convert import writeSetOfParticles, writeSetOfVolumes
 
 class ProtGenesis(EMProtocol):
     """ Protocol to perform MD/NMMD simulation based on GENESIS. """
     _label = 'MD-NMMD-Genesis'
+
+    def __init__(self, **kwargs):
+        EMProtocol.__init__(self, **kwargs)
+        self.inputEMMetadata =None
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
@@ -401,20 +405,14 @@ class ProtGenesis(EMProtocol):
         Convert EM data step
         :return None:
         """
-
+        # Convert EM data
         inputEMfn = self.getInputEMfn()
         n_em = self.getNumberOfInputEM()
-
         dest_ext = "mrc" if self.EMfitChoice.get() == EMFIT_VOLUMES else "spi"
-
-        # Convert / copy EM data
-        for i in range(n_em):
-            pre, ext = os.path.splitext(os.path.basename(inputEMfn[i]))
-            if self.EMfitChoice.get() == EMFIT_IMAGES and  ext == ".%s"%dest_ext:
-                createLink(inputEMfn[i], "%s.%s" % (self.getInputEMprefix(i), dest_ext))
-            else:
-                runProgram("xmipp_image_convert", "-i %s --oext %s -o %s.%s" %
-                           (inputEMfn[i], dest_ext, self.getInputEMprefix(i), dest_ext))
+        inputMd = self.getInputEMMetadata()
+        inputMdName = self._getExtraPath("inputEM.xmd")
+        runProgram("xmipp_image_convert", "-i %s --oext %s --oroot %s" %
+                       (inputMdName, dest_ext, self._getExtraPath("inputEM_")))
 
         # Fix volumes origin
         if self.EMfitChoice.get() == EMFIT_VOLUMES:
@@ -449,7 +447,7 @@ class ProtGenesis(EMProtocol):
             outputPrefix = self.getOutputPrefix(indexFit)
             inputPDBprefix = self.getInputPDBprefix(indexFit)
             inputEMprefix = self.getInputEMprefix(indexFit)
-            inp_file = self._getExtraPath("%s_INP" % str(indexFit + 1).zfill(5))
+            inp_file = self._getExtraPath("INP_%s" % str(indexFit + 1).zfill(6))
             if self.restartChoice.get():
                 inputProt = self.restartProt.get()
             else:
@@ -627,7 +625,7 @@ class ProtGenesis(EMProtocol):
         :return None:
         """
         programname = "atdyn" if self.md_program.get() == PROGRAM_ATDYN else "spdyn"
-        inp_file =self._getExtraPath("%s_INP" % str(index + 1).zfill(5))
+        inp_file =self._getExtraPath("INP_%s" % str(index + 1).zfill(6))
         params = "%s > %s.log" % (inp_file,self.getOutputPrefix(index))
         env = self.getGenesisEnv()
         env.set("OMP_NUM_THREADS",str(self.numberOfThreads.get()))
@@ -659,12 +657,12 @@ class ProtGenesis(EMProtocol):
         # Build command
         programname = os.path.join( Plugin.getVar("GENESIS_HOME"), "bin/atdyn")
         extradir = self._getExtraPath()
-        params = "%s/{}_INP > %s/{}_output.log " %(extradir, extradir)
+        params = "%s/INP_{} > %s/output_{}.log " %(extradir, extradir)
         cmd = buildRunCommand(programname, params, numberOfMpi=numberOfMpiPerFit, hostConfig=self._stepsExecutor.hostConfig,
                               env=env)
 
         # Build parallel command
-        parallel_cmd = "seq -f \"%%05g\" 1 %i | parallel -P %i \" %s\" " % (
+        parallel_cmd = "seq -f \"%%06g\" 1 %i | parallel -P %i \" %s\" " % (
         self.getNumberOfSimulation(),self.numberOfMpi.get()//numberOfMpiPerFit, cmd)
 
         print("Command : %s" % cmd)
@@ -840,11 +838,11 @@ class ProtGenesis(EMProtocol):
         :param int index: index of input PDB
         :return str: Input PDB prefix
         """
-        prefix = self._getExtraPath("%s_inputPDB")
+        prefix = self._getExtraPath("inputPDB_%s")
         if self.getNumberOfInputPDB() == 1:
-            return prefix % str(1).zfill(5)
+            return prefix % str(1).zfill(6)
         else:
-            return prefix % str(index + 1).zfill(5)
+            return prefix % str(index + 1).zfill(6)
 
     def getInputEMprefix(self, index=0):
         """
@@ -852,13 +850,13 @@ class ProtGenesis(EMProtocol):
         :param int index: index of the EM data
         :return str: Input EM data prefix
         """
-        prefix = self._getExtraPath("%s_inputEM")
+        prefix = self._getExtraPath("inputEM_%s")
         if self.getNumberOfInputEM() == 0:
             return ""
         elif self.getNumberOfInputEM() == 1:
-            return prefix % str(1).zfill(5)
+            return prefix % str(1).zfill(6)
         else:
-            return prefix % str(index + 1).zfill(5)
+            return prefix % str(index + 1).zfill(6)
 
 
     def getOutputPrefix(self, index=0):
@@ -867,7 +865,7 @@ class ProtGenesis(EMProtocol):
         :param int index: index of the simulation to get
         :return string : Output prefix of the specified index
         """
-        return self._getExtraPath("%s_output" % str(index + 1).zfill(5))
+        return self._getExtraPath("output_%s" % str(index + 1).zfill(6))
 
     def getOutputPrefixAll(self, index=0):
         """
@@ -878,10 +876,10 @@ class ProtGenesis(EMProtocol):
         outputPrefix=[]
         if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
             for i in range(self.nreplica.get()):
-                outputPrefix.append(self._getExtraPath("%s_output_remd%i" %
-                                (str(index + 1).zfill(5), i + 1)))
+                outputPrefix.append(self._getExtraPath("output_%s_remd%i" %
+                                (str(index + 1).zfill(6), i + 1)))
         else:
-            outputPrefix.append(self._getExtraPath("%s_output" % str(index + 1).zfill(5)))
+            outputPrefix.append(self._getExtraPath("output_%s" % str(index + 1).zfill(6)))
         return outputPrefix
 
     def getRigidBodyParams(self, index=0):
@@ -890,18 +888,15 @@ class ProtGenesis(EMProtocol):
         :param int index: Index of the simulation
         :return list: angle_rot, angle_tilt, angle_psi, shift_x, shift_y
         """
-        imgXmd = self._getExtraPath("inputEM.xmd")
-        if not os.path.exists(imgXmd):
-            writeSetOfParticles(self.inputImage.get(), imgXmd)
-        mdImg = md.MetaData(imgXmd)
+        inputMd = self.getInputEMMetadata()
 
         idx = int(index + 1)
         params =  [
-            mdImg.getValue(md.MDL_ANGLE_ROT, idx),
-            mdImg.getValue(md.MDL_ANGLE_TILT, idx),
-            mdImg.getValue(md.MDL_ANGLE_PSI, idx),
-            mdImg.getValue(md.MDL_SHIFT_X, idx),
-            mdImg.getValue(md.MDL_SHIFT_Y, idx),
+            inputMd.getValue(md.MDL_ANGLE_ROT, idx),
+            inputMd.getValue(md.MDL_ANGLE_TILT, idx),
+            inputMd.getValue(md.MDL_ANGLE_PSI, idx),
+            inputMd.getValue(md.MDL_SHIFT_X, idx),
+            inputMd.getValue(md.MDL_SHIFT_Y, idx),
         ]
         if any([i is None for i in params]):
             raise RuntimeError("Can not find angles or shifts")
@@ -924,11 +919,12 @@ class ProtGenesis(EMProtocol):
         :param int index: Index of the simulation
         :return str: restart file
         """
-        allOutPrx = []
-        for i in range(self.restartProt.get().getNumberOfSimulation()):
-            allOutPrx += self.restartProt.get().getOutputPrefixAll(i)
-        allOut = [i + ".rst" for i in allOutPrx]
-        return allOut[int(np.min([len(allOut)-1, index]))]
+        if len(self.restartProt.get().getOutputPrefixAll(index))>1:
+            raise RuntimeError("Multiple restart not implemented")
+        rstfile = self.getInputPDBprefix(index) + ".rst"
+        if not os.path.exists(rstfile):
+            runCommand("cp %s.rst %s" % (self.restartProt.get().getOutputPrefix(index), rstfile))
+        return rstfile
 
     def getForceField(self):
         """
@@ -940,13 +936,30 @@ class ProtGenesis(EMProtocol):
         else:
             return self.forcefield.get()
 
+    def getInputEMMetadata(self):
+        nameMd = self._getExtraPath("inputEM.xmd")
+        if self.inputEMMetadata is None:
+            if self.EMfitChoice.get() == EMFIT_IMAGES :
+                writeSetOfParticles(self.inputImage.get(),nameMd)
+                self.inputEMMetadata = md.MetaData(nameMd)
+
+            elif self.EMfitChoice.get() == EMFIT_VOLUMES :
+                if isinstance(self.inputVolume.get(), Volume):
+                    self.inputEMMetadata = md.MetaData()
+                    self.inputEMMetadata.setValue(md.MDL_IMAGE, 
+                        self.inputVolume.get().getFileName(), self.inputEMMetadata.addObject())
+                    self.inputEMMetadata.write(nameMd)
+                else:
+                    writeSetOfVolumes(self.inputVolume.get(), nameMd)
+                    self.inputEMMetadata = md.MetaData(nameMd)
+        return self.inputEMMetadata
 
     def convertReusOutputDcd(self):
 
         for i in range(self.getNumberOfSimulation()):
-            remdPrefix = self._getExtraPath("%s_output_remd" % str(i + 1).zfill(5))
-            tmpPrefix =  self._getExtraPath("%s_output_tmp" % str(i + 1).zfill(5))
-            inp_file = self._getExtraPath("tmp_INP")
+            remdPrefix = self._getExtraPath("output_%s_remd" % str(i + 1).zfill(6))
+            tmpPrefix =  self._getExtraPath("output_%s_tmp" % str(i + 1).zfill(6))
+            inp_file = self._getExtraPath("INP_tmp")
 
             with open(inp_file, "w") as f:
                 f.write("\n[INPUT]\n")
@@ -983,7 +996,7 @@ class ProtGenesis(EMProtocol):
 
             runCommand("remd_convert %s"%inp_file, env=self.getGenesisEnv())
             for j in range(self.nreplica.get()):
-                repPrefix = self._getExtraPath("%s_output_remd%i" % (str(i + 1).zfill(5), j+1))
-                reptmpPrefix = self._getExtraPath("%s_output_tmp%i" % (str(i + 1).zfill(5), j+1))
+                repPrefix = self._getExtraPath("output_%s_remd%i" % (str(i + 1).zfill(6), j+1))
+                reptmpPrefix = self._getExtraPath("output_%s_tmp%i" % (str(i + 1).zfill(6), j+1))
                 runCommand("mv %s.dcd %s.dcd"%(reptmpPrefix,repPrefix))
                 runCommand("mv %s.log %s.log"%(reptmpPrefix,repPrefix))
