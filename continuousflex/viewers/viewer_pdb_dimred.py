@@ -316,17 +316,20 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             item.setClassId(row)
 
         class itemDataIterator:
-            def __init__(self, classID):
-                self.classID = classID
+            def __init__(self, clsID):
+                self.clsID = clsID
 
             def __iter__(self):
                 self.n = 0
                 return self
 
             def __next__(self):
-                index = self.classID[self.n]
-                self.n += 1
-                return index
+                if self.n > len(self.clsID)-1:
+                    return 0
+                else:
+                    index = self.clsID[self.n]
+                    self.n += 1
+                    return index
 
         classSet.classifyItems(
             updateItemCallback=updateItemCallback,
