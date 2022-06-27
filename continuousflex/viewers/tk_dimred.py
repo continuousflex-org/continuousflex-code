@@ -1,6 +1,6 @@
 from continuousflex.viewers.nma_gui import TrajectoriesWindow, ClusteringWindow
 import tkinter as tk
-from pyworkflow.gui.widgets import Button, HotButton
+from pyworkflow.gui.widgets import Button, HotButton, ComboBox
 from pyworkflow.utils.properties import Icon
 import numpy as np
 from continuousflex.protocols.data import Point, Data
@@ -9,8 +9,7 @@ class ClusteringWindowDimred(ClusteringWindow):
 
     def __init__(self, **kwargs):
         ClusteringWindow.__init__(self, **kwargs)
-        self.saveClusterCallback = kwargs.get('saveClusterCallback', None)
-        self._clusterNumber = 0
+        self._clusterNumber = 1
 
     def _createClusteringBox(self, content):
         frame = tk.LabelFrame(content, text='Clustering')
@@ -40,17 +39,16 @@ class ClusteringWindowDimred(ClusteringWindow):
         frame.grid(row=2, column=0, sticky='new', padx=5, pady=(10, 5))
 
     def _onCreateCluster(self):
-        self.setClusterNumber(self.getClusterNumber()+1)
         for point in self.data:
             if point.getState() == Point.SELECTED:
                 point._weight =self.getClusterNumber()
-
+        self.setClusterNumber(self.getClusterNumber()+1)
         self.saveClusterBtn.config(state=tk.NORMAL)
         ClusteringWindow._onResetClick(self)
 
     def _onSaveClusterClick(self, e=None):
-        if self.saveClusterCallback:
-            self.saveClusterCallback(self)
+        if self.callback:
+            self.callback(self)
 
     def getClusterName(self):
         return self.clusterName.get().strip()
@@ -103,6 +101,41 @@ class TrajectoriesWindowDimred(TrajectoriesWindow):
 
         frame.grid(row=2, column=0, sticky='new', padx=5, pady=(10, 5))
 
+    def _createTrajectoriesBox(self, content):
+        frame = tk.LabelFrame(content, text='Trajectories')
+        frame.columnconfigure(0, minsize=50)
+        frame.columnconfigure(1, weight=1)  # , minsize=30)
+
+        # Animation name
+        self._addLabel(frame, 'Name', 0, 0)
+        self.animationVar = tk.StringVar()
+        clusterEntry = tk.Entry(frame, textvariable=self.animationVar,
+                                width=30, bg='white')
+        clusterEntry.grid(row=0, column=1, sticky='nw', pady=5)
+
+        buttonsFrame = tk.Frame(frame)
+        buttonsFrame.grid(row=1, column=1,
+                          sticky='se', padx=5, pady=5)
+        buttonsFrame.columnconfigure(0, weight=1)
+
+        self.generateBtn = HotButton(buttonsFrame, text='Generate Animation', state=tk.DISABLED,
+                                     tooltip='Select trajectory points to generate the animations',
+                                     imagePath='fa-plus-circle.png', command=self._onCreateClick)
+        self.generateBtn.grid(row=0, column=1, padx=5)
+
+        self.loadBtn = Button(buttonsFrame, text='Load', imagePath='fa-folder-open.png',
+                              tooltip='Load a generated animation.', command=self._onLoadClick)
+        self.loadBtn.grid(row=0, column=2, padx=5)
+
+        self.closeBtn = Button(buttonsFrame, text='Close', imagePath=Icon.ACTION_CLOSE,
+                               tooltip='Close window', command=self.close)
+        self.closeBtn.grid(row=0, column=3, padx=(5, 10))
+
+        self.comboBtn = ComboBox(buttonsFrame, choices=["Inverse transformation", "cluster average", "cluster PCA"])
+        self.comboBtn.grid(row=0, column=0, padx=(5, 10))
+
+        frame.grid(row=1, column=0, sticky='new', padx=5, pady=(5, 10))
+
     def _onSaveClusterClick(self, e=None):
         if self.saveClusterCallback:
             self.saveClusterCallback(self)
@@ -115,7 +148,7 @@ class TrajectoriesWindowDimred(TrajectoriesWindow):
         for point in self.data:
             point_sel = point.getData()[selection]
             closet_point = np.argmin(np.linalg.norm(traj_sel - point_sel, axis=1))
-            point._weight =closet_point
+            point._weight =closet_point +1
 
         self.saveClusterBtn.config(state=tk.NORMAL)
         self._onUpdateClick()
@@ -135,4 +168,6 @@ class TrajectoriesWindowDimred(TrajectoriesWindow):
     def getClusterName(self):
         return self.clusterName.get().strip()
 
+    def getAnimationType(self):
+        return self.comboBtn.getValue()
 

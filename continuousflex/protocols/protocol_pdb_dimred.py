@@ -31,7 +31,7 @@ from pwem.emlib import MetaData, MDL_ENABLED, MDL_NMA_MODEFILE,MDL_ORDER
 from pwem.objects import SetOfNormalModes, AtomStruct
 from .convert import rowToMode
 from xmipp3.base import XmippMdRow
-
+from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd, dcd2numpyArr
 from umap import UMAP
 
 import numpy as np
@@ -124,16 +124,16 @@ class FlexProtDimredPdb(ProtAnalysis3D):
     # --------------------------- STEPS functions --------------------------------------------
     def readInputFiles(self):
         inputFiles = self.getInputFiles()
+        inputPDB = ContinuousFlexPDBHandler(self.getPDBRef())
 
         # Align PDBS if needed
         if self.pdbSource.get() != PDB_SOURCE_TRAJECT:
             if self.alignPDBs.get():
                 ref = ContinuousFlexPDBHandler(self.alignRefPDB.get().getFileName())
-                mol = ContinuousFlexPDBHandler(inputFiles[0])
                 if self.matchingType.get() == 1:
-                    idx_matching_atoms = mol.matchPDBatoms(reference_pdb=ref, matchingType=0)
+                    idx_matching_atoms = inputPDB.matchPDBatoms(reference_pdb=ref, matchingType=0)
                 elif self.matchingType.get() == 2:
-                    idx_matching_atoms = mol.matchPDBatoms(reference_pdb=ref, matchingType=1)
+                    idx_matching_atoms = inputPDB.matchPDBatoms(reference_pdb=ref, matchingType=1)
                 else:
                     idx_matching_atoms = None
 
@@ -142,14 +142,11 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         for pdbfn in inputFiles:
             if self.pdbSource.get() == PDB_SOURCE_TRAJECT:
                 traj_arr= dcd2numpyArr(pdbfn)
-                mol = ContinuousFlexPDBHandler(self.getPDBRef())
                 traj_arr.shape
                 for i in range(self.dcd_start.get(),
                                self.dcd_end.get() if self.dcd_end.get()!= -1 else traj_arr.shape[0],
                                self.dcd_step.get()):
-                    pdbs_matrix.append(traj_arr[i].flatten())
-                    mol.coords=traj_arr[i]
-                    mol.write_pdb(self._getExtraPath("%s_traj.pdb"%str(i+1).zfill(5)))
+                    pdbs_matrix.append(traj_arr[i])
             else:
                 try :
                     # Read PDBs
@@ -159,32 +156,40 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                     if self.alignPDBs.get():
                         mol= mol.alignMol(reference_pdb=ref, idx_matching_atoms=idx_matching_atoms)
 
-                    pdbs_matrix.append(mol.coords.flatten())
+                    pdbs_matrix.append(mol.coords)
 
                 except RuntimeError:
                     print("Warning : Can not read PDB file %s "%pdbfn)
 
-        self.pdbs_matrix = np.array(pdbs_matrix)
+        pdbs_arr = np.array(pdbs_matrix)
+
+        # save as dcd file
+        numpyArr2dcd(pdbs_arr, self._getExtraPath("coords.dcd"))
+
 
 
     def performDimred(self):
 
+        pdbs_arr = dcd2numpyArr(self._getExtraPath("coords.dcd"))
+        nframe, natom,_ = pdbs_arr.shape
+        pdbs_matrix = pdbs_arr.reshape(nframe, natom*3)
+
         if self.method.get() == REDUCE_METHOD_PCA:
             pca = decomposition.PCA(n_components=self.reducedDim.get())
-            Y = pca.fit_transform(self.pdbs_matrix)
+            Y = pca.fit_transform(pdbs_matrix)
             dump(pca, self._getExtraPath('pca_pickled.joblib'))
 
             pathPC = self._getPath("modes")
             pdb = ContinuousFlexPDBHandler(self.getPDBRef())
-            pdb.coords = pca.mean_.reshape(self.pdbs_matrix.shape[1] // 3, 3)
+            pdb.coords = pca.mean_.reshape(pdbs_matrix.shape[1] // 3, 3)
             pdb.write_pdb(self._getPath("atoms.pdb"))
             makePath(pathPC)
-            matrix = pca.components_.reshape(self.reducedDim.get(),self.pdbs_matrix.shape[1]//3,3)
+            matrix = pca.components_.reshape(self.reducedDim.get(),pdbs_matrix.shape[1]//3,3)
             self.writePrincipalComponents(prefix=pathPC, matrix = matrix)
 
         elif self.method.get() == REDUCE_METHOD_UMAP:
-            umap = UMAP(n_components=self.reducedDim.get(), n_neighbors=15, n_epochs=1000).fit(self.pdbs_matrix)
-            Y = umap.transform(self.pdbs_matrix)
+            umap = UMAP(n_components=self.reducedDim.get(), n_neighbors=15, n_epochs=1000).fit(pdbs_matrix)
+            Y = umap.transform(pdbs_matrix)
             dump(umap, self._getExtraPath('pca_pickled.joblib'))
 
         np.savetxt(self.getOutputMatrixFile(),Y)

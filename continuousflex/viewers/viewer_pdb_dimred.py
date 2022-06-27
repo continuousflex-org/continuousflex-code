@@ -47,7 +47,7 @@ from continuousflex.viewers.tk_dimred import ClusteringWindowDimred, Trajectorie
 from continuousflex.protocols.data import Point, Data, PathData
 from pwem.viewers import VmdView
 from pyworkflow.utils.path import cleanPath, makePath
-from continuousflex.protocols.utilities.genesis_utilities import save_dcd
+from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd, dcd2numpyArr
 from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
 from pyworkflow.gui.browser import FileBrowserWindow
 from continuousflex.protocols.protocol_pdb_dimred import REDUCE_METHOD_PCA, REDUCE_METHOD_UMAP
@@ -61,6 +61,10 @@ Y_LIMITS_NONE = 0
 Y_LIMITS = 1
 Z_LIMITS_NONE = 0
 Z_LIMITS = 1
+
+ANIMATION_INV=0
+ANIMATION_AVG=1
+ANIMATION_PCA=2
 
 NUM_POINTS_TRAJECTORY=10
 
@@ -178,8 +182,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                                            title='Clustering Tool',
                                            dim=self.protocol.reducedDim.get(),
                                            data=self.getData(),
-                                           callback=self._createCluster,
-                                           saveClusterCallback=self.saveClusterCallback,
+                                           callback=self.saveClusterCallback,
                                            limits_mode=0,
                                            LimitL=0.0,
                                            LimitH=1.0,
@@ -230,6 +233,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
     def _generateAnimation(self):
         prot = self.protocol
+        initPDB = ContinuousFlexPDBHandler(prot.getPDBRef())
 
         # Get animation root
         animation = self.trajectoriesWindow.getAnimationName()
@@ -239,62 +243,63 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         animationRoot = os.path.join(animationPath, 'animation_%s' % animation)
 
         # get trajectory coordinates
-        trajectoryPoints = np.array([p.getData() for p in self.trajectoriesWindow.pathData])
-        np.savetxt(animationRoot + 'trajectory.txt', trajectoryPoints)
-        pca = load(prot._getExtraPath('pca_pickled.joblib'))
-        deformations = pca.inverse_transform(trajectoryPoints)
+        animtype = self.trajectoriesWindow.getAnimationType()
+        coords_list = []
+        if animtype ==ANIMATION_INV:
+            trajectoryPoints = np.array([p.getData() for p in self.trajectoriesWindow.pathData])
+            np.savetxt(animationRoot + 'trajectory.txt', trajectoryPoints)
+            pca = load(prot._getExtraPath('pca_pickled.joblib'))
+            deformations = pca.inverse_transform(trajectoryPoints)
+            for i in range(NUM_POINTS_TRAJECTORY):
+                coords_list.append(deformations[i].reshape((initPDB.n_atoms, 3)))
+        else :
+            # read save coordinates
+            coords = dcd2numpyArr(self.protocol._getExtraPath("coords.dcd"))
+
+            # get class dict
+            classDict = {}
+            count = 0 #CLUSTERINGTAG
+            for p in self.trajectoriesWindow.data:
+                clsId = str(int(p._weight)) #CLUSTERINGTAG
+                if clsId in classDict:
+                    classDict[clsId].append(count)
+                else:
+                    classDict[clsId] = [count]
+                count += 1
+
+            if animtype == ANIMATION_AVG:
+                # compute avg
+                for i in classDict:
+                    coord_avg = np.mean(coords[np.array(classDict[i])], axis=0)
+                    coords_list.append(coord_avg.reshape((initPDB.n_atoms, 3)))
+
+            elif animtype == ANIMATION_PCA:
+                # Compute PCA
+
+                pass
 
         # Generate DCD trajectory
-        initPDB = ContinuousFlexPDBHandler(prot.getPDBRef())
         initdcdcp = initPDB.copy()
-        coords_list = []
-        for i in range(NUM_POINTS_TRAJECTORY):
-            coords_list.append(deformations[i].reshape((initdcdcp.n_atoms, 3)))
-        save_dcd(mol=initdcdcp, coords_list=coords_list, prefix=animationRoot)
         initdcdcp.coords = coords_list[0]
         initdcdcp.write_pdb(animationRoot+".pdb")
+        numpyArr2dcd(arr = np.array(coords_list), filename=animationRoot+".dcd")
 
         # Generate the vmd script
         vmdFn = animationRoot + '.vmd'
         vmdFile = open(vmdFn, 'w')
         vmdFile.write("""
-        mol load pdb %s.pdb dcd %s.dcd
+        mol new %s.pdb waitfor all
+        mol addfile %s.dcd waitfor all
         animate style Rock
         display projection Orthographic
         mol modcolor 0 0 Index
         mol modstyle 0 0 Tube 1.000000 8.000000
-        animate speed 1.0
+        animate speed 0.75
         animate forward
         """ % (animationRoot,animationRoot))
         vmdFile.close()
 
         VmdView(' -e ' + vmdFn).show()
-
-    def _createCluster(self):
-        """ Create the cluster with the selected particles
-        from the cluster. This method will be called when
-        the button 'Create Cluster' is pressed.
-        """
-
-        # define metadata
-        cluster = md.MetaData()
-        for point in self.getData():
-            if point.getState() == Point.SELECTED:
-                cluster.setValue(md.MDL_ITEM_ID, int(point.getId()), cluster.addObject())
-                point._weight = 0.5
-
-        # get name
-        cluster_name = self.clusterWindow.getClusterName()
-        if cluster_name == "":
-            index = 1
-            while(os.path.exists(self.protocol._getExtraPath("%s_cluster.xmd"%index))):
-                index+=1
-            cluster_name = self.protocol._getExtraPath("%s_cluster.xmd"%index)
-
-        # write metadata
-        print("Write cluster to %s "%cluster_name)
-        cluster.write(cluster_name)
-
 
     def saveClusterCallback(self, tkWindow):
         # get cluster name
@@ -305,7 +310,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
         classID=[]
         for p in tkWindow.data:
-            classID.append(p._weight)
+            classID.append(int(p._weight))
 
         if isinstance(inputSet, SetOfParticles):
             classSet = self.protocol._createSetOfClasses2D(inputSet, clusterName)
