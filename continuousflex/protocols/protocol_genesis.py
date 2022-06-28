@@ -157,19 +157,26 @@ class ProtGenesis(EMProtocol):
                       expertLevel=params.LEVEL_ADVANCED)
 
         group = form.addGroup('NMMD parameters', condition="simulationType==2 or simulationType==4")
-        group.addParam('nm_number', params.IntParam, default=10, label='Number of normal modes',
-                      help="Number of normal modes for NMMD. 10 should work in most cases. Avoid "
-                           " using too much NM (>50).",
-                      condition="simulationType==2 or simulationType==4")
-        group.addParam('inputModes', params.PointerParam, pointerClass = "SetOfNormalModes", label='Input Modes', default=None,
-                      help="Input set of normal modes", condition="simulationType==2 or simulationType==4")
+        group.addParam('inputModes', params.PointerParam, pointerClass="SetOfNormalModes", label='Input Modes',
+                       default=None,
+                       help="Input set of normal modes", condition="simulationType==2 or simulationType==4")
+        group.addParam('modeList', params.NumericRangeParam, expertLevel=params.LEVEL_ADVANCED,
+                      label="Modes selection",
+                      help='Select the normal modes that will be used for image analysis. \n'
+                           'If you leave this field empty, all computed modes will be selected for simulation.\n'
+                           'You have several ways to specify the modes.\n'
+                           '   Examples:\n'
+                           ' "7,8-10" -> [7,8,9,10]\n'
+                           ' "8, 10, 12" -> [8,10,12]\n'
+                           ' "8 9, 10-12" -> [8,9,10,11,12])\n')
+
         group.addParam('nm_dt', params.FloatParam, label='NM time step', default=0.001,
                       help="TODO", condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
         group.addParam('nm_mass', params.FloatParam, default=10.0, label='NM mass',
                       help="Mass value of Normal modes for NMMD", condition="simulationType==2 or simulationType==4",
                       expertLevel=params.LEVEL_ADVANCED)
-        group.addParam('nm_init', params.FileParam, label='NM init', default=None,
-                      help="TODO", condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
+        # group.addParam('nm_init', params.FileParam, label='NM init', default=None,
+        #               help="TODO", condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
         group = form.addGroup('REMD parameters', condition="simulationType==3 or simulationType==4")
         group.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
                       help="Number of MD steps between replica exchanges", condition="simulationType==3 or simulationType==4")
@@ -389,9 +396,13 @@ class ProtGenesis(EMProtocol):
         :return None:
         """
         nm_file = self.getInputPDBprefix() + ".nma"
+        if self.modeList.empty():
+            modeSelection = np.arange(7,self.inputModes.get().getSize()+1)
+        else:
+            modeSelection = getListFromRangeString(self.modeList.get())
         with open(nm_file, "w") as f:
             for i in range(self.inputModes.get().getSize()):
-                if i >= 6:
+                if i+1 in modeSelection:
                     f.write(" VECTOR    %i       VALUE  0.0\n" % (i + 1))
                     f.write(" -----------------------------------\n")
                     nm_vec = np.loadtxt(self.inputModes.get()[i + 1].getModeFile())
@@ -523,11 +534,11 @@ class ProtGenesis(EMProtocol):
 
             if self.simulationType.get() == SIMULATION_NMMD or self.simulationType.get() == SIMULATION_RENMMD:
                 s += "\n[NMMD] \n"  # -----------------------------------------------------------
-                s += "nm_number = %i \n" % self.nm_number.get()
+                s += "nm_number = %i \n" % self.getNumberOfNormalModes()
                 s += "nm_mass = %f \n" % self.nm_mass.get()
                 s += "nm_file = %s.nma \n" % inputPDBprefix
-                if self.nm_init.get() is not None and self.nm_init.get() != "":
-                    s += "nm_init = %s \n" % " ".join([str(i) for i in np.loadtxt(self.nm_init.get())[indexFit]])
+                # if self.nm_init.get() is not None and self.nm_init.get() != "":
+                #     s += "nm_init = %s \n" % " ".join([str(i) for i in np.loadtxt(self.nm_init.get())[indexFit]])
                 if self.nm_dt.get() is None:
                     s += "nm_dt = %f \n" % self.time_step.get()
                 else:
@@ -790,6 +801,14 @@ class ProtGenesis(EMProtocol):
                 and numberOfInputEM != 0:
             raise RuntimeError("Number of input EM data and PDBs must be the same.")
         return np.max([numberOfInputEM, numberOfInputPDB])
+
+    def getNumberOfNormalModes(self):
+        if self.modeList.empty():
+            modeSelection = np.arange(7,self.inputModes.get().getSize()+1)
+        else:
+            modeSelection\
+                = getListFromRangeString(self.modeList.get())
+        return len(modeSelection)
 
     def getInputPDBfn(self):
         """
