@@ -78,6 +78,10 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                       condition='pdbSource == 3',
                       label="DCD trajectory file (s)",
                       help='Use the file pattern as file location with /*.dcd')
+        form.addParam('dcd_ref_pdb', params.PointerParam, pointerClass='AtomStruct',
+                      condition='pdbSource == 3',
+                      label="trajectory Reference PDB",
+                      help='Reference PDB of the trajectory')
         form.addParam('dcd_start', params.IntParam, default=0,
                       condition='pdbSource == 3',
                       label="Beginning of the trajectory",
@@ -90,10 +94,7 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                       condition='pdbSource == 3',
                       label="Step of the trajectory",
                       help='Step to skip points in the trajectory', expertLevel=params.LEVEL_ADVANCED)
-        form.addParam('dcd_ref_pdb', params.PointerParam, pointerClass='AtomStruct',
-                      condition='pdbSource == 3',
-                      label="trajectory Reference PDB",
-                      help='Reference PDB of the trajectory', expertLevel=params.LEVEL_ADVANCED)
+
         form.addParam('method', params.EnumParam, label="Reduction method", default=REDUCE_METHOD_PCA,
                       choices=['PCA', 'UMAP'],help="")
 
@@ -132,25 +133,28 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         inputFiles = self.getInputFiles()
 
         # Get pdbs coordinates
-        pdbs_matrix = []
-        for pdbfn in inputFiles:
-            if self.pdbSource.get() == PDB_SOURCE_TRAJECT:
-                traj_arr= dcd2numpyArr(pdbfn)
-                traj_arr.shape
-                for i in range(self.dcd_start.get(),
-                               self.dcd_end.get() if self.dcd_end.get()!= -1 else traj_arr.shape[0],
-                               self.dcd_step.get()):
-                    pdbs_matrix.append(traj_arr[i])
-            else:
-                try :
+        if self.pdbSource.get() == PDB_SOURCE_TRAJECT:
+            # TODO
+            # start = self.dcd_start.get()
+            # self.dcd_end.get() if self.dcd_end.get() != -1 else traj_arr.shape[0],
+            # self.dcd_step.get()
+            pdbs_arr = dcd2numpyArr(inputFiles[0])
+            for i in range(1,len(inputFiles)):
+
+                pdbs_arr = np.concatenate((pdbs_arr, dcd2numpyArr(inputFiles[i])), axis=0)
+
+        else:
+            pdbs_matrix = []
+            for pdbfn in inputFiles:
+                try:
                     # Read PDBs
                     mol = ContinuousFlexPDBHandler(pdbfn)
                     pdbs_matrix.append(mol.coords)
 
                 except RuntimeError:
-                    print("Warning : Can not read PDB file %s "%pdbfn)
+                    print("Warning : Can not read PDB file %s " % pdbfn)
+            pdbs_arr = np.array(pdbs_matrix)
 
-        pdbs_arr = np.array(pdbs_matrix)
         # save as dcd file
         numpyArr2dcd(pdbs_arr, self._getExtraPath("coords.dcd"))
 
@@ -173,6 +177,7 @@ class FlexProtDimredPdb(ProtAnalysis3D):
 
         # loop over all pdbs
         for i in range(nframe):
+            print("Aligning PDB %i ... " %i)
 
             # rotate
             if self.matchingType.get() != 0 :
@@ -182,7 +187,7 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                 ref_coord = refPDB.coords
                 coord = arrDCD[i]
             rot_mat, tran = ContinuousFlexPDBHandler.alignCoords(ref_coord, coord)
-            arrDCD[i] = np.dot(arrDCD[i], rot_mat) + tran
+            arrDCD[i] = (np.dot(arrDCD[i], rot_mat) + tran).astype(np.float32)
 
             # add to MD
             shftx, shfty, shftz = tran

@@ -457,7 +457,11 @@ def dcd2numpyArr(filename):
         # ---------------- TITLE
         start_size = int.from_bytes((f.read(BYTESIZE)), "little")
         ntitle = int.from_bytes((f.read(BYTESIZE)), "little")
-        title = f.read(BYTESIZE*20 * ntitle).decode('ascii')
+        tilte_rd = f.read(BYTESIZE*20 * ntitle)
+        try :
+            title = tilte_rd.encode("ascii")
+        except AttributeError:
+            title = str(tilte_rd)
         end_size = int.from_bytes((f.read(BYTESIZE)), "little")
 
         if end_size != start_size:
@@ -472,9 +476,8 @@ def dcd2numpyArr(filename):
             raise RuntimeError("Can not read dcd file")
 
         # ----------------- DCD COORD
-        dcd_list = []
+        dcd_arr =  np.zeros((nframe, natom, 3), dtype=np.float32)
         for i in range(nframe):
-            coordarr = np.zeros((natom, 3))
             for j in range(3):
 
                 start_size = int.from_bytes((f.read(BYTESIZE)), "little")
@@ -489,7 +492,7 @@ def dcd2numpyArr(filename):
 
                 bin_arr = f.read(BYTESIZE * natom)
                 if len(bin_arr) == BYTESIZE * natom:
-                    coordarr[:, j] = np.frombuffer(bin_arr, dtype=np.float32)
+                    dcd_arr[i, :, j] = np.frombuffer(bin_arr, dtype=np.float32)
                 else:
                     break
                 end_size = int.from_bytes((f.read(BYTESIZE)), "little")
@@ -497,10 +500,8 @@ def dcd2numpyArr(filename):
                     if i>1:
                         break
                     else:
-                        pass
-                        # raise RuntimeError("Can not read dcd file %i %i " % (start_size, end_size))
-
-            dcd_list.append(coordarr)
+                        # pass
+                        raise RuntimeError("Can not read dcd file %i %i " % (start_size, end_size))
 
         print("\t -- Summary of DCD file -- ")
         print("\t\t crd_type  : %s"%crd_type)
@@ -513,7 +514,7 @@ def dcd2numpyArr(filename):
         print("\t\t natom  : %s"%natom)
     print("\t Done \n")
 
-    return np.array(dcd_list)
+    return dcd_arr
 
 
 def numpyArr2dcd(arr, filename, start_frame=1, len_frame=1, time_step=1.0, title=None):
