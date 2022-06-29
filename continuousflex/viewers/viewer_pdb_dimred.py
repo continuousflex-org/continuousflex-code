@@ -25,7 +25,7 @@
 from os.path import basename
 import numpy as np
 from pwem.emlib import MetaData, MDL_ORDER
-from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam
+from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam, IntParam
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.utils import replaceBaseExt, replaceExt
 from pwem.viewers import ChimeraView
@@ -104,6 +104,8 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
 
         group = form.addGroup("Window parameters")
+        group.addParam('numberOfPoints', IntParam, default=10,
+                       label='Number of trajectory points / clusters', )
         group.addParam('s', FloatParam, default=5, allowsNull=True,
                        label='Radius')
         group.addParam('alpha', FloatParam, default=0.5, allowsNull=True,
@@ -159,7 +161,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                                                 callback=self._generateAnimation,
                                                 loadCallback=self._loadAnimation,
                                                 saveClusterCallback=self.saveClusterCallback,
-                                                numberOfPoints=NUM_POINTS_TRAJECTORY,
+                                                numberOfPoints=self.numberOfPoints.get(),
                                                 limits_mode=0,
                                                 LimitL=None,
                                                 LimitH=None,
@@ -240,7 +242,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         animationPath = prot._getExtraPath('animation_%s' % animation)
         cleanPath(animationPath)
         makePath(animationPath)
-        animationRoot = os.path.join(animationPath, 'animation_%s' % animation)
+        animationRoot = os.path.join(animationPath, '')
 
         # get trajectory coordinates
         animtype = self.trajectoriesWindow.getAnimationType()
@@ -250,7 +252,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             np.savetxt(animationRoot + 'trajectory.txt', trajectoryPoints)
             pca = load(prot._getExtraPath('pca_pickled.joblib'))
             deformations = pca.inverse_transform(trajectoryPoints)
-            for i in range(NUM_POINTS_TRAJECTORY):
+            for i in range(self.trajectoriesWindow.numberOfPoints):
                 coords_list.append(deformations[i].reshape((initPDB.n_atoms, 3)))
         else :
             # read save coordinates
@@ -307,6 +309,9 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
         # get input metadata
         inputSet = self.inputSet.get()
+        if inputSet is None:
+            tkWindow.showError("Select an EM set before exporting clusters.")
+            return
 
         classID=[]
         for p in tkWindow.data:
@@ -355,40 +360,41 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         project.getRunsGraph()
 
     def _loadAnimation(self):
-        browser = FileBrowserWindow("Select the animation folder (animation_NAME)",
+        browser = FileBrowserWindow("Select animation directory / trajectory file (txt file)",
                                     self.getWindow(), self.protocol._getExtraPath(),
                                     onSelect=self._loadAnimationData)
         browser.show()
 
     def _loadAnimationData(self, obj):
-        prot = self.protocol
-        animationName = obj.getFileName()  # assumes that obj.getFileName is the folder of animation
-        animationPath = prot._getExtraPath(animationName)
-        animationRoot = os.path.join(animationPath, animationName)
 
-        animationSuffixes = ['.vmd', '.pdb','.dcd', 'trajectory.txt']
-        for s in animationSuffixes:
-            f = animationRoot + s
-            if not os.path.exists(f):
-                self.errorMessage('Animation file "%s" not found. ' % f)
+        if obj.isDir() :
+            trajPath = obj.getPath()
+            trajFile = os.path.join(trajPath,'trajectory.txt')
+            trajName = obj.getFileName()
+            print("dir")
+            print(trajFile)
+            if not os.path.exists(trajFile):
+                print("wtf")
+                self.errorMessage('Animation file "%s" not found. ' % trajFile)
+                self.infoMessage('Animation file "%s" not found. ' % trajFile)
+                self.warnMessage('Animation file "%s" not found. ' % trajFile)
                 return
+        else:
+            trajFile =  obj.getPath()
+            trajName,_ = os.path.splitext(os.path.basename(trajFile))
+
 
         # Load animation trajectory points
-        trajectoryPoints = np.loadtxt(animationRoot + 'trajectory.txt')
+        trajectoryPoints = np.loadtxt(trajFile)
         data = PathData(dim=trajectoryPoints.shape[1])
-
         for i, row in enumerate(trajectoryPoints):
-            data.addPoint(Point(pointId=i + 1, data=list(row), weight=1))
+            data.addPoint(Point(pointId=i + 1, data=list(row), weight=0))
 
         self.trajectoriesWindow.setPathData(data)
-        self.trajectoriesWindow.setAnimationName(animationName)
+        self.trajectoriesWindow.setAnimationName(trajName)
         self.trajectoriesWindow._onUpdateClick()
+        self.trajectoriesWindow._checkNumberOfPoints()
 
-        def _showVmd():
-            vmdFn = animationRoot + '.vmd'
-            VmdView(' -e %s' % vmdFn).show()
-
-        self.getTkRoot().after(500, _showVmd)
 
 class VolumeTrajectoryViewer(ProtocolViewer):
     """ Visualization of a SetOfVolumes as a trajectory with ChimeraX

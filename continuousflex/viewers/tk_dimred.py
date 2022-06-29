@@ -3,6 +3,7 @@ import tkinter as tk
 from pyworkflow.gui.widgets import Button, HotButton, ComboBox
 from pyworkflow.utils.properties import Icon
 import numpy as np
+import scipy as sp
 from continuousflex.protocols.data import Point, Data
 
 class ClusteringWindowDimred(ClusteringWindow):
@@ -32,8 +33,8 @@ class ClusteringWindowDimred(ClusteringWindow):
                                      imagePath='fa-plus-circle.png', command=self._onCreateCluster)
         self.createBtn.grid(row=0, column=1, padx=5)
 
-        self.saveClusterBtn = Button(buttonsFrame, text='Save', state=tk.DISABLED,
-                              tooltip='Save cluster', command=self._onSaveClusterClick)
+        self.saveClusterBtn = Button(buttonsFrame, text='Export', state=tk.DISABLED,
+                              tooltip='export clusters to scipion', command=self._onSaveClusterClick)
         self.saveClusterBtn.grid(row=0, column=2, padx=5)
 
         frame.grid(row=2, column=0, sticky='new', padx=5, pady=(10, 5))
@@ -95,8 +96,8 @@ class TrajectoriesWindowDimred(TrajectoriesWindow):
                                      imagePath='fa-plus-circle.png', command=self._onCreateCluster)
         self.updateClusterBtn.grid(row=0, column=1, padx=5)
 
-        self.saveClusterBtn = Button(buttonsFrame, text='Save', state=tk.DISABLED,
-                              tooltip='Save cluster', command=self._onSaveClusterClick)
+        self.saveClusterBtn = Button(buttonsFrame, text='Export', state=tk.DISABLED,
+                              tooltip='export clusters to scipion', command=self._onSaveClusterClick)
         self.saveClusterBtn.grid(row=0, column=2, padx=5)
 
         frame.grid(row=2, column=0, sticky='new', padx=5, pady=(10, 5))
@@ -113,32 +114,80 @@ class TrajectoriesWindowDimred(TrajectoriesWindow):
                                 width=30, bg='white')
         clusterEntry.grid(row=0, column=1, sticky='nw', pady=5)
 
-        buttonsFrame = tk.Frame(frame)
-        buttonsFrame.grid(row=1, column=1,
-                          sticky='se', padx=5, pady=5)
-        buttonsFrame.columnconfigure(0, weight=1)
-
-        self.generateBtn = HotButton(buttonsFrame, text='Generate Animation', state=tk.DISABLED,
-                                     tooltip='Select trajectory points to generate the animations',
-                                     imagePath='fa-plus-circle.png', command=self._onCreateClick)
-        self.generateBtn.grid(row=0, column=1, padx=5)
-
-        self.loadBtn = Button(buttonsFrame, text='Load', imagePath='fa-folder-open.png',
+        self.loadBtn = Button(frame, text='Load', imagePath='fa-folder-open.png',
                               tooltip='Load a generated animation.', command=self._onLoadClick)
         self.loadBtn.grid(row=0, column=2, padx=5)
 
-        self.closeBtn = Button(buttonsFrame, text='Close', imagePath=Icon.ACTION_CLOSE,
-                               tooltip='Close window', command=self.close)
-        self.closeBtn.grid(row=0, column=3, padx=(5, 10))
 
+        buttonsFrame = tk.Frame(frame)
+        buttonsFrame.grid(row=1, column=0,
+                          sticky='se', padx=5, pady=5)
+        buttonsFrame.columnconfigure(0, weight=1)
+        self.generateBtn = HotButton(buttonsFrame, text='Show in VMD', state=tk.DISABLED,
+                                     tooltip='Select trajectory points to generate the animations',
+                                     imagePath='fa-plus-circle.png', command=self._onCreateClick)
+        self.generateBtn.grid(row=0, column=0, padx=5)
         self.comboBtn = ComboBox(buttonsFrame, choices=["Inverse transformation", "cluster average", "cluster PCA"])
-        self.comboBtn.grid(row=0, column=0, padx=(5, 10))
+        self.comboBtn.grid(row=0, column=1, padx=(5, 10))
+
+        buttonsFrame2 = tk.Frame(frame)
+        buttonsFrame2.grid(row=2, column=0,
+                          sticky='se', padx=5, pady=5)
+        buttonsFrame2.columnconfigure(0, weight=1)
+        self.trajSimBtn = HotButton(buttonsFrame2, text='Generate points', state=tk.NORMAL,
+                                     tooltip='Generate trajectory points based on axis and trajectory type', command=self._onSimClick)
+        self.trajSimBtn.grid(row=0, column=0, padx=5)
+        self.trajAxisBtn = ComboBox(buttonsFrame2, choices=["axis %i"%(i+1) for i in range(self.dim)])
+        self.trajAxisBtn.grid(row=0, column=1, padx=(5, 10))
+        self.trajTypeBtn = ComboBox(buttonsFrame2, choices=["percentiles",
+                                                            "linear betmeen min and max", "Linear betmeen -2*std and +2*std"
+                                                            , "Gaussian betmeen min and max", "Gaussian betmeen -2*std and +2*std"])
+        self.trajTypeBtn.grid(row=0, column=2, padx=(5, 5))
 
         frame.grid(row=1, column=0, sticky='new', padx=5, pady=(5, 10))
 
     def _onSaveClusterClick(self, e=None):
         if self.saveClusterCallback:
             self.saveClusterCallback(self)
+
+    def _onSimClick(self):
+        self._onResetClick()
+        traj_axis = self.trajAxisBtn.getValue()
+        traj_type = self.trajTypeBtn.getValue()
+
+        data_axis = np.array([p.getData()[traj_axis] for p in self.data])
+        mean_axis =data_axis.mean()
+        std_axis =data_axis.std()
+        min_axis =data_axis.min()
+        max_axis =data_axis.max()
+
+        traj_points = np.zeros((self.numberOfPoints, self.dim))
+        if traj_type== 0 :
+            traj_points[:,traj_axis] = np.array(
+                [np.percentile(data_axis,100*(i+1)/(self.numberOfPoints+1)) for i in range(self.numberOfPoints)]
+            )
+        elif traj_type== 1 :
+            traj_points[:,traj_axis] = np.linspace(min_axis,max_axis,self.numberOfPoints)
+        elif traj_type== 2:
+            traj_points[:,traj_axis] = np.linspace(-2*std_axis,+2*std_axis,self.numberOfPoints)
+        elif traj_type== 3:
+            distribution = sp.stats.norm(loc=mean_axis, scale=std_axis)
+            bounds_for_range = distribution.cdf([min_axis, max_axis])
+            gaussTraj = distribution.ppf(np.linspace(*bounds_for_range, num=self.numberOfPoints))
+            traj_points[:, traj_axis] = gaussTraj
+        elif traj_type== 4:
+            distribution = sp.stats.norm(loc=mean_axis, scale=std_axis)
+            bounds_for_range = distribution.cdf([-2*std_axis, +2*std_axis])
+            gaussTraj = distribution.ppf(np.linspace(*bounds_for_range, num=self.numberOfPoints))
+            traj_points[:, traj_axis] = gaussTraj
+
+        for i in range(self.numberOfPoints):
+            self.pathData.addPoint(Point(pointId=i + 1, data=traj_points[i], weight=0))
+
+        self._checkNumberOfPoints()
+        self._onUpdateClick()
+
+
 
     def _onCreateCluster(self):
         traj_arr = np.array([p.getData() for p in self.pathData])
