@@ -181,26 +181,28 @@ class FlexBatchProtClusterSet(BatchProtocol):
         inputClasses = self.inputSet.get()
 
         for i in inputClasses:
-            classFile = self._getExtraPath("class%i.xmd" % i.getObjId())
-            classVol = self._getExtraPath("class%i.vol" % i.getObjId())
-            if isinstance(inputClasses, SetOfClasses2D):
-                writeSetOfParticles(i, classFile)
-                progname = "xmipp_reconstruct_fourier "
-                args = "-i %s -o %s " % (classFile, classVol)
-                runCommand(progname + args)
-            else:
-                writeSetOfVolumes(i,classFile)
-                classAvg = ImageHandler().computeAverage(i)
-                classAvg.write(classVol)
+            if i.getObjId() != 0:
+                classFile = self._getExtraPath("class%i.xmd" % i.getObjId())
+                classVol = self._getExtraPath("class%i.vol" % i.getObjId())
+                if isinstance(inputClasses, SetOfClasses2D):
+                    writeSetOfParticles(i, classFile)
+                    progname = "xmipp_reconstruct_fourier "
+                    args = "-i %s -o %s " % (classFile, classVol)
+                    runCommand(progname + args)
+                else:
+                    writeSetOfVolumes(i,classFile)
+                    classAvg = ImageHandler().computeAverage(i)
+                    classAvg.write(classVol)
 
     def createOutputStep(self):
         outputMd = md.MetaData()
         inputClasses = self.inputSet.get()
         for i in inputClasses:
-            classVol = self._getExtraPath("class%i.vol" % i.getObjId())
-            index = outputMd.addObject()
-            outputMd.setValue(md.MDL_IMAGE, classVol, index)
-            outputMd.setValue(md.MDL_ITEM_ID, i.getObjId(), index)
+            if i.getObjId() != 0:
+                classVol = self._getExtraPath("class%i.vol" % i.getObjId())
+                index = outputMd.addObject()
+                outputMd.setValue(md.MDL_IMAGE, classVol, index)
+                outputMd.setValue(md.MDL_ITEM_ID, i.getObjId(), index)
         outputMd.write(self._getExtraPath("outputVols.xmd"))
         outputVols = self._createSetOfVolumes()
         readSetOfVolumes(self._getExtraPath("outputVols.xmd"),outputVols)
