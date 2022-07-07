@@ -22,6 +22,8 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
 import os.path
+import subprocess
+
 from pyworkflow.utils.path import createLink
 
 import pyworkflow.protocol.params as params
@@ -678,7 +680,11 @@ class ProtGenesis(EMProtocol):
 
         print("Command : %s" % cmd)
         print("Parallel Command : %s" % parallel_cmd)
-        runCommand(parallel_cmd, env=env)
+        try :
+            runCommand(parallel_cmd, env=env)
+        except subprocess.CalledProcessError :
+            print("Warning : Some processes returned with errors")
+
 
 
     # --------------------------- Create output step --------------------------------------------
@@ -691,18 +697,17 @@ class ProtGenesis(EMProtocol):
         if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
             self.convertReusOutputDcd()
 
-        # Convert Output
-        for i in range(self.getNumberOfSimulation()):
-            outputPrefix = self.getOutputPrefixAll(i)
-            for j in outputPrefix:
-                # Extract the pdb from the DCD file in case of SPDYN
-                if self.md_program.get() == PROGRAM_SPDYN:
-                    lastPDBFromDCD(
-                        inputDCD=j + ".dcd",
-                        outputPDB=j + ".pdb",
-                        inputPDB=self.getInputPDBprefix(i) + ".pdb")
+        # Extract the pdb from the DCD file in case of SPDYN
+        if self.md_program.get() == PROGRAM_SPDYN:
+            for i in range(self.getNumberOfSimulation()):
+                outputPrefix = self.getOutputPrefixAll(i)
+                for j in outputPrefix:
+                        lastPDBFromDCD(
+                            inputDCD=j + ".dcd",
+                            outputPDB=j + ".pdb",
+                            inputPDB=self.getInputPDBprefix(i) + ".pdb")
 
-
+        # In Case of CAGO, replace PDB info by input PDB because Genesis is not saving it properly
         if self.getForceField() == FORCEFIELD_CAGO:
             input = ContinuousFlexPDBHandler(self.getInputPDBprefix() + ".pdb")
             for i in range(self.getNumberOfSimulation()):
@@ -721,14 +726,35 @@ class ProtGenesis(EMProtocol):
 
         # CREATE SET OF output PDBs
         else:
-
+            missing_pdbs = []
             pdbset = self._createSetOfPDBs("outputPDBs")
             # Add each output PDB to the Set
             for i in range(self.getNumberOfSimulation()):
                 outputPrefix =self.getOutputPrefixAll(i)
                 for j in outputPrefix:
-                    pdbset.append(AtomStruct(j + ".pdb"))
+                    pdb_fname = j + ".pdb"
+                    if os.path.isfile(pdb_fname) and os.path.getsize(pdb_fname) != 0 :
+                        pdbset.append(AtomStruct(pdb_fname))
+                    else:
+                        missing_pdbs.append(i+1)
             self._defineOutputs(outputPDBs=pdbset)
+
+            # If some pdbs are missing, output a subset of the EM data that have actually been anaylzed
+            if self.EMfitChoice.get() != EMFIT_NONE and len( missing_pdbs)>0:
+                if self.EMfitChoice.get() == EMFIT_VOLUMES:
+                    inSet = self.inputVolume.get()
+                    outSet = self._createSetOfVolumes("subsetVolumes")
+                    outSet.setSamplingRate(self.voxel_size.get())
+
+                else:
+                    inSet = self.inputImage.get()
+                    outSet = self._createSetOfParticles("subsetParticles")
+                    outSet.setSamplingRate(self.pixel_size.get())
+
+                for i in inSet:
+                    if not i.getObjId() in missing_pdbs:
+                        outSet.append(i)
+                self._defineOutputs(subsetEM=outSet)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
