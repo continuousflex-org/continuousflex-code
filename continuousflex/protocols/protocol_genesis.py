@@ -61,7 +61,7 @@ class ProtGenesis(EMProtocol):
         # Inputs ============================================================================================
         form.addSection(label='Inputs')
 
-        form.addParam('inputType', params.EnumParam, label="Simulation inputs", default=INPUT_TOPOLOGY,
+        form.addParam('inputType', params.EnumParam, label="Simulation inputs", default=INPUT_NEW_SIM,
                       choices=['New simulation from topology protocol', 'Restart previous GENESIS simulation', "New simulation from files"],
                       help="Chose the type of input for your simulation",
                       important=True)
