@@ -26,6 +26,7 @@ from pwem.tests.workflows import TestWorkflow
 from pyworkflow.tests import setupTestProject, DataSet
 
 from continuousflex.protocols.protocol_genesis import *
+from continuousflex.protocols.protocol_generate_topology import ProtGenerateTopology
 from continuousflex.protocols import FlexProtNMA, NMA_CUTOFF_ABS, FlexProtSynthesizeImages
 from continuousflex.viewers.viewer_genesis import *
 from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
@@ -57,15 +58,20 @@ class testGENESIS(TestWorkflow):
         protPdb4ake.setObjLabel('Input PDB (4AKE All-Atom)')
         self.launchProtocol(protPdb4ake)
 
+        # Energy min
+        protGenTopo = self.newProtocol(ProtGenerateTopology,
+            inputPDB = protPdb4ake.outputPdb,
+            forcefield = FORCEFIELD_CHARMM,
+            inputPRM = self.ds.getFile('charmm_prm'),
+            inputRTF = self.ds.getFile('charmm_top'),
+            inputPSF=self.ds.getFile('4ake_aa_psf'))
+        self.launchProtocol(protGenTopo)
+
 
         # Energy min
         protGenesisMin = self.newProtocol(ProtGenesis,
-            inputPDB = protPdb4ake.outputPdb,
-            forcefield = FORCEFIELD_CHARMM,
-            generateTop = False,
-            inputPRM = self.ds.getFile('charmm_prm'),
-            inputRTF = self.ds.getFile('charmm_top'),
-            inputPSF=self.ds.getFile('4ake_aa_psf'),
+            inputType = INPUT_TOPOLOGY,
+            topoProt = protGenTopo,
 
             simulationType = SIMULATION_MIN,
             time_step = 0.002,
@@ -113,7 +119,7 @@ class testGENESIS(TestWorkflow):
         self.launchProtocol(protNMA)
 
         protGenesisFitNMMD = self.newProtocol(ProtGenesis,
-          restartChoice=True,
+          inputType=INPUT_RESTART,
           restartProt = protGenesisMin,
 
           simulationType=SIMULATION_NMMD,
@@ -190,7 +196,7 @@ class testGENESIS(TestWorkflow):
         protGenesisMin = self.newProtocol(ProtGenesis,
             inputPDB = protPdb4ake.outputPdb,
             forcefield = FORCEFIELD_CAGO,
-            generateTop = False,
+            inputType = INPUT_NEW_SIM,
             inputTOP = self.ds.getFile('4ake_ca_top'),
 
             simulationType = SIMULATION_MIN,
@@ -222,8 +228,8 @@ class testGENESIS(TestWorkflow):
 
         protGenesisFitMD = self.newProtocol(ProtGenesis,
 
-                                              restartChoice=True,
-                                              restartProt=protGenesisMin,
+                                            inputType=INPUT_RESTART,
+                                            restartProt=protGenesisMin,
 
                                               simulationType=SIMULATION_MD,
                                               time_step=0.0005,
@@ -289,7 +295,7 @@ class testGENESIS(TestWorkflow):
         if NUMBER_OF_CPU >= 4:
             protGenesisFitREUS = self.newProtocol(ProtGenesis,
 
-                                                  restartChoice=True,
+                                                  inputType=INPUT_RESTART,
                                                   restartProt=protGenesisMin,
 
                                                   simulationType=SIMULATION_RENMMD,
@@ -393,8 +399,8 @@ class testGENESIS(TestWorkflow):
 
             protGenesisFitNMMDImg = self.newProtocol(ProtGenesis,
 
-                                                  restartChoice=True,
-                                                  restartProt=protGenesisMin,
+                                                 inputType=INPUT_RESTART,
+                                                 restartProt=protGenesisMin,
 
                                                   simulationType=SIMULATION_NMMD,
                                                   time_step=0.0005,
