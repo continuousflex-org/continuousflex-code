@@ -283,15 +283,15 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         # Generate DCD trajectory
         initdcdcp = initPDB.copy()
         initdcdcp.coords = coords_list[0]
-        initdcdcp.write_pdb(animationRoot+".pdb")
-        numpyArr2dcd(arr = np.array(coords_list), filename=animationRoot+".dcd")
+        initdcdcp.write_pdb(animationRoot+"trajectory.pdb")
+        numpyArr2dcd(arr = np.array(coords_list), filename=animationRoot+"trajectory.dcd")
 
         # Generate the vmd script
-        vmdFn = animationRoot + '.vmd'
+        vmdFn = animationRoot + 'trajectory.vmd'
         vmdFile = open(vmdFn, 'w')
         vmdFile.write("""
-        mol new %s.pdb waitfor all
-        mol addfile %s.dcd waitfor all
+        mol new %strajectory.pdb waitfor all
+        mol addfile %strajectory.dcd waitfor all
         animate style Rock
         display projection Orthographic
         mol modcolor 0 0 Index
