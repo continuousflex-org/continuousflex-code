@@ -199,6 +199,7 @@ class FlexProtDimredPdb(ProtAnalysis3D):
             alignXMD.setValue(md.MDL_SHIFT_X, shftx, index)
             alignXMD.setValue(md.MDL_SHIFT_Y, shfty, index)
             alignXMD.setValue(md.MDL_SHIFT_Z, shftz, index)
+            alignXMD.setValue(md.MDL_IMAGE, "", index)
 
         numpyArr2dcd(arrDCD, self._getExtraPath("coords.dcd"))
         alignXMD.write(self._getExtraPath("alignement.xmd"))

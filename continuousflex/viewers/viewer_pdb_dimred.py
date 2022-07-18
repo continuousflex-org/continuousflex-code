@@ -319,6 +319,31 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
         if isinstance(inputSet, SetOfParticles):
             classSet = self.protocol._createSetOfClasses2D(inputSet, clusterName)
+
+            if inputSet.getFirstItem().hasTransform() and self.protocol.alignPDBs.get():
+                inputAlignement = self.protocol._createSetOfParticles("inputAlignement")
+                alignedParticles = self.protocol._createSetOfParticles("alignedParticles")
+                readSetOfParticles(self.protocol._getExtraPath("alignement.xmd"),inputAlignement)
+                iter1 = inputSet.iterItems()
+                iter2 = inputAlignement.iterItems()
+                for i in range(inputSet.getSize()):
+                    p1 = iter1.__next__()
+                    p2 = iter2.__next__()
+                    r1 = p1.getTransform()
+                    r2 = p2.getTransform()
+                    middle = np.ones(3) * p1.getDim()[0]/2 * inputSet.getSamplingRate()
+                    rot = r2.getRotationMatrix()
+                    tran = np.array(r2.getShifts())/ inputSet.getSamplingRate()
+                    print(middle)
+                    new_tran = np.dot(middle, rot) + tran - middle
+                    print(new_tran)
+
+                    # r2[:,3:] = 0.0
+                    # rot = np.dot(p1.getTransform(),)
+                    # tran = np.dot(p1.getTransform(),p2.getTransform())
+                    alignedParticles.append(p1)
+
+
         else:
             classSet = self.protocol._createSetOfClasses3D(inputSet,clusterName)
 
