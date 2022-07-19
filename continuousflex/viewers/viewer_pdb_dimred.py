@@ -30,7 +30,7 @@ from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.utils import replaceBaseExt, replaceExt
 from pwem.viewers import ChimeraView
 from pyworkflow.viewer import Viewer
-
+from pwem.constants import ALIGN_PROJ
 
 from pwem.objects.data import SetOfParticles,SetOfVolumes, Class2D, ClassVol
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
@@ -320,28 +320,39 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         if isinstance(inputSet, SetOfParticles):
             classSet = self.protocol._createSetOfClasses2D(inputSet, clusterName)
 
-            if inputSet.getFirstItem().hasTransform() and self.protocol.alignPDBs.get():
-                inputAlignement = self.protocol._createSetOfParticles("inputAlignement")
-                alignedParticles = self.protocol._createSetOfParticles("alignedParticles")
-                readSetOfParticles(self.protocol._getExtraPath("alignement.xmd"),inputAlignement)
-                iter1 = inputSet.iterItems()
-                iter2 = inputAlignement.iterItems()
-                for i in range(inputSet.getSize()):
-                    p1 = iter1.__next__()
-                    p2 = iter2.__next__()
-                    r1 = p1.getTransform()
-                    r2 = p2.getTransform()
-                    middle = np.ones(3) * p1.getDim()[0]/2 * inputSet.getSamplingRate()
-                    rot = r2.getRotationMatrix()
-                    tran = np.array(r2.getShifts())/ inputSet.getSamplingRate()
-                    print(middle)
-                    new_tran = np.dot(middle, rot) + tran - middle
-                    print(new_tran)
+            # if inputSet.getFirstItem().hasTransform() and self.protocol.alignPDBs.get():
+            #     inputAlignement = self.protocol._createSetOfParticles("inputAlignement")
+            #     alignedParticles = self.protocol._createSetOfParticles("alignedParticles")
+            #     readSetOfParticles(self.protocol._getExtraPath("alignement.xmd"),inputAlignement)
+            #     alignedParticles.setSamplingRate(inputSet.getSamplingRate())
+            #     alignedParticles.setAlignment(ALIGN_PROJ)
+            #     iter1 = inputSet.iterItems()
+            #     iter2 = inputAlignement.iterItems()
+            #     for i in range(inputSet.getSize()):
+            #         p1 = iter1.__next__()
+            #         p2 = iter2.__next__()
+            #         r1 = p1.getTransform()
+            #         r2 = p2.getTransform()
+            #         middle = np.ones(3) * p1.getDim()[0]/2 * inputSet.getSamplingRate()
+            #         rot = r2.getRotationMatrix()
+            #         tran = np.array(r2.getShifts())/ inputSet.getSamplingRate()
+            #         print("///")
+            #         print(tran)
+            #         print(tran/ inputSet.getSamplingRate())
+            #         print(middle)
+            #         new_tran = np.dot(middle, rot) + tran
+            #         print(new_tran)
+            #         print(new_tran - middle)
+            #         new_tran = np.zeros(3)
+            #         new_trans = np.zeros((4,4))
+            #         # new_trans[:3,3:] = new_tran
+            #         new_trans[:3,:3] = rot
+            #         new_trans[3,3] = 1.0
+            #         r1.composeTransform(new_trans)
+            #         p1.setTransform(r1)
+            #         alignedParticles.append(p1)
+            #     self.protocol._defineOutputs(**{clusterName+"_alignPart": alignedParticles})
 
-                    # r2[:,3:] = 0.0
-                    # rot = np.dot(p1.getTransform(),)
-                    # tran = np.dot(p1.getTransform(),p2.getTransform())
-                    alignedParticles.append(p1)
 
 
         else:
