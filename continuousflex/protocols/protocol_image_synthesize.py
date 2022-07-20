@@ -41,6 +41,7 @@ import glob
 from joblib import dump
 from math import cos, sin, pi
 import xmippLib
+import math
 
 NMA_ALIGNMENT_WAV = 0
 NMA_ALIGNMENT_PROJ = 1
@@ -490,6 +491,27 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                 psi1 = np.random.uniform(self.LowPsi.get(), self.HighPsi.get())
             else:
                 psi1 = np.random.normal(self.MeanPsi.get(), self.StdPsi.get())
+
+            # uniform over the sphere
+            if (self.psi.get() == ROTATION_UNIFORM) and\
+                (self.tilt.get()==ROTATION_UNIFORM) and \
+                    (self.rot.get()==ROTATION_UNIFORM) and \
+                    self.LowRot.get() == 0.0 and self.HighRot.get() == 360.0 and \
+                    self.LowTilt.get() == 0.0 and self.HighTilt.get() == 180.0 and \
+                    self.LowPsi.get() == 0.0 and self.HighPsi.get() == 360.0:
+                x1,x2,x3 = np.random.uniform(0,1,3)
+                R = np.array([
+                    [np.cos(2*np.pi*x1), np.sin(2*np.pi*x1), 0],
+                    [-np.sin(2*np.pi*x1), np.cos(2*np.pi*x1), 0],
+                    [0, 0, 1]
+                ])
+                v = np.array([[np.cos(2*np.pi*x2)*np.sqrt(x3),
+                              np.sin(2*np.pi*x2)*np.sqrt(x3),
+                              np.sqrt(1-x3)]])
+                H = np.eye(3) - 2*np.dot(v.T,v)
+                M = -np.dot(H,R)
+                rot1,tilt1,psi1 = matrix2eulerAngles(M)
+                print("hello")
             subtomogramMD.setValue(md.MDL_SHIFT_X, shift_x1, i + 1)
             subtomogramMD.setValue(md.MDL_SHIFT_Y, shift_y1, i + 1)
             subtomogramMD.setValue(md.MDL_ANGLE_ROT, rot1, i + 1)
@@ -701,3 +723,31 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
     def _getLocalModesFn(self):
         modesFn = self.inputModes.get().getFileName()
         return self._getBasePath(modesFn)
+
+
+def matrix2eulerAngles(A):
+    abs_sb = np.sqrt(A[0, 2] * A[0, 2] + A[1, 2] * A[1, 2])
+    if (abs_sb > 16 * np.exp(-5)):
+        gamma = math.atan2(A[1, 2], -A[0, 2])
+        alpha = math.atan2(A[2, 1], A[2, 0])
+        if (abs(np.sin(gamma)) < np.exp(-5)):
+            sign_sb = np.sign(-A[0, 2] / np.cos(gamma))
+        else:
+            if np.sin(gamma) > 0:
+                sign_sb = np.sign(A[1, 2])
+            else:
+                sign_sb = -np.sign(A[1, 2])
+        beta = math.atan2(sign_sb * abs_sb, A[2, 2])
+    else:
+        if (np.sign(A[2, 2]) > 0):
+            alpha = 0
+            beta = 0
+            gamma = math.atan2(-A[1, 0], A[0, 0])
+        else:
+            alpha = 0
+            beta = np.pi
+            gamma = math.atan2(A[1, 0], -A[0, 0])
+    gamma = np.rad2deg(gamma)
+    beta = np.rad2deg(beta)
+    alpha = np.rad2deg(alpha)
+    return alpha, beta, gamma

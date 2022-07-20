@@ -291,12 +291,20 @@ class ProtGenesis(EMProtocol):
         # Images
         group = form.addGroup('Image Parameters', condition="EMfitChoice==2")
         group.addParam('inputImage', params.PointerParam, pointerClass="SetOfParticles",
-                      label="Input images ", help='Select the target EM density map',
+                      label="Input images ", help='Select the target image set',
                       condition="EMfitChoice==2", important=True)
-        group.addParam('image_size', params.IntParam, default=64, label='Image Size',
-                      help="TODO", condition="EMfitChoice==2")
         group.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
                       help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==2")
+        group.addParam('projectAngleChoice', params.EnumParam, default=0, label='Projection angles',
+                       choices=['same as image set', 'from xmipp file', 'from other set'],
+                      help="Source of projection angles to align the input PDB with the set of images",
+                       condition="EMfitChoice==2")
+        group.addParam('projectAngleXmipp', params.FileParam, default=None, label='projection angle Xmipp file',
+                      help="Xmipp metadata file with projection alignement parameters ",
+                       condition="EMfitChoice==2 and projectAngleChoice==%i"%(PROJECTION_ANGLE_XMIPP))
+        group.addParam('projectAngleImage', params.PointerParam, pointerClass="SetOfParticles",
+                      label="projection angle image set  ", help='Image set containing projection alignement parameters',
+                      condition="EMfitChoice==2 and projectAngleChoice==%i"%(PROJECTION_ANGLE_IMAGE))
 
         form.addParallelSection(threads=1, mpi=1)
         # --------------------------- INSERT steps functions --------------------------------------------
@@ -958,6 +966,22 @@ class ProtGenesis(EMProtocol):
             if self.EMfitChoice.get() == EMFIT_IMAGES :
                 writeSetOfParticles(self.inputImage.get(),nameMd)
                 self.inputEMMetadata = md.MetaData(nameMd)
+                if self.projectAngleChoice.get() == PROJECTION_ANGLE_XMIPP:
+                    xmd = md.MetaData(self.projectAngleXmipp.get())
+                    for i in xmd:
+                        rot = xmd.getValue(md.MDL_ANGLE_ROT, i)
+                        tilt = xmd.getValue(md.MDL_ANGLE_TILT, i)
+                        psi = xmd.getValue(md.MDL_ANGLE_PSI, i)
+                        shx = xmd.getValue(md.MDL_SHIFT_X, i)
+                        shy = xmd.getValue(md.MDL_SHIFT_Y, i)
+                        self.inputEMMetadata.setValue(md.MDL_ANGLE_ROT, rot, i)
+                        self.inputEMMetadata.setValue(md.MDL_ANGLE_TILT, tilt, i)
+                        self.inputEMMetadata.setValue(md.MDL_ANGLE_PSI, psi, i)
+                        self.inputEMMetadata.setValue(md.MDL_SHIFT_X, shx, i)
+                        self.inputEMMetadata.setValue(md.MDL_SHIFT_Y, shy, i)
+                    self.inputEMMetadata.write(nameMd)
+                elif self.projectAngleChoice.get() == PROJECTION_ANGLE_IMAGE:
+                    raise RuntimeError("projection angles from other image set error : Not implemented")
 
             elif self.EMfitChoice.get() == EMFIT_VOLUMES :
                 if isinstance(self.inputVolume.get(), Volume):
@@ -968,6 +992,7 @@ class ProtGenesis(EMProtocol):
                 else:
                     writeSetOfVolumes(self.inputVolume.get(), nameMd)
                     self.inputEMMetadata = md.MetaData(nameMd)
+
         return self.inputEMMetadata
 
     def getCHARMMInputs(self):

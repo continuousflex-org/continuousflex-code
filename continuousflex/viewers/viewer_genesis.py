@@ -337,16 +337,16 @@ class GenesisViewer(ProtocolViewer):
             else:
                 labels.append("RMSD %s"%str(i+1))
             rmsd_rep=[]
-            for j in outputPrefix:
+            for outprf in outputPrefix:
                 rmsd_curr = []
 
                 inputPDB = ContinuousFlexPDBHandler(self.protocol.getInputPDBprefix(i)+".pdb")
                 targetPDB = ContinuousFlexPDBHandler(self.getTargetPDB(i))
-                rmsd_curr.append(inputPDB.getRMSD(reference_pdb=targetPDB, align=align, idx_matchin_atoms=idx_matchin_atoms))
-                coord_arr = dcd2numpyArr(outputPrefix + ".dcd")
+                rmsd_curr.append(inputPDB.getRMSD(reference_pdb=targetPDB, align=self.alignTarget.get(), idx_matching_atoms=idx_matchin_atoms))
+                coord_arr = dcd2numpyArr(outprf + ".dcd")
                 for i in range(len(coord_arr)):
                     inputPDB.coords[:, :] = coord_arr[i]
-                    rmsd_curr.append(inputPDB.getRMSD(reference_pdb=targetPDB, align=align, idx_matchin_atoms=idx_matchin_atoms))
+                    rmsd_curr.append(inputPDB.getRMSD(reference_pdb=targetPDB, align=self.alignTarget.get(), idx_matching_atoms=idx_matchin_atoms))
 
                 rmsd_rep.append(rmsd_curr)
             rmsd.append(rmsd_rep)

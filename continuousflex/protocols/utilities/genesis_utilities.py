@@ -60,6 +60,10 @@ INPUT_TOPOLOGY = 0
 INPUT_RESTART = 1
 INPUT_NEW_SIM = 2
 
+PROJECTION_ANGLE_SAME=0
+PROJECTION_ANGLE_XMIPP=1
+PROJECTION_ANGLE_IMAGE=2
+
 def save_dcd(mol, coords_list, prefix):
     print("> Saving DCD trajectory ...")
     n_frames = len(coords_list)
