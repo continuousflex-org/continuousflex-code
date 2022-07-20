@@ -151,6 +151,8 @@ class ProtGenerateTopology(EMProtocol):
         moltmp.alias_atom("OT1", "O")
         moltmp.alias_atom("OT2", "OXT")
         moltmp.alias_res("HSE", "HIS")
+        moltmp.alias_res("HSD", "HIS")
+        moltmp.alias_res("HSP", "HIS")
 
         if self.nucleicChoice.get() == NUCLEIC_RNA:
             moltmp.alias_res("CYT", "C")
