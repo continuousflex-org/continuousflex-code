@@ -125,6 +125,7 @@ class Plugin(pwem.Plugin):
         env.addPackage('MD-NMMD-Genesis', version='1.0', deps=[lapack],
                        buildDir='MD-NMMD-Genesis', tar="void.tgz",
                        commands=[('git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; '
+                                  'autoreconf -fi ;'
                                   './configure LDFLAGS=-L%s ;'
                                   'make install;' % (target_branch,env.getLibFolder()), "bin/atdyn")],
                        neededProgs=['mpif90'],default=True)

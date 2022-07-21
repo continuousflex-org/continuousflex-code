@@ -331,7 +331,8 @@ class ProtGenesis(EMProtocol):
         else:
             if not self.disableParallelSim.get() and  \
                 self.getNumberOfSimulation() >1  and  not existsCommand("parallel"):
-                self.warnMessage()
+                self.warning("Warning : Can not use parallel computation for GENESIS,"
+                                    " please install \"GNU parallel\". Running in linear mode.")
             for i in range(self.getNumberOfSimulation()):
                 self._insertFunctionStep("runSimulation", i)
 
