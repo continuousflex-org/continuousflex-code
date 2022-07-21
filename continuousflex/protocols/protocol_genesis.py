@@ -326,11 +326,12 @@ class ProtGenesis(EMProtocol):
 
         # RUN simulation
         if not self.disableParallelSim.get() and  \
-            self.getNumberOfSimulation() >1 :
-            if not existsCommand("parallel") :
-                raise RuntimeError("GNU parallel command not found")
+            self.getNumberOfSimulation() >1  and  existsCommand("parallel") :
             self._insertFunctionStep("runSimulationParallel")
         else:
+            if not self.disableParallelSim.get() and  \
+                self.getNumberOfSimulation() >1  and  not existsCommand("parallel"):
+                self.warnMessage()
             for i in range(self.getNumberOfSimulation()):
                 self._insertFunctionStep("runSimulation", i)
 
