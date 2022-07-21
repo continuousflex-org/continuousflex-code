@@ -23,29 +23,23 @@
 # **************************************************************************
 import os.path
 import subprocess
-
 from pyworkflow.utils.path import createLink
-
 import pyworkflow.protocol.params as params
 from pwem.protocols import EMProtocol
 from pwem.objects.data import AtomStruct, SetOfAtomStructs, SetOfPDBs, SetOfVolumes,SetOfParticles, Volume
-
 import numpy as np
 import mrcfile
 from pwem.emlib.image import ImageHandler
 from pwem.utils import runProgram
 from pyworkflow.utils import getListFromRangeString
 import xmipp3.convert
-
-
 from .utilities.genesis_utilities import *
 from .utilities.pdb_handler import ContinuousFlexPDBHandler
-
 from xmipp3 import Plugin
 import pyworkflow.utils as pwutils
 from pyworkflow.utils import runCommand, buildRunCommand
-
 from xmipp3.convert import writeSetOfParticles, writeSetOfVolumes
+from pwem.convert.atom_struct import cifToPdb
 
 class ProtGenesis(EMProtocol):
     """ Protocol to perform MD/NMMD simulation based on GENESIS. """
@@ -158,7 +152,7 @@ class ProtGenesis(EMProtocol):
                        help="Input set of normal modes", condition="simulationType==2 or simulationType==4")
         group.addParam('modeList', params.NumericRangeParam, expertLevel=params.LEVEL_ADVANCED,
                       label="Modes selection",
-                      help='Select the normal modes that will be used for image analysis. \n'
+                      help='Select the normal modes that will be used for analysis. \n'
                            'If you leave this field empty, all computed modes will be selected for simulation.\n'
                            'You have several ways to specify the modes.\n'
                            '   Examples:\n'
@@ -167,7 +161,9 @@ class ProtGenesis(EMProtocol):
                            ' "8 9, 10-12" -> [8,9,10,11,12])\n')
 
         group.addParam('nm_dt', params.FloatParam, label='NM time step', default=0.001,
-                      help="TODO", condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
+                      help="Time step of normal modes integration. Should be equal to MD time step. Could be increase "
+                           "to accelerate NM integration, however can make the simulation unstable.",
+                       condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
         group.addParam('nm_mass', params.FloatParam, default=10.0, label='NM mass',
                       help="Mass value of Normal modes for NMMD", condition="simulationType==2 or simulationType==4",
                       expertLevel=params.LEVEL_ADVANCED)
@@ -351,7 +347,13 @@ class ProtGenesis(EMProtocol):
         inputPDBfn = self.getInputPDBfn()
         n_pdb = self.getNumberOfInputPDB()
         for i in range(n_pdb):
-            runCommand("cp %s %s.pdb"%(inputPDBfn[i],self.getInputPDBprefix(i)))
+            ext = os.path.splitext(inputPDBfn[i])[1]
+            if ext == ".pdb" or ext == ".ent":
+                runCommand("cp %s %s.pdb" % (inputPDBfn[i], self.getInputPDBprefix(i)))
+            elif ext == ".cif" or ext == ".mmcif":
+                cifToPdb(inputPDBfn[i], self.getInputPDBprefix(i)+".pdb")
+            else:
+                print("ERROR (toPdb), Unknown file type for file = %s" % inputPDBfn[i])
 
         # TOPOLOGY FILES -------------------------------------------------
         inputPrefix = self.getInputPDBprefix()

@@ -4,6 +4,7 @@ from pwem.objects.data import AtomStruct
 from .utilities.pdb_handler import ContinuousFlexPDBHandler
 from pyworkflow.utils import runCommand
 import os
+from pwem.convert.atom_struct import cifToPdb
 
 
 NUCLEIC_NO = 0
@@ -29,10 +30,14 @@ class ProtGenerateTopology(EMProtocol):
 
         group = form.addGroup('Forcefield Inputs')
         group.addParam('forcefield', params.EnumParam, label="Forcefield type", default=FORCEFIELD_CHARMM, important=True,
-                       choices=['CHARMM', 'AAGO', 'CAGO'],
-                       help="Type of the force field used for energy and force calculation")
+                       choices=['CHARMM', 'All-atom Go model', 'C-Alpha Go model'],
+                       help="Type of the force field used for energy and force calculation. For Go models, it is strongly"
+                            " recommended to first generate topology using CHARMM, then create a new protocol to generate"
+                            " Go model topology based on the output CHARMM all-atom PDB model."
+                            " This will ensure that residue sequences are consecutive and TER statements are present in PDB."
+                            " CHARMM requires VMD psfgen installed. Go models requires SMOG 2 installed. ")
         group.addParam('nucleicChoice', params.EnumParam, label="Contains nucleic acids ?", default=NUCLEIC_NO,
-                       choices=['NO', 'RNA', 'DNA'], help="Specify if the generator should consider nucleic residues as DNA or RNA")
+                       choices=['No', 'RNA', 'DNA'], help="Specify if the generator should consider nucleic residues as DNA or RNA")
 
         group.addParam('inputPRM', params.FileParam, label="CHARMM parameter file (prm)",
                        condition="forcefield==%i"%FORCEFIELD_CHARMM,
@@ -47,34 +52,51 @@ class ProtGenerateTopology(EMProtocol):
                        help='CHARMM stream file containing both topology information and parameters. '
                             'Latest forcefields can be founded at http://mackerell.umaryland.edu/charmm_ff.shtml ')
 
-
         group.addParam('smog_dir', params.FileParam, label="SMOG 2 install directory",
                        help="Path to SMOG2 install directory (For SMOG2 installation, see "
-                            "https://smog-server.org/smog2/ , otherwise use the web GUI "
-                            "https://smog-server.org/cgi-bin/GenTopGro.pl )",
+                            "https://smog-server.org/smog2/). If SMOG2 is not installed, you can use the web GUI instead "
+                            "https://smog-server.org/cgi-bin/GenTopGro.pl (Recommended to run the protocol with empty smog_dir,"
+                            " when the protocol fails, get the input.pdb file generate in the extra directory as input of SMOG server)",
                        condition="(forcefield==%i or forcefield==%i)"%(FORCEFIELD_CAGO, FORCEFIELD_AAGO))
 
     def _insertAllSteps(self):
         ff = self.forcefield.get()
 
+        self._insertFunctionStep("convertInput")
+
         if ff == FORCEFIELD_CAGO or ff == FORCEFIELD_AAGO:
-            self._insertFunctionStep("generateGROTOP")
+            self._insertFunctionStep("prepareGROTOP")
+            self._insertFunctionStep("runGROTOP")
 
         if ff == FORCEFIELD_CHARMM:
-            self._insertFunctionStep("generatePSF")
+            self._insertFunctionStep("preparePSF")
+            self._insertFunctionStep("runPSF")
 
+        self._insertFunctionStep("checkPDB")
         self._insertFunctionStep("createOutput")
+
+    def convertInput(self):
+        inputPDB = self.inputPDB.get().getFileName()
+        outPDB = self._getExtraPath("input.pdb")
+        ext = os.path.splitext(inputPDB)[1]
+
+        if ext == ".pdb" or ext == ".ent" :
+            runCommand("cp %s %s" % (inputPDB, outPDB))
+        elif ext == ".cif" or ext == ".mmcif" :
+            cifToPdb(inputPDB, outPDB)
+        else:
+            print("ERROR (toPdb), Unknown file type for file = %s" % inputPDB)
 
     def createOutput(self):
         self._defineOutputs(outputPDB=AtomStruct(self._getExtraPath("output.pdb")))
 
-    def generatePSF(self):
-        inputPDB = self.inputPDB.get().getFileName()
+    def preparePSF(self):
+        inputPDB = self._getExtraPath("input.pdb")
         inputTopo = self.inputRTF.get()
         outputPrefix = self._getExtraPath("output")
         nucleicChoice = self.nucleicChoice.get()
 
-        fnPSFgen = outputPrefix + "psfgen.tcl"
+        fnPSFgen = self._getExtraPath("psfgen.tcl")
         with open(fnPSFgen, "w") as psfgen:
             psfgen.write("mol load pdb %s\n" % inputPDB)
             psfgen.write("\n")
@@ -126,70 +148,78 @@ class ProtGenerateTopology(EMProtocol):
             psfgen.write("writepsf %s.psf\n" % outputPrefix)
             psfgen.write("exit\n")
 
+    def checkPDB(self):
+        outPDB = self._getExtraPath("output.pdb")
+
+        # Check PDB
+        if not os.path.isfile(outPDB) :
+            raise RuntimeError("Can not locate output PDB file %s, check log files for more details " % outPDB)
+        if os.path.getsize(outPDB) ==0 :
+            raise RuntimeError("PDB file %s is empty, check log files for more details " % outPDB)
+
+        outMol = ContinuousFlexPDBHandler(outPDB)
+        if outMol.n_atoms == 0:
+            raise RuntimeError("PDB file %s is empty, check log files for more details " % outPDB)
+
+    def runPSF(self):
+        fnPSFgen = self._getExtraPath("psfgen.tcl")
+        outputPrefix = self._getExtraPath("output")
+
         # Run VMD PSFGEN
         runCommand("vmd -dispdev text -e %s > %s.log " % (fnPSFgen, outputPrefix))
 
-        # Check PDB
-        outMol = ContinuousFlexPDBHandler(outputPrefix + ".pdb")
-        if outMol.n_atoms == 0:
-            raise RuntimeError("VMD psfgen failed, check %s.log for details" % outputPrefix)
 
-
-    def generateGROTOP(self):
-        inputPDB = self.inputPDB.get().getFileName()
-        outputPrefix = self._getExtraPath("output")
-        forcefield = self.forcefield.get()
+    def prepareGROTOP(self):
+        inputPDB = self._getExtraPath("input.pdb")
 
         mol = ContinuousFlexPDBHandler(inputPDB)
         # mol.remove_alter_atom()
         mol.remove_hydrogens()
         mol.check_res_order()
 
-        moltmp = mol.copy()
-
-        moltmp.alias_atom("CD", "CD1", "ILE")
-        moltmp.alias_atom("OT1", "O")
-        moltmp.alias_atom("OT2", "OXT")
-        moltmp.alias_res("HSE", "HIS")
-        moltmp.alias_res("HSD", "HIS")
-        moltmp.alias_res("HSP", "HIS")
+        mol.alias_atom("CD", "CD1", "ILE")
+        mol.alias_atom("OT1", "O")
+        mol.alias_atom("OT2", "OXT")
+        mol.alias_res("HSE", "HIS")
+        mol.alias_res("HSD", "HIS")
+        mol.alias_res("HSP", "HIS")
 
         if self.nucleicChoice.get() == NUCLEIC_RNA:
-            moltmp.alias_res("CYT", "C")
-            moltmp.alias_res("GUA", "G")
-            moltmp.alias_res("ADE", "A")
-            moltmp.alias_res("URA", "U")
+            mol.alias_res("CYT", "C")
+            mol.alias_res("GUA", "G")
+            mol.alias_res("ADE", "A")
+            mol.alias_res("URA", "U")
 
         elif self.nucleicChoice.get() == NUCLEIC_DNA:
-            moltmp.alias_res("CYT", "DC")
-            moltmp.alias_res("GUA", "DG")
-            moltmp.alias_res("ADE", "DA")
-            moltmp.alias_res("THY", "DT")
+            mol.alias_res("CYT", "DC")
+            mol.alias_res("GUA", "DG")
+            mol.alias_res("ADE", "DA")
+            mol.alias_res("THY", "DT")
 
-        moltmp.alias_atom("O1'", "O1*")
-        moltmp.alias_atom("O2'", "O2*")
-        moltmp.alias_atom("O3'", "O3*")
-        moltmp.alias_atom("O4'", "O4*")
-        moltmp.alias_atom("O5'", "O5*")
-        moltmp.alias_atom("C1'", "C1*")
-        moltmp.alias_atom("C2'", "C2*")
-        moltmp.alias_atom("C3'", "C3*")
-        moltmp.alias_atom("C4'", "C4*")
-        moltmp.alias_atom("C5'", "C5*")
-        moltmp.alias_atom("C5M", "C7")
-        moltmp.add_terminal_res()
-        moltmp.atom_res_reorder()
-        moltmp.write_pdb(inputPDB)
+        mol.alias_atom("O1'", "O1*")
+        mol.alias_atom("O2'", "O2*")
+        mol.alias_atom("O3'", "O3*")
+        mol.alias_atom("O4'", "O4*")
+        mol.alias_atom("O5'", "O5*")
+        mol.alias_atom("C1'", "C1*")
+        mol.alias_atom("C2'", "C2*")
+        mol.alias_atom("C3'", "C3*")
+        mol.alias_atom("C4'", "C4*")
+        mol.alias_atom("C5'", "C5*")
+        mol.alias_atom("C5M", "C7")
+        mol.add_terminal_res()
+        mol.atom_res_reorder()
+        mol.write_pdb(inputPDB)
+
+    def runGROTOP(self):
+        outputPrefix = self._getExtraPath("output")
+        inputPDB = self._getExtraPath("input.pdb")
 
         # Run Smog2
         runCommand("%s/bin/smog2" % self.smog_dir.get() + \
                    " -i %s -dname %s -%s -limitbondlength -limitcontactlength > %s.log" %
                    (inputPDB, outputPrefix,
-                    "CA" if forcefield == FORCEFIELD_CAGO else "AA", outputPrefix))
-
-        if forcefield == FORCEFIELD_CAGO:
-            mol.select_atoms(mol.allatoms2ca())
-        mol.write_pdb(outputPrefix + ".pdb")
+                    "CA" if self.forcefield.get() == FORCEFIELD_CAGO else "AA", outputPrefix))
 
         # ADD CHARGE TO TOP FILE
         grotopFile = outputPrefix + ".top"
@@ -216,6 +246,13 @@ class ProtGenerateTopology(EMProtocol):
                         f2.write(line)
         runCommand("cp %s.tmp %s" % (grotopFile, grotopFile))
         runCommand("rm -f %s.tmp" % grotopFile)
+
+        if self.forcefield.get() == FORCEFIELD_CAGO:
+            mol = ContinuousFlexPDBHandler(inputPDB)
+            mol.select_atoms(mol.allatoms2ca())
+            mol.write_pdb(outputPrefix + ".pdb")
+        else:
+            runCommand("cp %s %s"%(inputPDB,outputPrefix + ".pdb"))
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
