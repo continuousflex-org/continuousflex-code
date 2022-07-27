@@ -333,19 +333,12 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                     p2 = iter2.__next__()
                     r1 = p1.getTransform()
                     r2 = p2.getTransform()
-                    middle = np.ones(3) * p1.getDim()[0]/2 * inputSet.getSamplingRate()
                     rot = r2.getRotationMatrix()
                     tran = np.array(r2.getShifts())/ inputSet.getSamplingRate()
-                    print("///")
-                    print(tran)
-                    print(tran/ inputSet.getSamplingRate())
-                    print(middle)
-                    new_tran = np.dot(middle, rot) + tran
-                    print(new_tran)
-                    print(new_tran - middle)
-                    new_tran = np.zeros(3)
+                    # middle = np.ones(3) * p1.getDim()[0]/2 * inputSet.getSamplingRate()
+                    # new_tran = np.dot(middle, rot) + tran
                     new_trans = np.zeros((4,4))
-                    # new_trans[:3,3:] = new_tran
+                    new_trans[:3,3] = tran
                     new_trans[:3,:3] = rot
                     new_trans[3,3] = 1.0
                     r1.composeTransform(new_trans)
@@ -353,8 +346,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                     alignedParticles.append(p1)
                 self.protocol._defineOutputs(**{clusterName+"_alignPart": alignedParticles})
                 writeSetOfParticles(alignedParticles, self.protocol._getExtraPath(clusterName+"_alignement.xmd"))
-
-
 
         else:
             classSet = self.protocol._createSetOfClasses3D(inputSet,clusterName)
