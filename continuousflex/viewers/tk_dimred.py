@@ -150,17 +150,8 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         # frame.columnconfigure(0, minsize=50)
         # frame.columnconfigure(1, weight=1)  # , minsize=30)
 
-        # Animation name
-        label = tk.Label(frame, text="Name", font=self.fontBold)
-        label.grid(row=0, column=0, sticky='w')
-        self.animationVar = tk.StringVar()
-        clusterEntry = tk.Entry(label, textvariable=self.animationVar,
-                                width=30, bg='white')
-        clusterEntry.grid(row=0, column=0)
-
-
         buttonsFrame2 = tk.Frame(frame)
-        buttonsFrame2.grid(row=1, column=0,
+        buttonsFrame2.grid(row=0, column=0,
                           sticky='w', padx=5, pady=5)
         buttonsFrame2.columnconfigure(0, weight=1)
         self.trajSimBtn = Button(buttonsFrame2, text='Generate points', state=tk.NORMAL,
@@ -174,7 +165,7 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         self.trajTypeBtn.grid(row=0, column=2, padx=(5, 5))
 
         buttonsFrame = tk.Frame(frame)
-        buttonsFrame.grid(row=2, column=0,
+        buttonsFrame.grid(row=1, column=0,
                           sticky='w', padx=5, pady=5)
         buttonsFrame.columnconfigure(0, weight=1)
         self.generateBtn = HotButton(buttonsFrame, text='Show in VMD', state=tk.DISABLED,
@@ -186,7 +177,7 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
 
 
         buttonsFrame2 = tk.Frame(frame)
-        buttonsFrame2.grid(row=3, column=0,
+        buttonsFrame2.grid(row=2, column=0,
                           sticky='w', padx=5, pady=5)
         self.updateClusterBtn = HotButton(buttonsFrame2, text='Update cluster', state=tk.DISABLED,
                                      tooltip='Create new cluster',
