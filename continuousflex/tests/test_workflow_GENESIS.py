@@ -26,11 +26,13 @@ from pwem.tests.workflows import TestWorkflow
 from pyworkflow.tests import setupTestProject, DataSet
 
 from continuousflex.protocols.protocol_genesis import *
+from continuousflex.protocols import FlexProtNMA, NMA_CUTOFF_ABS, FlexProtSynthesizeImages
 from continuousflex.viewers.viewer_genesis import *
+from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
 import os
 import multiprocessing
 
-NUMBER_OF_CPU = 4
+NUMBER_OF_CPU = int(np.min([multiprocessing.cpu_count(),4]))
 
 class testGENESIS(TestWorkflow):
     """ Test Class for GENESIS. """
@@ -56,6 +58,7 @@ class testGENESIS(TestWorkflow):
         self.launchProtocol(protPdb4ake)
 
 
+        # Energy min
         protGenesisMin = self.newProtocol(ProtGenesis,
             inputPDB = protPdb4ake.outputPdb,
             forcefield = FORCEFIELD_CHARMM,
@@ -77,7 +80,7 @@ class testGENESIS(TestWorkflow):
             cutoff_dist = 12.0,
             pairlist_dist = 15.0,
 
-            numberOfThreads = int(np.min([NUMBER_OF_CPU,4])),
+            numberOfThreads = NUMBER_OF_CPU,
 
        )
 
@@ -101,6 +104,14 @@ class testGENESIS(TestWorkflow):
 
         assert(potential_ene[0] > potential_ene[-1])
 
+
+        # Launch NMA for energy min PDB
+        protNMA = self.newProtocol(FlexProtNMA,
+                                    cutoffMode=NMA_CUTOFF_ABS)
+        protNMA.inputStructure.set(protGenesisMin.outputPDB)
+        protNMA.setObjLabel('NMA')
+        self.launchProtocol(protNMA)
+
         protGenesisFitNMMD = self.newProtocol(ProtGenesis,
           restartChoice=True,
           restartProt = protGenesisMin,
@@ -113,6 +124,7 @@ class testGENESIS(TestWorkflow):
           nbupdate_period=10,
           nm_number=6,
           nm_mass=1.0,
+          inputModes=protNMA.outputModes,
 
           implicitSolvent=IMPLICIT_SOLVENT_GBSA,
           electrostatics=ELECTROSTATICS_CUTOFF,
@@ -133,7 +145,7 @@ class testGENESIS(TestWorkflow):
           voxel_size=2.0,
           centerOrigin=True,
 
-          numberOfThreads=int(np.min([NUMBER_OF_CPU,4])),
+          numberOfThreads=NUMBER_OF_CPU,
           )
         protGenesisFitNMMD.setObjLabel('NMMD Flexible Fitting CHARMM')
 
@@ -146,26 +158,25 @@ class testGENESIS(TestWorkflow):
         # Get the CC from the log file
         cc = readLogFile(log_file)["RESTR_CVS001"]
 
-        # Get the RMSD from the dcd file
-        matchingAtoms = matchPDBatoms([PDBMol(protGenesisFitNMMD.getInputPDBprefix() + ".pdb")
-                                          , PDBMol(self.ds.getFile('1ake_pdb'))])
-        rmsd = rmsdFromDCD(outputPrefix = protGenesisFitNMMD.getOutputPrefix(),
-                           inputPDB = protGenesisFitNMMD.getInputPDBprefix()+".pdb",
-                           targetPDB=self.ds.getFile('1ake_pdb'),
-                           idx=matchingAtoms,
-                           align=False)
+        # Get the RMSD
+        inp = ContinuousFlexPDBHandler(protGenesisFitNMMD.getInputPDBprefix() + ".pdb")
+        ref = ContinuousFlexPDBHandler(self.ds.getFile('1ake_pdb'))
+        out = ContinuousFlexPDBHandler(protGenesisFitNMMD.getOutputPrefix()+".pdb")
+        matchingAtoms = inp.matchPDBatoms(reference_pdb=ref)
+        rmsd_inp = inp.getRMSD(reference_pdb=ref,idx_matching_atoms=matchingAtoms,align=True)
+        rmsd_out = out.getRMSD(reference_pdb=ref,idx_matching_atoms=matchingAtoms,align=True)
 
         # Assert that the CC is increasing and  the RMSD is decreasing
         print("\n\n//////////////////////////////////////////////")
         print(protGenesisFitNMMD.getObjLabel())
         print("Initial CC : %.2f"%cc[0])
         print("Final CC : %.2f"%cc[-1])
-        print("Initial rmsd : %.2f Ang"%rmsd[0])
-        print("Final rmsd : %.2f Ang"%rmsd[-1])
+        print("Initial rmsd : %.2f Ang"%rmsd_inp)
+        print("Final rmsd : %.2f Ang"%rmsd_out)
         print("//////////////////////////////////////////////\n\n")
 
         assert(cc[0] < cc[-1])
-        assert(rmsd[0] > rmsd[-1])
+        assert(rmsd_inp >rmsd_out)
         # assert(rmsd[-1] < 3.0)
 
     def test2_EmfitVolumeCAGO(self):
@@ -174,6 +185,7 @@ class testGENESIS(TestWorkflow):
                                          pdbFile=self.ds.getFile('4ake_ca_pdb'))
         protPdb4ake.setObjLabel('Input PDB (4AKE C-Alpha only)')
         self.launchProtocol(protPdb4ake)
+
 
         protGenesisMin = self.newProtocol(ProtGenesis,
             inputPDB = protPdb4ake.outputPdb,
@@ -194,30 +206,31 @@ class testGENESIS(TestWorkflow):
             cutoff_dist = 12.0,
             pairlist_dist = 15.0,
 
-            numberOfThreads = int(np.min([NUMBER_OF_CPU,4])),
+            numberOfThreads = NUMBER_OF_CPU,
 
        )
         protGenesisMin.setObjLabel('Energy Minimization CAGO')
         # Launch minimisation
         self.launchProtocol(protGenesisMin)
 
-        protGenesisFitNMMD = self.newProtocol(ProtGenesis,
+        # Launch NMA for energy min PDB
+        protNMA = self.newProtocol(FlexProtNMA,
+                                    cutoffMode=NMA_CUTOFF_ABS)
+        protNMA.inputStructure.set(protGenesisMin.outputPDB)
+        protNMA.setObjLabel('NMA')
+        self.launchProtocol(protNMA)
 
-                                              inputPDB=protGenesisMin.outputPDB,
-                                              forcefield=FORCEFIELD_CAGO,
-                                              generateTop=False,
-                                              inputTOP=protGenesisMin.getInputPDBprefix() + ".top",
-                                              restartchoice=True,
-                                              inputRST=protGenesisMin.getOutputPrefix() + ".rst",
+        protGenesisFitMD = self.newProtocol(ProtGenesis,
 
-                                              simulationType=SIMULATION_NMMD,
+                                              restartChoice=True,
+                                              restartProt=protGenesisMin,
+
+                                              simulationType=SIMULATION_MD,
                                               time_step=0.0005,
                                               n_steps=1000,
                                               eneout_period=100,
                                               crdout_period=100,
                                               nbupdate_period=10,
-                                              nm_number=6,
-                                              nm_mass=1.0,
 
                                               implicitSolvent=IMPLICIT_SOLVENT_NONE,
                                               electrostatics=ELECTROSTATICS_CUTOFF,
@@ -238,39 +251,38 @@ class testGENESIS(TestWorkflow):
                                               voxel_size=2.0,
                                               centerOrigin=True,
 
-                                              numberOfThreads=int(np.min([NUMBER_OF_CPU,4])),
+                                              numberOfThreads=NUMBER_OF_CPU,
                                               numberOfMpi=1,
                                               )
-        protGenesisFitNMMD.setObjLabel('NMMD Flexible Fitting CAGO')
+        protGenesisFitMD.setObjLabel('MD Flexible Fitting CAGO')
 
         # Launch Fitting
-        self.launchProtocol(protGenesisFitNMMD)
+        self.launchProtocol(protGenesisFitMD)
 
         # Get GENESIS log file
-        log_file = protGenesisFitNMMD.getOutputPrefix()+".log"
+        log_file = protGenesisFitMD.getOutputPrefix()+".log"
 
         # Get the CC from the log file
         cc = readLogFile(log_file)["RESTR_CVS001"]
 
-        # Get the RMSD from the dcd file
-        matchingAtoms = matchPDBatoms([PDBMol(protGenesisFitNMMD.getInputPDBprefix() + ".pdb")
-                                          , PDBMol(self.ds.getFile('1ake_pdb'))])
-        rmsd = rmsdFromDCD(outputPrefix = protGenesisFitNMMD.getOutputPrefix(),
-                           inputPDB = protGenesisFitNMMD.getInputPDBprefix()+".pdb",
-                           targetPDB=self.ds.getFile('1ake_pdb'),
-                           idx=matchingAtoms,
-                           align=False)
+        # Get the RMSD
+        inp = ContinuousFlexPDBHandler(protGenesisFitMD.getInputPDBprefix() + ".pdb")
+        ref = ContinuousFlexPDBHandler(self.ds.getFile('1ake_pdb'))
+        out = ContinuousFlexPDBHandler(protGenesisFitMD.getOutputPrefix()+".pdb")
+        matchingAtoms = inp.matchPDBatoms(reference_pdb=ref)
+        rmsd_inp = inp.getRMSD(reference_pdb=ref,idx_matching_atoms=matchingAtoms,align=True)
+        rmsd_out = out.getRMSD(reference_pdb=ref,idx_matching_atoms=matchingAtoms,align=True)
 
         # Assert that the CC is increasing and  the RMSD is decreasing
         print("\n\n//////////////////////////////////////////////")
-        print(protGenesisFitNMMD.getObjLabel())
+        print(protGenesisFitMD.getObjLabel())
         print("Initial CC : %.2f"%cc[0])
         print("Final CC : %.2f"%cc[-1])
-        print("Initial rmsd : %.2f Ang"%rmsd[0])
-        print("Final rmsd : %.2f Ang"%rmsd[-1])
+        print("Initial rmsd : %.2f Ang"%rmsd_inp)
+        print("Final rmsd : %.2f Ang"%rmsd_out)
         print("//////////////////////////////////////////////\n\n")
         assert (cc[0] < cc[-1])
-        assert (rmsd[0] > rmsd[-1])
+        assert (rmsd_inp > rmsd_out)
 
 
         # Need at least 4 cores
@@ -288,6 +300,7 @@ class testGENESIS(TestWorkflow):
                                                   nbupdate_period=10,
                                                   nm_number=6,
                                                   nm_mass=1.0,
+                                                  inputModes=protNMA.outputModes,
                                                   exchange_period=100, # 100
                                                   nreplica = 4,
 
@@ -327,33 +340,30 @@ class testGENESIS(TestWorkflow):
             cc1 = readLogFile(log_file1)["RESTR_CVS001"]
             cc2 = readLogFile(log_file2)["RESTR_CVS001"]
 
-
-            # Get the RMSD from the dcd file
-            matchingAtoms = matchPDBatoms([PDBMol(protGenesisFitREUS.getInputPDBprefix() + ".pdb")
-                                                  ,PDBMol(self.ds.getFile('1ake_pdb'))])
-            rmsd1 = rmsdFromDCD(outputPrefix=outPref[0],
-                               inputPDB=protGenesisFitREUS.getInputPDBprefix() + ".pdb",
-                               targetPDB=self.ds.getFile('1ake_pdb'),
-                               align=False, idx=matchingAtoms)
-            rmsd2 = rmsdFromDCD(outputPrefix=outPref[0],
-                                inputPDB=protGenesisFitREUS.getInputPDBprefix() + ".pdb",
-                                targetPDB=self.ds.getFile('1ake_pdb'),
-                                align=False, idx=matchingAtoms)
+            # Get the RMSD
+            ref = ContinuousFlexPDBHandler(self.ds.getFile('1ake_pdb'))
+            inp = ContinuousFlexPDBHandler(protGenesisFitREUS.getInputPDBprefix() + ".pdb")
+            out1 = ContinuousFlexPDBHandler(outPref[0] + ".pdb")
+            out2 = ContinuousFlexPDBHandler(outPref[1] + ".pdb")
+            matchingAtoms = inp.matchPDBatoms(reference_pdb=ref)
+            rmsd_inp = inp.getRMSD(reference_pdb=ref, idx_matching_atoms=matchingAtoms, align=True)
+            rmsd_out2 = out2.getRMSD(reference_pdb=ref, idx_matching_atoms=matchingAtoms, align=True)
+            rmsd_out1 = out1.getRMSD(reference_pdb=ref, idx_matching_atoms=matchingAtoms, align=True)
 
             # Assert that the CCs are increasing
             print("\n\n//////////////////////////////////////////////")
             print(protGenesisFitREUS.getObjLabel())
             print("Initial CC : [%.2f , %.2f]" % (cc1[0],cc2[0]))
             print("Final CC :[%.2f , %.2f]" % (cc1[-1],cc2[-1]))
-            print("Initial rmsd : [%.2f , %.2f] Ang" % (rmsd1[0],rmsd2[0]))
-            print("Final rmsd : [%.2f , %.2f] Ang" % (rmsd1[-1],rmsd2[-1]))
+            print("Initial rmsd : [%.2f , %.2f] Ang" % (rmsd_inp,rmsd_inp))
+            print("Final rmsd : [%.2f , %.2f] Ang" % (rmsd_out1,rmsd_out2))
             print("//////////////////////////////////////////////\n\n")
 
             assert (cc1[0] < cc1[-1])
             assert (cc2[0] < cc2[-1])
-            assert (rmsd1[0] > rmsd1[-1])
+            assert (rmsd_inp> rmsd_out1)
             # assert (rmsd1[-1] < 3.0)
-            assert (rmsd2[0] > rmsd2[-1])
+            assert (rmsd_inp > rmsd_out2)
             # assert (rmsd2[-1] < 3.0)
 
     # def test3_MDCHARMM(self):

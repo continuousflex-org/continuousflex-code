@@ -49,5 +49,7 @@ from .protocol_pca_pdbs import FlexProtPCAPdb
 from .protocol_subtomograms_classify import FlexProtSubtomoClassify
 from .protocol_image_synthesize import FlexProtSynthesizeImages
 from .protocol_subtomogram_refine_alignment import FlexProtRefineSubtomoAlign
+from .protocol_deep_hemnma_train import FlexProtDeepHEMNMATrain
+from .protocol_deep_hemnma_infer import FlexProtDeepHEMNMAInfer
 #from .protocol_histogram_matching import FlexProtHistogramMatch
 from .protocol_genesis import ProtGenesis

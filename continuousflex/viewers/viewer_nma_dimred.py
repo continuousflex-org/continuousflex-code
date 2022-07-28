@@ -44,6 +44,7 @@ from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 from continuousflex.viewers.nma_gui import ClusteringWindow, TrajectoriesWindow
 from pwem.utils import runProgram
 from pyworkflow.protocol import params
+from continuousflex.protocols import FlexProtDeepHEMNMAInfer
 
 FIGURE_LIMIT_NONE = 0
 FIGURE_LIMITS = 1
@@ -171,6 +172,9 @@ class FlexDimredNMAViewer(ProtocolViewer):
         return self._doViewRawDeformation(components)
 
     def _doViewRawDeformation(self, components):
+        ProtDeepHEMNMA = False
+        if (isinstance(self.protocol.inputNMA.get(), FlexProtDeepHEMNMAInfer)):
+            ProtDeepHEMNMA = True
         components = list(map(int, components.split()))
         dim = len(components)
         views = []
@@ -207,7 +211,12 @@ class FlexDimredNMAViewer(ProtocolViewer):
             else:
                 self.getData().YIND = modeList[1]
                 if dim == 2:
-                    plotter.plotArray2D("Normal-mode amplitudes in low-dimensional space: %s vs %s" % tuple(baseList),
+                    if ProtDeepHEMNMA:
+                        plotter.plotArray2D_xy(
+                            "Normal-mode amplitudes in low-dimensional space: %s vs %s" % tuple(baseList),
+                            *baseList)
+                    else:
+                        plotter.plotArray2D("Normal-mode amplitudes in low-dimensional space: %s vs %s" % tuple(baseList),
                                         *baseList)
                 elif dim == 3:
                     self.getData().ZIND = modeList[2]
@@ -218,6 +227,9 @@ class FlexDimredNMAViewer(ProtocolViewer):
         return views
 
     def _displayClustering(self, paramName):
+        ProtDeepHEMNMA = False
+        if (isinstance(self.protocol.inputNMA.get(), FlexProtDeepHEMNMAInfer)):
+            ProtDeepHEMNMA = True
         self.clusterWindow = self.tkWindow(ClusteringWindow,
                                            title='Clustering Tool',
                                            dim=self.protocol.reducedDim.get(),
@@ -233,10 +245,15 @@ class FlexDimredNMAViewer(ProtocolViewer):
                                            zlim_low=self.zlim_low,
                                            zlim_high=self.zlim_high,
                                            s=self.s,
-                                           alpha=self.alpha)
+                                           alpha=self.alpha,
+                                           deepHEMNMA=ProtDeepHEMNMA)
         return [self.clusterWindow]
 
     def _displayTrajectories(self, paramName):
+        ProtDeepHEMNMA = False
+        if (isinstance(self.protocol.inputNMA.get(), FlexProtDeepHEMNMAInfer)):
+            ProtDeepHEMNMA = True
+
         self.trajectoriesWindow = self.tkWindow(TrajectoriesWindow,
                                                 title='Trajectories Tool',
                                                 dim=self.protocol.reducedDim.get(),
@@ -254,7 +271,8 @@ class FlexDimredNMAViewer(ProtocolViewer):
                                                 zlim_low=self.zlim_low,
                                                 zlim_high=self.zlim_high,
                                                 s=self.s,
-                                                alpha=self.alpha)
+                                                alpha=self.alpha,
+                                                deepHEMNMA=ProtDeepHEMNMA)
         return [self.trajectoriesWindow]
 
     def _createCluster(self):
@@ -364,7 +382,7 @@ class FlexDimredNMAViewer(ProtocolViewer):
         if prot.getDataChoice() == 'NMAs':
             pdb = prot.getInputPdb()
             pdbFile = pdb.getFileName()
-            modesFn = prot.inputNMA.get()._getExtraPath('modes.xmd')
+            modesFn = prot.getInputModes()
             for i, d in enumerate(deformations):
                 atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i + 1)
                 cmd = '-o %s --pdb %s --nma %s --deformations ' % (atomsFn, pdbFile, modesFn)
@@ -438,10 +456,21 @@ class FlexDimredNMAViewer(ProtocolViewer):
         particles = self.protocol.getInputParticles()
 
         data = Data()
-        for i, particle in enumerate(particles):
-            data.addPoint(Point(pointId=particle.getObjId(),
-                                data=matrix[i, :],
-                                weight=particle._xmipp_cost.get()))
+
+        ProtDeepHEMNMA = False
+        if (isinstance(self.protocol.inputNMA.get(), FlexProtDeepHEMNMAInfer)):
+            ProtDeepHEMNMA = True
+
+        if ProtDeepHEMNMA:
+            for i, particle in enumerate(particles):
+                data.addPoint(Point(pointId=particle.getObjId(),
+                                    data=matrix[i, :],
+                                    weight=0.0))
+        else:
+            for i, particle in enumerate(particles):
+                data.addPoint(Point(pointId=particle.getObjId(),
+                                    data=matrix[i, :],
+                                    weight=particle._xmipp_cost.get()))
 
         return data
 

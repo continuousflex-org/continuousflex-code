@@ -44,7 +44,7 @@ from continuousflex.protocols.pdb import FlexProtConvertToPseudoAtomsBase
 #from ..pdb.protocol_pseudoatoms_base import XmippProtConvertToPseudoAtomsBase
 from .protocol_nma_base import FlexProtNMABase, NMA_CUTOFF_REL
 from pwem.utils import runProgram
-
+import multiprocessing
 
 def mds(d, dimensions = 2):
     """
@@ -114,7 +114,7 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
         FlexProtNMABase._defineParamsCommon(self,form)
         
                
-        form.addParallelSection(threads=4, mpi=1)
+        form.addParallelSection(threads=multiprocessing.cpu_count()//2-1, mpi=0)
         
     #--------------------------- INSERT steps functions --------------------------------------------    
     def _insertAllSteps(self):

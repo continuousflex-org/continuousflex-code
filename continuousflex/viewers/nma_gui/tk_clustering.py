@@ -69,6 +69,7 @@ class ClusteringWindow(gui.Window):
         # Alpha and S are the transparancy and the size of the points, respectively
         self._alpha = kwargs.get('alpha')
         self._s = kwargs.get('s')
+        self.deep = kwargs.get('deepHEMNMA')
 
         content = tk.Frame(self.root)
         self._createContent(content)
@@ -227,14 +228,21 @@ class ClusteringWindow(gui.Window):
                     self._updateSelectionLabel()
                     # ax = self.plotter.createSubPlot("Click and drag to add points to the Cluster",
                     #                                 *baseList)
-                    ax = self.plotter.plotArray2D("Click and drag to add points to the Cluster",
+                    if self.deep:
+                        ax = self.plotter.plotArray2D_xy("Click and drag to add points to the Cluster",
+                                                      *baseList)
+                    else:
+                        ax = self.plotter.plotArray2D("Click and drag to add points to the Cluster",
                                                   *baseList)
                     self.ps = PointSelector(ax, self.data, callback=self._updateSelectionLabel,
                                             LimitL=self.LimitLow, LimitH=self.LimitHigh, alpha=self._alpha, s=self._s)
                 elif dim == 3:
                     del self.ps  # Remove PointSelector
                     self.data.ZIND = modeList[2]
-                    self.plotter.plotArray3D("%s %s %s" % tuple(baseList), *baseList)
+                    if self.deep:
+                        self.plotter.plotArray3D_xyz("%s %s %s" % tuple(baseList), *baseList)
+                    else:
+                        self.plotter.plotArray3D("%s %s %s" % tuple(baseList), *baseList)
 
             if doShow:
                 self.plotter.show()

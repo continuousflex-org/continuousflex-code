@@ -102,7 +102,9 @@ class FlexBatchProtNMACluster(BatchProtocol):
         md_file = md.MetaData(imagesMd)
         deformations = []
         for j in md_file:
-            deformations.append(md_file.getValue(md.MDL_NMA, j))
+            defor = md_file.getValue(md.MDL_NMA, j)
+            if defor:
+                deformations.append(defor)
         ampl = np.mean(np.array(deformations), axis= 0)
         print(self.getFnPDB())
 
@@ -139,7 +141,7 @@ class FlexBatchProtNMACluster(BatchProtocol):
             return path, True
 
     def getFnModes(self):
-        return self.inputNmaDimred.get().inputNMA.get()._getExtraPath('modes.xmd')
+        return self.inputNmaDimred.get().getInputModes()
 
     #--------------------------- INFO functions --------------------------------------------
     def _summary(self):

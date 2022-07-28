@@ -38,6 +38,7 @@ from pyworkflow.protocol.params import NumericRangeParam
 from .convert import modeToRow, eulerAngles2matrix, matrix2eulerAngles
 from pwem import Domain
 import numpy as np
+import multiprocessing
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -133,7 +134,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                       help='The maximum shift is a number between 1 and half the size of your volume. '
                            'It represents the maximum distance searched in x, y and z directions. Keep as default'
                            ' if your target is near the center in your subtomograms')
-        form.addParallelSection(threads=0, mpi=5)
+        form.addParallelSection(threads=0, mpi=multiprocessing.cpu_count()//2-1)
 
     # --------------------------- INSERT steps functions --------------------------------------------
     def getInputPdb(self):

@@ -66,6 +66,7 @@ class TrajectoriesWindow(gui.Window):
         self.zlim_high = kwargs.get('zlim_high')
         self.s = kwargs.get('s')
         self.alpha = kwargs.get('alpha')
+        self.deep = kwargs.get('deepHEMNMA')
         self.plotter = None
 
         content = tk.Frame(self.root)
@@ -249,8 +250,13 @@ class TrajectoriesWindow(gui.Window):
                     self._updateSelectionLabel()
                     # ax = self.plotter.createSubPlot("Click and drag to add points to the Cluster",
                     #                                 *baseList)
-                    ax = self.plotter.plotArray2D("Click and drag to add points to the Cluster",
+                    if self.deep:
+                        ax = self.plotter.plotArray2D_xy("Click and drag to add points to the Cluster",
+                                                      *baseList)
+                    else:
+                        ax = self.plotter.plotArray2D("Click and drag to add points to the Cluster",
                                                     *baseList)
+
                     self.ps = PointPath(ax, self.data, self.pathData,
                                         callback=self._checkNumberOfPoints,
                                         LimitL = self.LimitLow, LimitH = self.LimitHigh,
@@ -258,7 +264,10 @@ class TrajectoriesWindow(gui.Window):
                 elif dim == 3:
                     # del self.ps # Remove PointSelector
                     self.setDataIndex('ZIND', modeList[2])
-                    self.plotter.plotArray3D("%s %s %s" % tuple(baseList), *baseList)
+                    if self.deep:
+                        self.plotter.plotArray3D_xyz("%s %s %s" % tuple(baseList), *baseList)
+                    else:
+                        self.plotter.plotArray3D("%s %s %s" % tuple(baseList), *baseList)
 
             if doShow:
                 self.plotter.show()
