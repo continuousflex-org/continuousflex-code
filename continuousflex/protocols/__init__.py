@@ -49,4 +49,5 @@ from .protocol_image_synthesize import FlexProtSynthesizeImages
 from .protocol_subtomogram_refine_alignment import FlexProtRefineSubtomoAlign
 #from .protocol_histogram_matching import FlexProtHistogramMatch
 from .protocol_genesis import ProtGenesis
+from .protocol_nmmd_refine import ProtNMMDRefine
 from .protocol_generate_topology import ProtGenerateTopology
