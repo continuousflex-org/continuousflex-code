@@ -25,7 +25,9 @@ from pwem.protocols import ProtAnalysis3D
 from pyworkflow.protocol import params
 from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd, dcd2numpyArr
 from .utilities.pdb_handler import ContinuousFlexPDBHandler
-from pwem.objects import AtomStruct
+from pwem.objects import AtomStruct, SetOfParticles, SetOfVolumes
+from xmipp3.convert import writeSetOfVolumes, writeSetOfParticles, readSetOfVolumes, readSetOfParticles
+from pwem.constants import ALIGN_PROJ
 
 import numpy as np
 import glob
@@ -97,10 +99,23 @@ class FlexProtAlignPdb(ProtAnalysis3D):
                            'in the extra directory.'
                         , expertLevel=params.LEVEL_ADVANCED)
 
+        form.addSection(label='Apply alignment to other set')
+        form.addParam('applyAlignment', params.BooleanParam, default=False,
+                      label="Apply alignment to other data set ?",
+                      help='Use the PDB alignement to align another data set.')
+        form.addParam('otherSet', params.PointerParam, pointerClass='SetOfParticles, SetOfVolumes',
+                      condition='applyAlignment',
+                      label="Other set of Particles / Volumes",
+                      help='Use a scipion EMSet object')
+
+
+
         # --------------------------- INSERT steps functions --------------------------------------------
     def _insertAllSteps(self):
         self._insertFunctionStep('readInputFiles')
         self._insertFunctionStep('rigidBodyAlignementStep')
+        if self.applyAlignment.get():
+            self._insertFunctionStep('applyAlignmentStep')
         if self.createOutput.get():
             self._insertFunctionStep('createOutputStep')
 
@@ -196,6 +211,44 @@ class FlexProtAlignPdb(ProtAnalysis3D):
 
         self._defineOutputs(outputPDBs = pdbset)
 
+    def applyAlignmentStep(self):
+        inputSet = self.otherSet.get()
+
+        if isinstance(inputSet, SetOfVolumes):
+            inputAlignement = self._createSetOfVolumes("inputAlignement")
+            readSetOfVolumes(self._getExtraPath("alignement.xmd"), inputAlignement)
+            alignedSet = self._createSetOfVolumes("alignedSet")
+        else:
+            inputAlignement = self._createSetOfParticles("inputAlignement")
+            alignedSet = self._createSetOfParticles("alignedSet")
+            readSetOfParticles(self._getExtraPath("alignement.xmd"), inputAlignement)
+
+        alignedSet.setSamplingRate(inputSet.getSamplingRate())
+        alignedSet.setAlignment(ALIGN_PROJ)
+        iter1 = inputSet.iterItems()
+        iter2 = inputAlignement.iterItems()
+        for i in range(inputSet.getSize()):
+            p1 = iter1.__next__()
+            p2 = iter2.__next__()
+            r1 = p1.getTransform()
+            r2 = p2.getTransform()
+            rot = r2.getRotationMatrix()
+            tran = np.array(r2.getShifts()) / inputSet.getSamplingRate()
+            # middle = np.ones(3) * p1.getDim()[0]/2 * inputSet.getSamplingRate()
+            # new_tran = np.dot(middle, rot) + tran
+            new_trans = np.zeros((4, 4))
+            new_trans[:3, 3] = tran
+            new_trans[:3, :3] = rot
+            new_trans[3, 3] = 1.0
+            r1.composeTransform(new_trans)
+            p1.setTransform(r1)
+            alignedSet.append(p1)
+        self._defineOutputs(alignedSet = alignedSet)
+
+        if isinstance(inputSet, SetOfVolumes):
+            writeSetOfVolumes(alignedSet, self._getExtraPath("alignedSet.xmd"))
+        else:
+            writeSetOfParticles(alignedSet, self._getExtraPath("alignedSet.xmd"))
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
         summary = []
