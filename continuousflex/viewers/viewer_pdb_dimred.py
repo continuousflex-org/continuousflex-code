@@ -209,7 +209,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         initPDB = ContinuousFlexPDBHandler(prot.getPDBRef())
 
         # Get animation root
-        animation = self.trajectoriesWindow.getAnimationName()
+        animation = self.trajectoriesWindow.getClusterName()
         animationPath = prot._getExtraPath('animation_%s' % animation)
         cleanPath(animationPath)
         makePath(animationPath)
