@@ -166,10 +166,10 @@ class GenesisViewer(ProtocolViewer):
             f.write("mol new %s.pdb waitfor all\n" % self.protocol.getInputPDBprefix(index))
             f.write("mol addfile %s.dcd waitfor all\n" % self.getOutputPrefixAll(index)[0])
 
-            if self.protocol.forcefield.get() == FORCEFIELD_CAGO:
-                f.write("mol modstyle 0 0 Tube \n")
-            else:
+            if self.protocol.forcefield.get() == FORCEFIELD_CHARMM:
                 f.write("mol modstyle 0 0 NewCartoon \n")
+            else:
+                f.write("mol modstyle 0 0 Tube \n")
             f.write("mol modcolor 0 0 Molecule\n")
 
             if self.protocol.EMfitChoice.get() == EMFIT_VOLUMES:
@@ -185,10 +185,10 @@ class GenesisViewer(ProtocolViewer):
                 f.write( "for {set i 1 } {$i < $nf} {incr i} {\n")
                 f.write( "animate dup frame 0 1\n")
                 f.write("}\n")
-                if self.protocol.forcefield.get() == FORCEFIELD_CAGO:
-                    f.write("mol modstyle 0 1 Tube \n")
-                else:
+                if self.protocol.forcefield.get() == FORCEFIELD_CHARMM:
                     f.write("mol modstyle 0 1 NewCartoon \n")
+                else:
+                    f.write("mol modstyle 0 1 Tube \n")
                 f.write("mol modcolor 0 1 Molecule\n")
             f.write("animate style Loop\n")
             f.write("display projection Orthographic\n")

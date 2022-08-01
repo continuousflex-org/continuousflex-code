@@ -339,84 +339,143 @@ def getAngularShiftDist(angle1MetaFile, angle2MetaData, angle2Idx, tmpPrefix, sy
     return angDist, shftDist
 
 
+
 def dcd2numpyArr(filename):
     print("> Reading dcd file %s"%filename)
+    BYTESIZE = 4
     with open(filename, 'rb') as f:
 
         # Header
         # ---------------- INIT
 
-        start_size = int.from_bytes((f.read(4)), "little")
-        crd_type = f.read(4).decode('ascii')
-        nframe = int.from_bytes((f.read(4)), "little")
-        start_frame = int.from_bytes((f.read(4)), "little")
-        len_frame = int.from_bytes((f.read(4)), "little")
-        len_total = int.from_bytes((f.read(4)), "little")
+        start_size = int.from_bytes((f.read(BYTESIZE)), "little")
+        crd_type = f.read(BYTESIZE).decode('ascii')
+        nframe = int.from_bytes((f.read(BYTESIZE)), "little")
+        start_frame = int.from_bytes((f.read(BYTESIZE)), "little")
+        len_frame = int.from_bytes((f.read(BYTESIZE)), "little")
+        len_total = int.from_bytes((f.read(BYTESIZE)), "little")
         for i in range(5):
-            f.read(4)
-        time_step = np.frombuffer(f.read(4), dtype=np.float32)
+            f.read(BYTESIZE)
+        time_step = np.frombuffer(f.read(BYTESIZE), dtype=np.float32)
         for i in range(9):
-            f.read(4)
-        charmm_version = int.from_bytes((f.read(4)), "little")
+            f.read(BYTESIZE)
+        charmm_version = int.from_bytes((f.read(BYTESIZE)), "little")
 
-        end_size = int.from_bytes((f.read(4)), "little")
+        end_size = int.from_bytes((f.read(BYTESIZE)), "little")
 
         if end_size != start_size:
             raise RuntimeError("Can not read dcd file")
 
         # ---------------- TITLE
-
-        start_size = int.from_bytes((f.read(4)), "little")
-        ntitle = int.from_bytes((f.read(4)), "little")
-        title = f.read(80 * ntitle).decode('ascii')
-        end_size = int.from_bytes((f.read(4)), "little")
+        start_size = int.from_bytes((f.read(BYTESIZE)), "little")
+        ntitle = int.from_bytes((f.read(BYTESIZE)), "little")
+        tilte_rd = f.read(BYTESIZE*20 * ntitle)
+        try :
+            title = tilte_rd.encode("ascii")
+        except AttributeError:
+            title = str(tilte_rd)
+        end_size = int.from_bytes((f.read(BYTESIZE)), "little")
 
         if end_size != start_size:
             raise RuntimeError("Can not read dcd file")
 
         # ---------------- NATOM
-
-        start_size = int.from_bytes((f.read(4)), "little")
-        natom = int.from_bytes((f.read(4)), "little")
-        end_size = int.from_bytes((f.read(4)), "little")
+        start_size = int.from_bytes((f.read(BYTESIZE)), "little")
+        natom = int.from_bytes((f.read(BYTESIZE)), "little")
+        end_size = int.from_bytes((f.read(BYTESIZE)), "little")
 
         if end_size != start_size:
             raise RuntimeError("Can not read dcd file")
 
         # ----------------- DCD COORD
-        dcd_list = []
+        dcd_arr =  np.zeros((nframe, natom, 3), dtype=np.float32)
         for i in range(nframe):
-            coordarr = np.zeros((natom, 3))
             for j in range(3):
 
-                start_size = int.from_bytes((f.read(4)), "little")
-                while (start_size != 4 * natom):
+                start_size = int.from_bytes((f.read(BYTESIZE)), "little")
+                while (start_size != BYTESIZE * natom and start_size != 0):
                     # print("\n-- UNKNOWN %s -- " % start_size)
 
                     f.read(start_size)
-                    end_size = int.from_bytes((f.read(4)), "little")
+                    end_size = int.from_bytes((f.read(BYTESIZE)), "little")
                     if end_size != start_size:
                         raise RuntimeError("Can not read dcd file")
-                    start_size = int.from_bytes((f.read(4)), "little")
+                    start_size = int.from_bytes((f.read(BYTESIZE)), "little")
 
-                bin_arr = f.read(4 * natom)
-                if len(bin_arr) == 4 * natom:
-                    coordarr[:, j] = np.frombuffer(bin_arr, dtype=np.float32)
+                bin_arr = f.read(BYTESIZE * natom)
+                if len(bin_arr) == BYTESIZE * natom:
+                    dcd_arr[i, :, j] = np.frombuffer(bin_arr, dtype=np.float32)
                 else:
                     break
-                end_size = int.from_bytes((f.read(4)), "little")
+                end_size = int.from_bytes((f.read(BYTESIZE)), "little")
                 if end_size != start_size:
                     if i>1:
                         break
                     else:
-                        pass
-                        # raise RuntimeError("Can not read dcd file %i %i " % (start_size, end_size))
+                        # pass
+                        raise RuntimeError("Can not read dcd file %i %i " % (start_size, end_size))
 
-            dcd_list.append(coordarr)
-
+        print("\t -- Summary of DCD file -- ")
+        print("\t\t crd_type  : %s"%crd_type)
+        print("\t\t nframe  : %s"%nframe)
+        print("\t\t len_frame  : %s"%len_frame)
+        print("\t\t len_total  : %s"%len_total)
+        print("\t\t time_step  : %s"%time_step)
+        print("\t\t charmm_version  : %s"%charmm_version)
+        print("\t\t title  : %s"%title)
+        print("\t\t natom  : %s"%natom)
     print("\t Done \n")
 
-    return np.array(dcd_list)
+    return dcd_arr
+
+
+def numpyArr2dcd(arr, filename, start_frame=1, len_frame=1, time_step=1.0, title=None):
+    print("> Wrinting dcd file %s"%filename)
+    BYTESIZE = 4
+    nframe, natom, _ = arr.shape
+    len_total=nframe*len_frame
+    charmm_version=24
+    if title is None:
+        title = "DCD file generated by Continuous Flex plugin"
+    ntitle = (len(title)//(20*BYTESIZE)) + 1
+    with open(filename, 'wb') as f:
+        zeroByte = int.to_bytes(0, BYTESIZE, "little")
+
+        # Header
+        # ---------------- INIT
+        f.write(int.to_bytes(21*BYTESIZE ,BYTESIZE, "little"))
+        f.write(b'CORD')
+        f.write(int.to_bytes(nframe, BYTESIZE, "little"))
+        f.write(int.to_bytes(start_frame, BYTESIZE, "little"))
+        f.write(int.to_bytes(len_frame, BYTESIZE, "little"))
+        f.write(int.to_bytes(len_total, BYTESIZE, "little"))
+        for i in range(5):
+            f.write(zeroByte)
+        f.write(np.float32(time_step).tobytes())
+        for i in range(9):
+            f.write(zeroByte)
+        f.write(int.to_bytes(charmm_version, BYTESIZE, "little"))
+
+        f.write(int.to_bytes(21*BYTESIZE,BYTESIZE, "little"))
+
+        # ---------------- TITLE
+        f.write(int.to_bytes((ntitle*20+1)*BYTESIZE ,BYTESIZE, "little"))
+        f.write(int.to_bytes(ntitle ,BYTESIZE, "little"))
+        f.write(title.ljust(20*BYTESIZE).encode("ascii"))
+        f.write(int.to_bytes((ntitle*20+1)*BYTESIZE ,BYTESIZE, "little"))
+
+        # ---------------- NATOM
+        f.write(int.to_bytes(BYTESIZE ,BYTESIZE, "little"))
+        f.write(int.to_bytes(natom ,BYTESIZE, "little"))
+        f.write(int.to_bytes(BYTESIZE ,BYTESIZE, "little"))
+
+        # ----------------- DCD COORD
+        for i in range(nframe):
+            for j in range(3):
+                f.write(int.to_bytes(BYTESIZE*natom, BYTESIZE, "little"))
+                f.write(np.float32(arr[i, :, j]).tobytes())
+                f.write(int.to_bytes(BYTESIZE*natom, BYTESIZE, "little"))
+    print("\t Done \n")
 
 def existsCommand(name):
     from shutil import which

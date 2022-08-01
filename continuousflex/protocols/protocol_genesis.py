@@ -33,6 +33,8 @@ from pwem.emlib.image import ImageHandler
 from pwem.utils import runProgram
 from pyworkflow.utils import getListFromRangeString
 import xmipp3.convert
+import multiprocessing
+
 from .utilities.genesis_utilities import *
 from .utilities.pdb_handler import ContinuousFlexPDBHandler
 from xmipp3 import Plugin
@@ -77,6 +79,7 @@ class ProtGenesis(EMProtocol):
                       help='Select the input PDB.', important=True,  condition="inputType==%i"%INPUT_NEW_SIM)
         group = form.addGroup('Forcefield Inputs',  condition="inputType==%i"%INPUT_NEW_SIM)
         group.addParam('forcefield', params.EnumParam, label="Forcefield type", default=FORCEFIELD_CHARMM, important=True,
+
                       choices=['CHARMM', 'AAGO', 'CAGO'], help="Type of the force field used for energy and force calculation")
 
         group.addParam('inputTOP', params.FileParam, label="GROMACS Topology File (top)",
@@ -243,6 +246,9 @@ class ProtGenesis(EMProtocol):
 
         # Experiments =================================================================================================
         form.addSection(label='EM data')
+        # form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
+        #               choices=['None', 'Volume'], important=True,
+        #               help="Type of cryo-EM data to be processed")
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
                       choices=['None', 'Volume (s)', 'Image (s)'], important=True,
                       help="Type of cryo-EM data to be processed")
@@ -267,8 +273,8 @@ class ProtGenesis(EMProtocol):
 
         # Volumes
         group = form.addGroup('Volume Parameters', condition="EMfitChoice==1")
-        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
-                      label="Input volume (s)", help='Select the target EM density volume',
+        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume",
+                      label="Input volume", help='Select the target EM density volume',
                       condition="EMfitChoice==1", important=True)
         group.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
                       help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==1")
@@ -302,7 +308,7 @@ class ProtGenesis(EMProtocol):
                       label="projection angle image set  ", help='Image set containing projection alignement parameters',
                       condition="EMfitChoice==2 and projectAngleChoice==%i"%(PROJECTION_ANGLE_IMAGE))
 
-        form.addParallelSection(threads=1, mpi=1)
+        form.addParallelSection(threads=multiprocessing.cpu_count()//2-1, mpi=multiprocessing.cpu_count()//2-1)
         # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
@@ -442,7 +448,7 @@ class ProtGenesis(EMProtocol):
 
     # --------------------------- GENESIS step --------------------------------------------
 
-    def createINPs(self):
+    def createINPs(self, allow_restart=True):
         """
         Create GENESIS input files
         :return None:
@@ -464,7 +470,7 @@ class ProtGenesis(EMProtocol):
                     s += "strfile = %s\n" % inputSTR
             elif self.getForceField() == FORCEFIELD_AAGO or self.getForceField() == FORCEFIELD_CAGO:
                 s += "grotopfile = %s.top\n" % inputPDBprefix
-            if self.inputType.get() == INPUT_RESTART:
+            if self.inputType.get() == INPUT_RESTART and allow_restart:
                 s += "rstfile = %s \n" % self.getRestartFile(indexFit)
 
             s += "\n[OUTPUT] \n"  # -----------------------------------------------------------
@@ -658,7 +664,9 @@ class ProtGenesis(EMProtocol):
         # Build command
         programname = os.path.join( Plugin.getVar("GENESIS_HOME"), "bin/atdyn")
         extradir = self._getExtraPath()
-        params = "%s/INP_{} > %s/output_{}.log " %(extradir, extradir)
+        outPath, outName = os.path.split(self.getOutputPrefix())
+        outLog = os.path.join(outPath,re.sub("output_\d+", "output_{}",outName))
+        params = "%s/INP_{} > %s.log " %(extradir, outLog)
         cmd = buildRunCommand(programname, params, numberOfMpi=numberOfMpiPerFit, hostConfig=self._stepsExecutor.hostConfig,
                               env=env)
 

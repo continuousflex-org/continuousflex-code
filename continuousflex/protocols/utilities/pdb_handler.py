@@ -3,6 +3,19 @@ import copy
 from Bio.SVDSuperimposer import SVDSuperimposer
 
 class ContinuousFlexPDBHandler:
+    
+    @classmethod
+    def read_coords(cls, pdb_file):
+        print("> Reading pdb file %s ..." % pdb_file)
+        coords = []
+        with open(pdb_file, "r") as f:
+            for line in f:
+                if 'ATOM' in line:
+                    coords.append([
+                            line[30:38],line[38:46],line[46:54]
+                        ])
+        return np.array(coords).astype(float)
+
     def __init__(self, pdb_file):
         """
         Contructor
@@ -104,6 +117,13 @@ class ContinuousFlexPDBHandler:
         print("\t Done \n")
 
     def matchPDBatoms(self, reference_pdb, ca_only=False, matchingType=None):
+        """
+        match atoms between the pdb and a reference pdb
+        :param reference_pdb: ContinuousflexPDBHandler
+        :param ca_only: True if carbon alph only
+        :param matchingType: 0= chain first, 1= segment ID first
+        :return: index of matching atoms
+        """
         print("> Matching PDBs atoms ...")
         n_mols = 2
 
@@ -163,21 +183,27 @@ class ContinuousFlexPDBHandler:
     def alignMol(self, reference_pdb, idx_matching_atoms=None):
         print("> Aligning PDB ...")
 
-        sup = SVDSuperimposer()
         if idx_matching_atoms is not None:
             c1 = reference_pdb.coords[idx_matching_atoms[:, 1]]
             c2 = self.coords[idx_matching_atoms[:, 0]]
         else:
             c1 = reference_pdb.coords
             c2 = self.coords
-        sup.set(c1, c2)
-        sup.run()
-        rot, tran = sup.get_rotran()
+
+        rot, tran = self.alignCoords(c1,c2)
         self_copy = self.copy()
         self_copy.coords = np.dot(self_copy.coords, rot) + tran
         print("\t Done \n")
 
         return self_copy
+
+    @classmethod
+    def alignCoords(cls, coord_ref, coord):
+        sup = SVDSuperimposer()
+        sup.set(coord_ref, coord)
+        sup.run()
+        rot, tran = sup.get_rotran()
+        return rot, tran
 
     def getRMSD(self, reference_pdb, align=False, idx_matching_atoms=None):
         if align:
@@ -214,7 +240,7 @@ class ContinuousFlexPDBHandler:
             lst = list(set(self.chainID))
         lst.sort()
         return lst
-    
+
     def get_chain(self, chainName):
         if not isinstance(chainName, list):
             chainName=[chainName]

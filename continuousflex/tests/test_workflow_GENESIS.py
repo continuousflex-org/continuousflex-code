@@ -372,7 +372,6 @@ class testGENESIS(TestWorkflow):
             assert (rmsd_inp > rmsd_out2)
             # assert (rmsd2[-1] < 3.0)
 
-
 ##################################################################################################
 #
 #                                  EMFIT IMAGES
@@ -438,12 +437,6 @@ class testGENESIS(TestWorkflow):
 
             # Launch Fitting
             self.launchProtocol(protGenesisFitNMMDImg)
-
-
-
-
-
-
 
     # def test3_MDCHARMM(self):
     #     # Import PDB

@@ -49,9 +49,10 @@ PDB_SOURCE_ALIGNED = 3
 REDUCE_METHOD_PCA = 0
 REDUCE_METHOD_UMAP = 1
 
-class FlexProtDimredPdb(ProtAnalysis3D):
-    """ Protocol for applying dimentionality reduction on PDB files. """
-    _label = 'pdb dimentionality reduction'
+
+class FlexProtPCAPdb(ProtAnalysis3D):
+    """ Protocol to perform Principal Component Analysis on a set of PDBs """
+    _label = 'PCA set of pdbs'
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
@@ -91,6 +92,12 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                       label="Step of the trajectory",
                       help='Step to skip points in the trajectory', expertLevel=params.LEVEL_ADVANCED)
 
+        form.addParam('alignPdbProt', params.PointerParam, pointerClass='FlexProtAlignPdb',
+                      condition='pdbSource == %i' % PDB_SOURCE_ALIGNED,
+                      label="Align PDBs Protocol",
+                      help='Point to a protocol of pdb aligned. For large data set, you can use here the align pdb protocol as input '
+                           'and avoid creating an output set of pdb in the align pdb protocol.')
+
         form.addParam('method', params.EnumParam, label="Reduction method", default=REDUCE_METHOD_PCA,
                       choices=['PCA', 'UMAP'],help="")
 
@@ -119,6 +126,8 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                 pdb_arr_i = dcd2numpyArr(inputFiles[i])[start:stop:step]
                 pdbs_arr = np.concatenate((pdbs_arr, pdb_arr_i), axis=0)
 
+        elif self.pdbSource.get() == PDB_SOURCE_ALIGNED:
+            pdbs_arr = dcd2numpyArr(inputFiles[0])
         else:
             pdbs_matrix = []
             for pdbfn in inputFiles:
@@ -214,12 +223,16 @@ class FlexProtDimredPdb(ProtAnalysis3D):
             l= [i.getFileName() for i in self.setOfPDBs.get()]
         elif self.pdbSource.get()==PDB_SOURCE_TRAJECT:
             l= [f for f in glob.glob(self.dcds_file.get())]
+        elif self.pdbSource.get()==PDB_SOURCE_ALIGNED:
+            l=[self.alignPdbProt.get()._getExtraPath("coords.dcd")]
         l.sort()
         return l
 
     def getPDBRef(self):
         if self.pdbSource.get()==PDB_SOURCE_TRAJECT:
             return self.dcd_ref_pdb.get().getFileName()
+        elif self.pdbSource.get()==PDB_SOURCE_ALIGNED:
+            return self.alignPdbProt.get()._getExtraPath("reference.pdb")
         else:
             return self.getInputFiles()[0]
 

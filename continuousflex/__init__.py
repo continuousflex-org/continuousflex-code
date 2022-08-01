@@ -122,13 +122,28 @@ class Plugin(pwem.Plugin):
                        neededProgs=['gfortran'], default=True)
 
         target_branch = "merge_genesis_1.4"
+
         env.addPackage('MD-NMMD-Genesis', version='1.0', deps=[lapack],
                        buildDir='MD-NMMD-Genesis', tar="void.tgz",
                        commands=[('git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; '
                                   'autoreconf -fi ;'
                                   './configure LDFLAGS=-L%s ;'
                                   'make install;' % (target_branch,env.getLibFolder()), "bin/atdyn")],
-                       neededProgs=['mpif90'],default=True)
+                       neededProgs=['mpif90'], default=True)
+
+        env.addPackage('DeepLearning', version='1.0',
+                       tar='void.tgz',
+                       buildDir='DeepLearning',
+                       commands=[('pip install -U torch==1.10.1 torchvision==0.11.2 tensorboard==2.8.0 tqdm==4.64.0'
+                                  ' && touch DeepLearning_Installed','DeepLearning_Installed')],
+                       default=True)
+
+        env.addPackage('OpticalFlow', version='1.0',
+                       tar='void.tgz',
+                       commands=[('pip install -U pycuda==2020.1 farneback3d==0.1.3 && touch OpticalFlow_Installed',
+                                  'OpticalFlow_Installed')],
+                       neededProgs=[''],
+                       default=True)
 
 
 files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol': 'volumes/AK_LP10.vol',

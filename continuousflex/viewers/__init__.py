@@ -27,7 +27,8 @@ from .viewer_nma_alignment import FlexAlignmentNMAViewer
 from .viewer_nma_dimred import FlexDimredNMAViewer
 from .viewer_structure_mapping import FlexProtStructureMappingViewer
 from .viewer_subtomograms_synthesize import FlexProtSynthesizeSubtomoViewer
-from .viewer_pdb_dimred import FlexProtPdbDimredViewer
+from .viewer_pdb_dimred import FlexProtPdbDimredViewer, VolumeTrajectoryViewer
+from .viewer_pca_pdbs import FlexProtPCAPdbViewer
 from .viewer_subtomograms_classify import FlexProtSubtomoClassifyViewer
 from .viewer_nma_alignment_vol import FlexAlignmentNMAVolViewer
 from .viewer_nma_dimred_vol import FlexDimredNMAVolViewer
@@ -35,4 +36,5 @@ from .viewer_image_synthesize import FlexProtSynthesizeImageViewer
 from .viewer_heteroflow_dimred import FlexDimredHeteroFlowViewer
 from .viewer_heteroflow import FlexHeteroFlowViewer
 from .viewer_genesis import GenesisViewer
-
+from .viewer_deephemnma_train import FlexDeepHEMNMAViewer
+from .viewer_deephemnma_infer import FlexDeepHEMNMAinferViewer

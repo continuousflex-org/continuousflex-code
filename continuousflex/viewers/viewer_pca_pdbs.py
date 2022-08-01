@@ -22,25 +22,12 @@
 # **************************************************************************
 
 
-from os.path import basename
 import numpy as np
-from pwem.emlib import MetaData, MDL_ORDER
-from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam, IntParam
+from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam, IntParam, LEVEL_ADVANCED
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
-from pyworkflow.utils import replaceBaseExt, replaceExt
-from pwem.viewers import ChimeraView
-from pyworkflow.viewer import Viewer
-from pwem.constants import ALIGN_PROJ
 
-from pwem.objects.data import SetOfParticles,SetOfVolumes, Class2D, ClassVol
-from continuousflex.viewers.nma_plotter import FlexNmaPlotter
-from continuousflex.protocols import FlexProtDimredPdb
-import xmipp3
-from xmipp3.convert import writeSetOfVolumes, writeSetOfParticles, readSetOfVolumes, readSetOfParticles
-import pwem.emlib.metadata as md
-from pwem.viewers import ObjectView
+from continuousflex.protocols import FlexProtPCAPdb
 import matplotlib.pyplot as plt
-from pwem.emlib.image import ImageHandler
 
 from joblib import load
 from continuousflex.viewers.tk_dimred import PCAWindowDimred
@@ -51,7 +38,6 @@ from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd, d
 from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
 from pyworkflow.gui.browser import FileBrowserWindow
 from continuousflex.protocols.protocol_pdb_dimred import REDUCE_METHOD_PCA, REDUCE_METHOD_UMAP
-
 
 import os
 
@@ -69,11 +55,11 @@ ANIMATION_PCA=2
 NUM_POINTS_TRAJECTORY=10
 
 
-class FlexProtPdbDimredViewer(ProtocolViewer):
-    """ Visualization of dimensionality reduction on PDBs
+class FlexProtPCAPdbViewer(ProtocolViewer):
+    """ Visualization of PCA of set of pdbs
     """
-    _label = 'viewer PDBs dimred'
-    _targets = [FlexProtDimredPdb]
+    _label = 'viewer PCA set of pdbs'
+    _targets = [FlexProtPCAPdb]
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
 
     def __init__(self, **kwargs):
@@ -82,14 +68,12 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
     def _defineParams(self, form):
         form.addSection(label='Visualization')
-        form.addParam('displayPCA', LabelParam,
-                      label='Open PCA tool ?',
+        form.addParam('displayTrajectories', LabelParam,
+                      label='Open trajectories tool ?',
                       help='Open a GUI to visualize the PCA space'
                            ' to draw and adjust trajectories.')
-
-        form.addParam('inputSet', PointerParam, pointerClass ='SetOfParticles,SetOfVolumes',
-                      label='Em data for cluster animation',  allowsNull=True,
-                      help="")
+        form.addParam('numberOfPoints', IntParam, default=10,
+                       label='Number of trajectory points', expertLevel=LEVEL_ADVANCED)
 
         # form.addParam("dataSet", StringParam, default= "", label="Data set label")
         form.addParam('displayPcaSingularValues', LabelParam,
@@ -99,8 +83,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
 
         group = form.addGroup("Window parameters")
-        group.addParam('numberOfPoints', IntParam, default=10,
-                       label='Number of trajectory points / clusters', )
+
         group.addParam('s', FloatParam, default=5, allowsNull=True,
                        label='Radius')
         group.addParam('alpha', FloatParam, default=0.5, allowsNull=True,
@@ -142,19 +125,19 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
     def _getVisualizeDict(self):
         return {
-                'displayPCA': self._displayPCA,
+                'displayTrajectories': self._displayTrajectories,
                 'displayPcaSingularValues': self.viewPcaSinglularValues,
                 }
 
 
-    def _displayPCA(self, paramName):
+    def _displayTrajectories(self, paramName):
         self.trajectoriesWindow = self.tkWindow(PCAWindowDimred,
                                                 title='Trajectories Tool',
                                                 dim=self.protocol.reducedDim.get(),
                                                 data=self.getData(),
                                                 callback=self._generateAnimation,
                                                 loadCallback=self._loadAnimation,
-                                                saveClusterCallback=self.saveClusterCallback,
+                                                saveClusterCallback=None,
                                                 numberOfPoints=self.numberOfPoints.get(),
                                                 limits_mode=0,
                                                 LimitL=None,
@@ -168,7 +151,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                                                 s=self.s,
                                                 alpha=self.alpha)
         return [self.trajectoriesWindow]
-
 
     def viewPcaSinglularValues(self, paramName):
         pca = load(self.protocol._getExtraPath('pca_pickled.joblib'))
@@ -198,7 +180,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         #
         # else:
         #
-        weights = [0 for i in range(pdb_matrix.shape[0])]
+        weights = [0.0 for i in range(pdb_matrix.shape[0])]
 
         for i in range(pdb_matrix.shape[0]):
             data.addPoint(Point(pointId=i+1, data=pdb_matrix[i, :],weight=weights[i]))
@@ -209,7 +191,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         initPDB = ContinuousFlexPDBHandler(prot.getPDBRef())
 
         # Get animation root
-        animation = self.trajectoriesWindow.getClusterName()
+        animation = self.trajectoriesWindow.getAnimationName()
         animationPath = prot._getExtraPath('animation_%s' % animation)
         cleanPath(animationPath)
         makePath(animationPath)
@@ -274,90 +256,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
         VmdView(' -e ' + vmdFn).show()
 
-    def saveClusterCallback(self, tkWindow):
-        # get cluster name
-        clusterName = "cluster_" + tkWindow.getClusterName()
-
-        # get input metadata
-        inputSet = self.inputSet.get()
-        if inputSet is None:
-            tkWindow.showError("Select an EM set before exporting clusters.")
-            return
-
-        classID=[]
-        for p in tkWindow.data:
-            classID.append(int(p._weight))
-
-        if isinstance(inputSet, SetOfParticles):
-            classSet = self.protocol._createSetOfClasses2D(inputSet, clusterName)
-
-            if inputSet.getFirstItem().hasTransform() and self.protocol.alignPDBs.get():
-                inputAlignement = self.protocol._createSetOfParticles("inputAlignement")
-                alignedParticles = self.protocol._createSetOfParticles("alignedParticles")
-                readSetOfParticles(self.protocol._getExtraPath("alignement.xmd"),inputAlignement)
-                alignedParticles.setSamplingRate(inputSet.getSamplingRate())
-                alignedParticles.setAlignment(ALIGN_PROJ)
-                iter1 = inputSet.iterItems()
-                iter2 = inputAlignement.iterItems()
-                for i in range(inputSet.getSize()):
-                    p1 = iter1.__next__()
-                    p2 = iter2.__next__()
-                    r1 = p1.getTransform()
-                    r2 = p2.getTransform()
-                    rot = r2.getRotationMatrix()
-                    tran = np.array(r2.getShifts())/ inputSet.getSamplingRate()
-                    # middle = np.ones(3) * p1.getDim()[0]/2 * inputSet.getSamplingRate()
-                    # new_tran = np.dot(middle, rot) + tran
-                    new_trans = np.zeros((4,4))
-                    new_trans[:3,3] = tran
-                    new_trans[:3,:3] = rot
-                    new_trans[3,3] = 1.0
-                    r1.composeTransform(new_trans)
-                    p1.setTransform(r1)
-                    alignedParticles.append(p1)
-                self.protocol._defineOutputs(**{clusterName+"_alignPart": alignedParticles})
-                writeSetOfParticles(alignedParticles, self.protocol._getExtraPath(clusterName+"_alignement.xmd"))
-
-        else:
-            classSet = self.protocol._createSetOfClasses3D(inputSet,clusterName)
-
-        def updateItemCallback(item, row):
-            item.setClassId(row)
-
-        class itemDataIterator:
-            def __init__(self, clsID):
-                self.clsID = clsID
-
-            def __iter__(self):
-                self.n = 0
-                return self
-
-            def __next__(self):
-                if self.n > len(self.clsID)-1:
-                    return 0
-                else:
-                    index = self.clsID[self.n]
-                    self.n += 1
-                    return index
-
-        classSet.classifyItems(
-            updateItemCallback=updateItemCallback,
-            updateClassCallback=None,
-            itemDataIterator=iter(itemDataIterator(classID)),
-            classifyDisabled=False,
-            iterParams=None,
-            doClone=True)
-
-        # Run reconstruction
-        self.protocol._defineOutputs(**{clusterName : classSet})
-        from continuousflex.protocols.protocol_batch_cluster import FlexBatchProtClusterSet
-        project = self.protocol.getProject()
-        newProt = project.newProtocol(FlexBatchProtClusterSet)
-        newProt.setObjLabel(clusterName)
-        newProt.inputSet.set(getattr(self.protocol, clusterName))
-        project.launchProtocol(newProt)
-        project.getRunsGraph()
-
     def _loadAnimation(self):
         browser = FileBrowserWindow("Select animation directory / trajectory file (txt file)",
                                     self.getWindow(), self.protocol._getExtraPath(),
@@ -393,40 +291,3 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         self.trajectoriesWindow.setAnimationName(trajName)
         self.trajectoriesWindow._onUpdateClick()
         self.trajectoriesWindow._checkNumberOfPoints()
-
-
-class VolumeTrajectoryViewer(ProtocolViewer):
-    """ Visualization of a SetOfVolumes as a trajectory with ChimeraX
-    """
-    _label = 'Volume trajectory viewer'
-    _targets = [SetOfVolumes]
-
-    def _defineParams(self, form):
-        form.addSection(label='Visualization')
-        form.addParam('displayTrajectories', LabelParam,
-                      label='ChimeraX',
-                      help='Open the trajectory in ChimeraX.')
-    def _getVisualizeDict(self):
-        return {
-                'displayTrajectories': self._visualize,
-                }
-
-    def _visualize(self, obj, **kwargs):
-        """visualisation for volumes set"""
-        volNames = ""
-        for i in self.protocol:
-            i.setSamplingRate(self.protocol.getSamplingRate())
-            vol = ImageHandler().read(i)
-            volName = os.path.abspath(self._getPath("tmp%i.vol"%i.getObjId()))
-            vol.write(volName)
-            volNames += volName+" "
-        # Show Chimera
-        tmpChimeraFile = self._getPath("chimera.cxc")
-        print(tmpChimeraFile)
-        with open(tmpChimeraFile, "w") as f:
-            f.write("open %s vseries true \n" % volNames)
-            # f.write("volume #1 style surface level 0.5")
-            f.write("vseries play #1 loop true maxFrameRate 7 direction oscillate \n")
-
-        cv = ChimeraView(tmpChimeraFile)
-        return [cv]
