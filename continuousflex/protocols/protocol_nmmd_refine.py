@@ -67,7 +67,7 @@ class ProtNMMDRefine(ProtGenesis):
         for iter_global in range(self.numberOfIter.get()):
 
             # Create INP files
-            self._insertFunctionStep("createINPs", False)
+            self._insertFunctionStep("createGenesisInputStep")
 
             # RUN simulation
             if not self.disableParallelSim.get() and  \
@@ -79,7 +79,9 @@ class ProtNMMDRefine(ProtGenesis):
                     self.warning("Warning : Can not use parallel computation for GENESIS,"
                                         " please install \"GNU parallel\". Running in linear mode.")
                 for i in range(self.getNumberOfSimulation()):
-                    self._insertFunctionStep("runSimulation", i)
+                    inp_file = self._getExtraPath("INP_%s" % str(i + 1).zfill(6))
+                    outPref = self.getOutputPrefix(i)
+                    self._insertFunctionStep("runSimulation", inp_file, outPref)
 
             self._insertFunctionStep("pdb2dcdStep")
 
@@ -87,10 +89,14 @@ class ProtNMMDRefine(ProtGenesis):
 
             self._insertFunctionStep("updateAlignementStep")
 
-            self._insertFunctionStep("newIterationStep")
+            if self.numberOfIter.get()-1 > iter_global:
 
-            if self.numberOfIter.get() > iter_global:
+                self._insertFunctionStep("newIterationStep")
+
                 self._insertFunctionStep("PCAStep")
+
+                self._insertFunctionStep("runMinimizationStep")
+
 
         self._insertFunctionStep("prepareOutputStep")
 
@@ -122,7 +128,7 @@ class ProtNMMDRefine(ProtGenesis):
     def rigidBodyAlignementStep(self):
 
         # open files
-        refPDB =  ContinuousFlexPDBHandler(self.getPDBRef())
+        refPDB =  ContinuousFlexPDBHandler(self.getInputPDBprefix()+".pdb")
         arrDCD = dcd2numpyArr(self._getExtraPath("coords.dcd"))
         nframe, natom,_ =arrDCD.shape
         alignXMD = md.MetaData()
@@ -203,7 +209,7 @@ class ProtNMMDRefine(ProtGenesis):
         else:
             writeSetOfParticles(alignedSet, self.getAlignementprefix())
 
-        self.inputEMMetadata = md.MetaData(self.getAlignementprefix())
+        self._inputEMMetadata = md.MetaData(self.getAlignementprefix())
 
     def newIterationStep(self):
         inputPref = self.getInputPDBprefix()
@@ -267,6 +273,50 @@ class ProtNMMDRefine(ProtGenesis):
             if os.path.isfile(pdbfile):
                 runCommand("cp %s.pdb %s.pdb" % (pdbfile, outPref))
 
+    def runMinimizationStep(self):
+
+        # INP file name
+        inp_file = self._getExtraPath("INP_min")
+        outPref = self.getInputPDBprefix()+"_min"
+
+        # Inputs files
+        args = self.getDefaultArgs()
+        args["outputPrefix"]  = outPref
+        args["simulationType"]  = SIMULATION_MIN
+        args["inputType"]  = INPUT_NEW_SIM
+        args["n_steps"]  = 10000
+        args["EMfitChoice"]  = EMFIT_NONE
+
+        # Create input genesis file
+        createGenesisInput(inp_file, **args)
+
+        # Run minimization
+        env = self.getGenesisEnv()
+        env.set("OMP_NUM_THREADS", str(self.numberOfThreads.get()))
+        runCommand("atdyn %s > %s.log"%(inp_file, outPref), env=env)
+
+        # Copy output pdb
+        runCommand("cp %s.pdb %s.pdb"%(outPref, self.getInputPDBprefix()))
+
+    def createGenesisInputStep(self):
+        """
+        Create GENESIS input files
+        :return None:
+        """
+        for indexFit in range(self.getNumberOfSimulation()):
+            inp_file = self._getExtraPath("INP_%s" % str(indexFit + 1).zfill(6))
+            args = self.getDefaultArgs(indexFit)
+            if self._iter != 0 :
+                args["inputType"] = INPUT_NEW_SIM
+                args["simulationType"] = SIMULATION_NMMD
+                args["nm_number"] =  self.numberOfPCA.get()
+                args["nm_dt"] =  0.002
+                args["nm_mass"] =  5.0
+            createGenesisInput(inp_file, **args)
+
+    def createOutputStep(self):
+        ProtGenesis.createOutputStep(self)
+
     def getPDBRef(self):
         return self._getExtraPath("inputPDB_000001_iter_001.pdb")
 
@@ -278,12 +328,6 @@ class ProtNMMDRefine(ProtGenesis):
         prefix = self._getExtraPath("output_%s_iter_%s"%(
             str(index+1).zfill(6), str(itr+1).zfill(3)))
         return prefix
-
-    def getNumberOfNormalModes(self):
-        if self._iter==0:
-            return ProtGenesis.getNumberOfNormalModes(self)
-        else:
-            return self.numberOfPCA.get()
 
     def getAlignementprefix(self, itr=None):
         if itr is None : itr = self._iter

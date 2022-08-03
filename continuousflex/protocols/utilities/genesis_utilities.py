@@ -91,26 +91,6 @@ def save_dcd(mol, coords_list, prefix):
     runCommand("rm -f %s_cmd.tcl" % prefix)
     print("\t Done \n")
 
-def readLogFile(log_file):
-    with open(log_file,"r") as file:
-        header = None
-        dic = {}
-        for line in file:
-            if line.startswith("INFO:"):
-                if header is None:
-                    header = line.split()
-                    for i in range(1,len(header)):
-                        dic[header[i]] = []
-                else:
-                    splitline = line.split()
-                    if len(splitline) == len(header):
-                        for i in range(1,len(header)):
-                            try :
-                                dic[header[i]].append(float(splitline[i]))
-                            except ValueError:
-                                pass
-
-    return dic
 
 def lastPDBFromDCD(inputPDB,inputDCD,  outputPDB):
 
@@ -339,6 +319,26 @@ def getAngularShiftDist(angle1MetaFile, angle2MetaData, angle2Idx, tmpPrefix, sy
     return angDist, shftDist
 
 
+def readLogFile(log_file):
+    with open(log_file,"r") as file:
+        header = None
+        dic = {}
+        for line in file:
+            if line.startswith("INFO:"):
+                if header is None:
+                    header = line.split()
+                    for i in range(1,len(header)):
+                        dic[header[i]] = []
+                else:
+                    splitline = line.split()
+                    if len(splitline) == len(header):
+                        for i in range(1,len(header)):
+                            try :
+                                dic[header[i]].append(float(splitline[i]))
+                            except ValueError:
+                                pass
+
+    return dic
 
 def dcd2numpyArr(filename):
     print("> Reading dcd file %s"%filename)
