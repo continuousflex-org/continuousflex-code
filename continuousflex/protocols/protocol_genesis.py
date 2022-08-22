@@ -308,7 +308,7 @@ class ProtGenesis(EMProtocol):
                       label="projection angle image set  ", help='Image set containing projection alignement parameters',
                       condition="EMfitChoice==2 and projectAngleChoice==%i"%(PROJECTION_ANGLE_IMAGE))
 
-        form.addParallelSection(threads=multiprocessing.cpu_count()//2-1, mpi=multiprocessing.cpu_count()//2-1)
+        form.addParallelSection(threads=1, mpi=multiprocessing.cpu_count()//2-1)
         # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
@@ -554,7 +554,6 @@ class ProtGenesis(EMProtocol):
         params = "%s/INP_{} > %s.log " %(extradir, outLog)
         cmd = buildRunCommand(programname, params, numberOfMpi=numberOfMpiPerFit, hostConfig=self._stepsExecutor.hostConfig,
                               env=env)
-
         # Build parallel command
         parallel_cmd = "seq -f \"%%06g\" 1 %i | parallel -P %i \" %s\" " % (
         self.getNumberOfSimulation(),self.numberOfMpi.get()//numberOfMpiPerFit, cmd)

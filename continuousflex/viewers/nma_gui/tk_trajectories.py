@@ -258,7 +258,7 @@ class TrajectoriesWindow(gui.Window):
                                                     *baseList)
 
                     self.ps = PointPath(ax, self.data, self.pathData,
-                                        callback=self._checkNumberOfPoints,
+                                        callback=self._checkNumberOfPoints, maxPoints=self.numberOfPoints,
                                         LimitL = self.LimitLow, LimitH = self.LimitHigh,
                                         alpha=self.alpha.get(), s = self.s.get())
                 elif dim == 3:

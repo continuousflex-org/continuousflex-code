@@ -201,8 +201,13 @@ class ContinuousFlexPDBHandler:
     def alignCoords(cls, coord_ref, coord):
         sup = SVDSuperimposer()
         sup.set(coord_ref, coord)
-        sup.run()
-        rot, tran = sup.get_rotran()
+        try:
+            sup.run()
+            rot, tran = sup.get_rotran()
+        except np.linalg.LinAlgError:
+            print("Error while aligning : SVD did not converge")
+            rot = np.eye(3)
+            tran = np.zeros(3)
         return rot, tran
 
     def getRMSD(self, reference_pdb, align=False, idx_matching_atoms=None):
@@ -373,3 +378,4 @@ class ContinuousFlexPDBHandler:
 
     def center(self):
         self.coords -= np.mean(self.coords, axis=0)
+

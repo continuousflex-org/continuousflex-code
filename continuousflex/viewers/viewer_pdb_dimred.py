@@ -288,6 +288,8 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         for p in tkWindow.data:
             classID.append(int(p._weight))
 
+        np.savetxt(self.protocol._getExtraPath("")+clusterName+".txt", np.array(classID))
+
         if isinstance(inputSet, SetOfParticles):
             classSet = self.protocol._createSetOfClasses2D(inputSet, clusterName)
 

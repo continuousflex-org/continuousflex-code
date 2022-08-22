@@ -118,12 +118,8 @@ class FlexProtPCAPdb(ProtAnalysis3D):
         # Get pdbs coordinates
         if self.pdbSource.get() == PDB_SOURCE_TRAJECT:
             pdbs_arr = dcd2numpyArr(inputFiles[0])
-            start = self.dcd_start.get()
-            stop = self.dcd_end.get() if self.dcd_end.get() != -1 else pdbs_arr.shape[0],
-            step = self.dcd_step.get()
-            pdbs_arr = pdbs_arr[start:stop:step]
             for i in range(1,len(inputFiles)):
-                pdb_arr_i = dcd2numpyArr(inputFiles[i])[start:stop:step]
+                pdb_arr_i = dcd2numpyArr(inputFiles[i])
                 pdbs_arr = np.concatenate((pdbs_arr, pdb_arr_i), axis=0)
 
         elif self.pdbSource.get() == PDB_SOURCE_ALIGNED:

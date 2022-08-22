@@ -52,7 +52,6 @@ class ProtNMMDRefine(ProtGenesis):
 
 
     def _insertAllSteps(self):
-
         # Convert input PDB
         self._insertFunctionStep("convertInputPDBStep")
 
@@ -269,9 +268,9 @@ class ProtNMMDRefine(ProtGenesis):
                             print("Incomplete DCD file")
                 numpyArr2dcd(dcdarr,outPref+ ".dcd")
 
-            pdbfile = self.getOutputPrefix(i)
+            pdbfile = self.getOutputPrefix(i)+".pdb"
             if os.path.isfile(pdbfile):
-                runCommand("cp %s.pdb %s.pdb" % (pdbfile, outPref))
+                runCommand("cp %s %s.pdb" % (pdbfile, outPref))
 
     def runMinimizationStep(self):
 

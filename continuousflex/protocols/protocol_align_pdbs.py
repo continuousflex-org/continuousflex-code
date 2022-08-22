@@ -127,15 +127,9 @@ class FlexProtAlignPdb(ProtAnalysis3D):
         if self.pdbSource.get() == PDB_SOURCE_TRAJECT:
             pdbs_arr = dcd2numpyArr(inputFiles[0])
             nframe, natom, _ = pdbs_arr.shape
-            first_idx = int(self.dcd_start.get())
-            last_idx = int(self.dcd_end.get()) if self.dcd_end.get() != -1 else nframe,
-            step_idx = int(self.dcd_step.get())
-            print(first_idx)
-            print(last_idx)
-            print(step_idx)
-            pdbs_arr = pdbs_arr[first_idx:last_idx[0]:step_idx]
+            pdbs_arr = pdbs_arr
             for i in range(1,len(inputFiles)):
-                pdb_arr_i = dcd2numpyArr(inputFiles[i])[first_idx:last_idx[0]:step_idx]
+                pdb_arr_i = dcd2numpyArr(inputFiles[i])
                 pdbs_arr = np.concatenate((pdbs_arr, pdb_arr_i), axis=0)
 
         else:

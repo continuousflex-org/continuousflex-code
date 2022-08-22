@@ -158,7 +158,7 @@ class FlexBatchProtNMACluster(BatchProtocol):
     def _methods(self):
         return []
 
-
+import multiprocessing
 class FlexBatchProtClusterSet(BatchProtocol):
     """ Protocol executed when a set of cluster is created
     from set of pdbs.
@@ -167,6 +167,9 @@ class FlexBatchProtClusterSet(BatchProtocol):
 
     def _defineParams(self, form):
         form.addHidden('inputSet', PointerParam, pointerClass='SetOfClasses2D,SetOfClasses3D')
+        form.addHidden('inputSet', PointerParam, pointerClass='SetOfClasses2D,SetOfClasses3D')
+        form.addParallelSection(threads=1, mpi=multiprocessing.cpu_count()//2-1)
+
     # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
@@ -185,14 +188,24 @@ class FlexBatchProtClusterSet(BatchProtocol):
         for i in inputClasses:
             if i.getObjId() != 0:
                 classFile = self._getExtraPath("class%i.xmd" % i.getObjId())
-                classVol = self._getExtraPath("class%i.vol" % i.getObjId())
                 if isinstance(inputClasses, SetOfClasses2D):
                     writeSetOfParticles(i, classFile)
-                    progname = "xmipp_reconstruct_fourier "
-                    args = "-i %s -o %s " % (classFile, classVol)
-                    runCommand(progname + args)
                 else:
                     writeSetOfVolumes(i,classFile)
+
+        for i in inputClasses:
+            if i.getObjId() != 0:
+                classFile = self._getExtraPath("class%i.xmd" % i.getObjId())
+                classVol = self._getExtraPath("class%i.vol" % i.getObjId())
+                if isinstance(inputClasses, SetOfClasses2D):
+                    args = "-i %s -o %s " % (classFile, classVol)
+                    if self.numberOfMpi.get() > 1 :
+                        progname = "xmipp_mpi_reconstruct_fourier "
+                        self.runJob(progname, args)
+                    else:
+                        progname = "xmipp_reconstruct_fourier "
+                        runCommand(progname + args)
+                else:
                     classAvg = ImageHandler().computeAverage(i)
                     classAvg.write(classVol)
 
