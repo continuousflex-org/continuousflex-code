@@ -9,8 +9,11 @@ import torch
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 import sys
-def norm():
+def norm(imgs_path, output_path, FLAG, mode, batch_size):
     dataset = cryodata(imgs_path, output_path, flag=FLAG, mode = mode, transform=transforms.ToTensor())
+    random_seed = 42
+    validation_split = .2
+    shuffle_dataset = True
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor((1-validation_split) * dataset_size))
@@ -27,7 +30,7 @@ def norm():
     train_loader = DataLoader(dataset, batch_size=batch_size, sampler=train_sampler)
     validation_loader = DataLoader(dataset, batch_size=batch_size, sampler=valid_sampler)
     sum_, squared_sum_, num_batches = 0, 0, 0
-    for img, nm_amplitudes in loader:
+    for img, nm_amplitudes in train_loader:
         sum_ += torch.mean(img, dim=[0, 2, 3])
         squared_sum_ += torch.mean(img**2, dim=[0, 2, 3])
         num_batches += 1
@@ -39,7 +42,7 @@ def train(imgs_path, output_path, epochs=400, batch_size=2, lr=1e-4, flag=0, dev
 
     num_epochs = epochs
     random_seed = 42
-    validation_split = .2
+    validation_split = .5
     shuffle_dataset = True
     FLAG = ''
     if flag==0:
@@ -55,11 +58,9 @@ def train(imgs_path, output_path, epochs=400, batch_size=2, lr=1e-4, flag=0, dev
         DEVICE = 'cuda'
     else:
         DEVICE = 'cpu'
-    mean, std = norm()
-    transforms = torch.nn.Sequential(
-    transforms.ToTensor()
-    transforms.Normalize((mean), (std)))
-    dataset = cryodata(imgs_path, output_path, flag=FLAG, mode = mode, transform=transforms.ToTensor())
+    mean, std = norm(imgs_path, output_path, FLAG, mode, batch_size)
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((mean), (std))])
+    dataset = cryodata(imgs_path, output_path, flag=FLAG, mode = mode, transform=transform)
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor((1-validation_split) * dataset_size))

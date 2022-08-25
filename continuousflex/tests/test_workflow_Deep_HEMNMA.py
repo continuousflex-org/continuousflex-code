@@ -82,7 +82,7 @@ class TestDeepHEMNMA1(TestWorkflow):
         protSubset1 = self.newProtocol(ProtSubSet,
                                       objLabel='Training set',
                                       chooseAtRandom=True,
-                                      nElements=3)
+                                      nElements=4)
         # protSubset1.inputFullSet.set(protImportParts.outputParticles)
         protSubset1.inputFullSet.set(protResizeParts.outputParticles)
         self.launchProtocol(protSubset1)
