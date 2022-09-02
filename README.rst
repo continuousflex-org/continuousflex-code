@@ -65,7 +65,7 @@ Protocols
 * StructMap: Structural Mapping method to interpret heterogeneity of a set of single particle cryo-EM maps in terms of continuous conformational transitions [4]
 * HEMNMA-3D: Extension of HEMNMA to continuous conformational variability analysis of macromolecules from in situ cryo-ET subtomograms [5]
 * TomoFlow: Method for analyzing continuous conformational variability of macromolecules in in vitro and in situ cryogenic subtomograms based on 3D dense optical flow [7]
-* GENESIS: Software to perform cryo-EM flexible fitting using Molecular Dynamics (MD) simulations and Normal Mode Molecular Dynamics (NMMD) [8]
+* NMMD: Software to perform cryo-EM flexible fitting using a combination of Normal Mode (NM) analysis and Molecular Dynamics (MD) simulations  implemented in GENESIS [8]
 * DeepHEMNMA: A deep learning extension of HEMNMA  [9]
 
 Notes:
