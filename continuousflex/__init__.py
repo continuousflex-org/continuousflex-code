@@ -127,7 +127,7 @@ class Plugin(pwem.Plugin):
                        commands=[('git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; '
                                   './configure LDFLAGS=-L%s ;'
                                   'make install;' % (target_branch,env.getLibFolder()), "bin/atdyn")],
-                       neededProgs=['mpif90'], default=True)
+                       neededProgs=['mpif90'], default=False)
 
         env.addPackage('DeepLearning', version='1.0',
                        tar='void.tgz',

@@ -65,7 +65,8 @@ Protocols
 * StructMap: Structural Mapping method to interpret heterogeneity of a set of single particle cryo-EM maps in terms of continuous conformational transitions [4]
 * HEMNMA-3D: Extension of HEMNMA to continuous conformational variability analysis of macromolecules from in situ cryo-ET subtomograms [5]
 * TomoFlow: Method for analyzing continuous conformational variability of macromolecules in in vitro and in situ cryogenic subtomograms based on 3D dense optical flow [7]
-* GENESIS: Software to perform cryo-EM flexible fitting using Molecular Dynamics (MD) simulations and Normal Mode Molecular Dynamics (NMMD) [8]
+* NMMD: Software to perform cryo-EM flexible fitting using a combination of Normal Mode (NM) analysis and Molecular Dynamics (MD) simulations  implemented in GENESIS [8]
+* DeepHEMNMA: A deep learning extension of HEMNMA  [9]
 
 Notes:
 
@@ -93,5 +94,7 @@ References
 [7] Harastani M, Eltsov M, Leforestier A, Jonic S: TomoFlow: Analysis of continuous conformational variability of macromolecules in cryogenic subtomograms based on 3D dense optical flow. J Mol Biol 2021,167381. `[Author’s version] <https://hal.archives-ouvertes.fr/hal-03452809>`__ `[Journal] <https://doi.org/10.1016/j.jmb.2021.167381>`__
 
 [8] Vuillemot R, Miyashita O, Tama F, Rouiller I, Jonic S, NMMD: Efficient Cryo-EM Flexible Fitting Based on Simultaneous Normal Mode and Molecular Dynamics atomic displacements. J Mol Biol 2022, 167483. `[Author’s version] <https://hal.archives-ouvertes.fr/hal-03577246>`__ `[Journal] <https://doi.org/10.1016/j.jmb.2022.167483>`__
+
+[9] Hamitouche I and Jonic S (2022), DeepHEMNMA: ResNet-based hybrid analysis of continuous conformational heterogeneity in cryo-EM single particle images. Front. Mol. Biosci. 9:965645. `[Author’s version] <https://hal.archives-ouvertes.fr/hal-03750789/document>`__ `[Journal] <https://doi.org/10.3389/fmolb.2022.965645>`__
 
 # scipion-em-continuousflex
