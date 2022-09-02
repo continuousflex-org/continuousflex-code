@@ -98,7 +98,7 @@ References
 
 [9] C.O.S. Sorzano, S. Jonic, R. Núñez-Ramírez, N. Boisset, J.M. Carazo: Fast, robust, and accurate determination of transmission electron microscopy contrast transfer function. Journal of Structural Biology 2007, 160: 249-262. `[Journal] <https://doi.org/10.1016/j.jsb.2007.08.013>`__
 
-[10] Jonic S, Sorzano CO, Thevenaz P, El-Bez C, De Carlo S, Unser M: Spline-based image-to-volume registration for three-dimensional electron microscopy. Ultramicroscopy 2005, 103:303-317. `[Journal] <Spline-based image-to-volume registration for three-dimensional electron microscopy>`__
+[10] Jonic S, Sorzano CO, Thevenaz P, El-Bez C, De Carlo S, Unser M: Spline-based image-to-volume registration for three-dimensional electron microscopy. Ultramicroscopy 2005, 103:303-317. `[Journal] <https://www.sciencedirect.com/science/article/pii/S0304399105000173>`__
 
 Contact:
 ----------
