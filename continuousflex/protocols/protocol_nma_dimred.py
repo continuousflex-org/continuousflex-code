@@ -265,7 +265,7 @@ class FlexProtDimredNMA(ProtAnalysis3D):
 
     # --------------------------- UTILS functions --------------------------------------------
     def getInputModes(self):
-        if isinstance(self.inputNMA, FlexProtAlignmentNMA):
+        if isinstance(self.inputNMA.get(), FlexProtAlignmentNMA):
             return self.inputNMA.get()._getExtraPath('modes.xmd')
         else:
             return self.inputNMA.get().trained_model.get().inputNMA.get()._getExtraPath('modes.xmd')
@@ -279,7 +279,7 @@ class FlexProtDimredNMA(ProtAnalysis3D):
         return self.inputNMA.get()._getExtraPath('images.xmd')
 
     def getInputPdb(self):
-        if isinstance(self.inputNMA, FlexProtAlignmentNMA):
+        if isinstance(self.inputNMA.get(), FlexProtAlignmentNMA):
             return self.inputNMA.get().getInputPdb()
         else:
             return self.inputNMA.get().trained_model.get().inputNMA.get().getInputPdb()

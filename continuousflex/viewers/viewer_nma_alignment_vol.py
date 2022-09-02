@@ -137,7 +137,7 @@ class FlexAlignmentNMAVolViewer(ProtocolViewer):
                        condition='GroundTruth==%d' % METADATA_PROJECT,
                        allowsNull=True,
                        label="Project for volume synthesize",
-                       help='Select a previous run for subtomogram synthesize.')
+                       help='Select a previous run for volume (subtomograms) synthesize.')
         group.addParam('MetadataFile', params.FileParam,
                        pointerClass='params.FileParam', allowsNull=True,
                        condition='GroundTruth==%d' % METADATA_FILE,
