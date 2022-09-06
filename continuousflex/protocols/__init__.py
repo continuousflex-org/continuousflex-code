@@ -28,7 +28,8 @@ from .protocol_nma_alignment import FlexProtAlignmentNMA
 from .protocol_nma_base import NMA_CUTOFF_ABS, NMA_CUTOFF_REL
 #from .protocol_nma_choose import XmippProtNMAChoose
 from .protocol_nma_dimred import FlexProtDimredNMA
-from .protocol_batch_cluster import FlexBatchProtNMACluster, FlexBatchProtClusterSet
+from .protocol_batch_cluster import FlexBatchProtNMACluster
+from .protocol_batch_pdb_cluster import FlexBatchProtClusterSet
 from .protocol_structure_mapping import FlexProtStructureMapping
 from .protocol_subtomogrmas_synthesize import FlexProtSynthesizeSubtomo
 from .protocol_batch_cluster_vol import FlexBatchProtNMAClusterVol
@@ -45,7 +46,6 @@ from .data import *
 from .pdb import *
 from .protocol_pdb_dimred import FlexProtDimredPdb
 from .protocol_align_pdbs import FlexProtAlignPdb
-from .protocol_pca_pdbs import FlexProtPCAPdb
 from .protocol_subtomograms_classify import FlexProtSubtomoClassify
 from .protocol_image_synthesize import FlexProtSynthesizeImages
 from .protocol_subtomogram_refine_alignment import FlexProtRefineSubtomoAlign

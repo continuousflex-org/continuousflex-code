@@ -202,7 +202,7 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
                                      tooltip='Select trajectory points to generate the animations',
                                      imagePath='fa-plus-circle.png', command=self._onCreateClick)
         self.generateBtn.grid(row=0, column=0, padx=5)
-        self.comboBtn = ComboBox(buttonsFrame, choices=["Inverse transformation", "cluster average", "cluster PCA"])
+        self.comboBtn = ComboBox(buttonsFrame, choices=["Inverse transformation", "cluster average"])
         self.comboBtn.grid(row=0, column=1, padx=(5, 10))
 
         frame.grid(row=2, column=0, sticky='new', padx=5, pady=(5, 10))

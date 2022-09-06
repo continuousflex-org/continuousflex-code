@@ -45,6 +45,8 @@ from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd, d
 from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
 from pyworkflow.gui.browser import FileBrowserWindow
 from continuousflex.protocols.protocol_pdb_dimred import REDUCE_METHOD_PCA, REDUCE_METHOD_UMAP
+from continuousflex.protocols.protocol_batch_pdb_cluster import FlexBatchProtClusterSet
+
 
 
 import os
@@ -186,7 +188,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
     def _displayAnimationtool(self, paramName):
         self.trajectoriesWindow = self.tkWindow(PCAWindowDimred,
-                                                title='PCA tool',
+                                                title='Animation tool',
                                                 dim=self.protocol.reducedDim.get(),
                                                 data=self.getData(),
                                                 callback=self._generateAnimation,
@@ -358,7 +360,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
         # Run reconstruction
         self.protocol._defineOutputs(**{clusterName : classSet})
-        from continuousflex.protocols.protocol_batch_cluster import FlexBatchProtClusterSet
         project = self.protocol.getProject()
         newProt = project.newProtocol(FlexBatchProtClusterSet)
         newProt.setObjLabel(clusterName)

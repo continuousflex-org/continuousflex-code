@@ -41,10 +41,11 @@ from .utilities.pdb_handler import ContinuousFlexPDBHandler
 import pwem.emlib.metadata as md
 
 
-PDB_SOURCE_PATTERN = 0
-PDB_SOURCE_OBJECT = 1
-PDB_SOURCE_TRAJECT = 2
-PDB_SOURCE_ALIGNED = 3
+PDB_SOURCE_SUBTOMO = 0
+PDB_SOURCE_PATTERN = 1
+PDB_SOURCE_OBJECT = 2
+PDB_SOURCE_TRAJECT = 3
+PDB_SOURCE_ALIGNED = 4
 
 REDUCE_METHOD_PCA = 0
 REDUCE_METHOD_UMAP = 1
@@ -58,10 +59,14 @@ class FlexProtDimredPdb(ProtAnalysis3D):
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
-        form.addParam('pdbSource', EnumParam, default=0,
+        form.addParam('pdbSource', EnumParam, default=PDB_SOURCE_SUBTOMO,
                       label='Source of PDBs',
-                      choices=['File pattern', 'Object', 'Trajectory Files', 'Align PDBs protocol'],
+                      choices=['Used for subtomogram synthesis', 'File pattern', 'Object', 'Trajectory Files', 'Align PDBs protocol'],
                       help='Use the file pattern as file location with /*.pdb')
+        form.addParam('pdbs', params.PointerParam, pointerClass='FlexProtSynthesizeSubtomo',
+                      condition='pdbSource ==  %i'%PDB_SOURCE_SUBTOMO,
+                      label="Subtomogram synthesis",
+                      help='Point to a protocol of synthesizing subtomograms, the ground truth PDBs will be used as input')
         form.addParam('pdbs_file', params.PathParam,
                       condition='pdbSource == %i' % PDB_SOURCE_PATTERN,
                       label="List of PDBs",
@@ -214,7 +219,9 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         fWarn.close()
 
     def getInputFiles(self):
-        if self.pdbSource.get()==PDB_SOURCE_PATTERN:
+        if self.pdbSource.get()==PDB_SOURCE_SUBTOMO:
+            l= [f for f in glob.glob(self.pdbs.get()._getExtraPath('*.pdb'))]
+        elif self.pdbSource.get()==PDB_SOURCE_PATTERN:
             l= [f for f in glob.glob(self.pdbs_file.get())]
         elif self.pdbSource.get()==PDB_SOURCE_OBJECT:
             l= [i.getFileName() for i in self.setOfPDBs.get()]

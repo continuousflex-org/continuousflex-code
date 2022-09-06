@@ -28,6 +28,7 @@ from .utilities.pdb_handler import ContinuousFlexPDBHandler
 from pwem.objects import AtomStruct, SetOfParticles, SetOfVolumes
 from xmipp3.convert import writeSetOfVolumes, writeSetOfParticles, readSetOfVolumes, readSetOfParticles
 from pwem.constants import ALIGN_PROJ
+from continuousflex.protocols.convert import matrix2eulerAngles
 
 import numpy as np
 import glob
@@ -179,8 +180,10 @@ class FlexProtAlignPdb(ProtAnalysis3D):
             arrDCD[i] = (np.dot(arrDCD[i], rot_mat) + tran).astype(np.float32)
 
             # add to MD
-            shftx, shfty, shftz = tran
-            rot, tilt, psi, = matrix2eulerAngles(rot_mat)
+            trans_mat = np.zeros((4,4))
+            trans_mat[:3,:3] = rot_mat
+            trans_mat[:,3] = tran
+            rot, tilt, psi,shftx, shfty, shftz = matrix2eulerAngles(trans_mat)
             index = alignXMD.addObject()
             alignXMD.setValue(md.MDL_ANGLE_ROT, rot, index)
             alignXMD.setValue(md.MDL_ANGLE_TILT, tilt, index)
@@ -286,33 +289,3 @@ class FlexProtAlignPdb(ProtAnalysis3D):
             return self.dcd_ref_pdb.get().getFileName()
         else:
             return self.getInputFiles()[0]
-
-
-
-def matrix2eulerAngles(A):
-    abs_sb = np.sqrt(A[0, 2] * A[0, 2] + A[1, 2] * A[1, 2])
-    if (abs_sb > 16 * np.exp(-5)):
-        gamma = np.arctan2(A[1, 2], -A[0, 2])
-        alpha = np.arctan2(A[2, 1], A[2, 0])
-        if (abs(np.sin(gamma)) < np.exp(-5)):
-            sign_sb = np.sign(-A[0, 2] / np.cos(gamma))
-        else:
-            if np.sin(gamma) > 0:
-                sign_sb = np.sign(A[1, 2])
-            else:
-                sign_sb = -np.sign(A[1, 2])
-        beta = np.arctan2(sign_sb * abs_sb, A[2, 2])
-    else:
-        if (np.sign(A[2, 2]) > 0):
-            alpha = 0
-            beta = 0
-            gamma = np.arctan2(-A[1, 0], A[0, 0])
-        else:
-            alpha = 0
-            beta = np.pi
-            gamma = np.arctan2(A[1, 0], -A[0, 0])
-    gamma = np.rad2deg(gamma)
-    beta = np.rad2deg(beta)
-    alpha = np.rad2deg(alpha)
-    return alpha, beta, gamma
-

@@ -23,11 +23,11 @@
 # **************************************************************************
 
 from continuousflex.protocols.protocol_genesis import *
-from continuousflex.protocols.protocol_align_pdbs import matrix2eulerAngles
 import pyworkflow.protocol.params as params
 from sklearn import decomposition
 from xmipp3.convert import writeSetOfVolumes, writeSetOfParticles, readSetOfVolumes, readSetOfParticles
 from pwem.constants import ALIGN_PROJ
+from continuousflex.protocols.convert import matrix2eulerAngles
 
 class ProtNMMDRefine(ProtGenesis):
     """ Protocol to perform NMMD refinement using GENESIS """
@@ -142,8 +142,10 @@ class ProtNMMDRefine(ProtGenesis):
             arrDCD[i] = (np.dot(arrDCD[i], rot_mat) + tran).astype(np.float32)
 
             # add to MD
-            shftx, shfty, shftz = tran
-            rot, tilt, psi, = matrix2eulerAngles(rot_mat)
+            trans_mat = np.zeros((4,4))
+            trans_mat[:3,:3] = rot_mat
+            trans_mat[:,3] = tran
+            rot, tilt, psi,shftx, shfty, shftz = matrix2eulerAngles(trans_mat)
             index = alignXMD.addObject()
             alignXMD.setValue(md.MDL_ANGLE_ROT, rot, index)
             alignXMD.setValue(md.MDL_ANGLE_TILT, tilt, index)

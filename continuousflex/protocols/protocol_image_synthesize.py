@@ -42,6 +42,7 @@ from joblib import dump
 from math import cos, sin, pi
 import xmippLib
 import math
+from continuousflex.protocols.convert import matrix2eulerAngles
 
 NMA_ALIGNMENT_WAV = 0
 NMA_ALIGNMENT_PROJ = 1
@@ -510,8 +511,10 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                               np.sqrt(1-x3)]])
                 H = np.eye(3) - 2*np.dot(v.T,v)
                 M = -np.dot(H,R)
-                rot1,tilt1,psi1 = matrix2eulerAngles(M)
-                print("hello")
+                trans_mat = np.zeros((4,4))
+                trans_mat[:3,:3] = M
+                rot1,tilt1,psi1,_,_,_ = matrix2eulerAngles(trans_mat)
+
             subtomogramMD.setValue(md.MDL_SHIFT_X, shift_x1, i + 1)
             subtomogramMD.setValue(md.MDL_SHIFT_Y, shift_y1, i + 1)
             subtomogramMD.setValue(md.MDL_ANGLE_ROT, rot1, i + 1)
@@ -723,31 +726,3 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
     def _getLocalModesFn(self):
         modesFn = self.inputModes.get().getFileName()
         return self._getBasePath(modesFn)
-
-
-def matrix2eulerAngles(A):
-    abs_sb = np.sqrt(A[0, 2] * A[0, 2] + A[1, 2] * A[1, 2])
-    if (abs_sb > 16 * np.exp(-5)):
-        gamma = math.atan2(A[1, 2], -A[0, 2])
-        alpha = math.atan2(A[2, 1], A[2, 0])
-        if (abs(np.sin(gamma)) < np.exp(-5)):
-            sign_sb = np.sign(-A[0, 2] / np.cos(gamma))
-        else:
-            if np.sin(gamma) > 0:
-                sign_sb = np.sign(A[1, 2])
-            else:
-                sign_sb = -np.sign(A[1, 2])
-        beta = math.atan2(sign_sb * abs_sb, A[2, 2])
-    else:
-        if (np.sign(A[2, 2]) > 0):
-            alpha = 0
-            beta = 0
-            gamma = math.atan2(-A[1, 0], A[0, 0])
-        else:
-            alpha = 0
-            beta = np.pi
-            gamma = math.atan2(A[1, 0], -A[0, 0])
-    gamma = np.rad2deg(gamma)
-    beta = np.rad2deg(beta)
-    alpha = np.rad2deg(alpha)
-    return alpha, beta, gamma
