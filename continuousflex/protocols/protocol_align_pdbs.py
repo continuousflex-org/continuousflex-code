@@ -85,9 +85,9 @@ class FlexProtAlignPdb(ProtAnalysis3D):
         form.addParam('alignRefPDB', params.PointerParam, pointerClass='AtomStruct',
                       label="Alignement Reference PDB",
                       help='Reference PDB to align the PDBs with')
-        form.addParam('matchingType', params.EnumParam, label="Match structures ?", default=0,
-                      choices=['All structures are matching', 'Match chain name + res no',
-                               'Match segment name + res no'],
+        form.addParam('matchingType', params.EnumParam, label="Match PDBs and reference PDB ?", default=0,
+                      choices=['All PDBs are matching', 'Match chain name + residue no',
+                               'Match segment name + residue no'],
                       help="Method to find atomic coordinates correspondence between the pdb set "
                            "coordinates and the reference PDB. The method will select the matching atoms"
                            " and sort them in the corresponding order. If the structures in the files are"
