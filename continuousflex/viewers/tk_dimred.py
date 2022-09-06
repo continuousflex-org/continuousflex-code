@@ -6,7 +6,7 @@ from tkinter import Radiobutton
 import numpy as np
 import scipy as sp
 from continuousflex.protocols.data import Point, Data, PathData
-
+from sklearn.cluster import KMeans
 
 TOOL_TRAJECTORY = 1
 TOOL_CLUSTERING = 2
@@ -16,8 +16,8 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
     def __init__(self, **kwargs):
         TrajectoriesWindow.__init__(self, **kwargs)
         self.saveClusterCallback = kwargs.get('saveClusterCallback', None)
-        self.saveCallback = kwargs.get('saveCallback', None)
         self.numberOfPoints = kwargs.get('numberOfPoints', 10)
+
         self._alpha=self.alpha
         self._s=self.s
         self._clusterNumber = 0
@@ -149,7 +149,7 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         buttonsFrame.grid(row=0, column=0,
                           sticky='new', padx=5, pady=5)
 
-        label = tk.Label(buttonsFrame, text="Clustering from trajectory", font = self.fontItalic)
+        label = tk.Label(buttonsFrame, text="From trajectory", font = self.fontItalic)
         label.grid(row=0, column=0, padx=5, pady=5, sticky='w')
 
         self.updateClusterBtn = Button(buttonsFrame, text='Cluster from traj', state=tk.DISABLED,
@@ -162,7 +162,7 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         buttonsFrame.grid(row=1, column=0,
                           sticky='new', padx=5, pady=5)
 
-        label = tk.Label(buttonsFrame, text="Clustering from selection", font = self.fontItalic)
+        label = tk.Label(buttonsFrame, text="From selection", font = self.fontItalic)
         label.grid(row=0, column=0, padx=5, pady=5, sticky='w')
 
         self.createClusterBtn = Button(buttonsFrame, text='New cluster from sel', state=tk.DISABLED,
@@ -173,15 +173,46 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         self.eraseBtn = Button(buttonsFrame, text='Erase sel',  tooltip='Erase selection', command=self._onErase)
         self.eraseBtn.grid(row=0, column=2, padx=5)
 
+        buttonsFrame = tk.Frame(frame)
+        buttonsFrame.grid(row=2, column=0,
+                          sticky='new', padx=5, pady=5)
+
+        label = tk.Label(buttonsFrame, text="K-means", font = self.fontItalic)
+        label.grid(row=0, column=0, padx=5, pady=5, sticky='w')
+
+        kmeansCluster = Button(buttonsFrame, text='Compute clusters', state=tk.NORMAL,
+                                     tooltip='K means clustering', command=self._onKMeansCluster)
+        kmeansCluster.grid(row=0, column=1, padx=5)
+
+        label = tk.Label(buttonsFrame, text="Number of clusters")
+        label.grid(row=0, column=2, padx=5, pady=5, sticky='w')
+        self.numPointsKmean = tk.StringVar(value="3")
+        clusterEntry = tk.Entry(buttonsFrame, textvariable=self.numPointsKmean ,
+                                width=3, bg='white')
+        clusterEntry.grid(row=0, column=3, pady=5)
+
+
         frame.grid(row=3, column=0, sticky='new', padx=5, pady=(10, 5))
 
     def _createTrajectoriesBox(self, content):
         frame = tk.LabelFrame(content, text='Trajectories', font=self.fontBold, highlightcolor="cyan")
-        # frame.columnconfigure(0, minsize=50)
-        # frame.columnconfigure(1, weight=1)  # , minsize=30)
+        buttonsFrame = tk.Frame(frame)
+        buttonsFrame.grid(row=0, column=0,
+                          sticky='w', padx=5, pady=5)
+
+        label = tk.Label(buttonsFrame, text="Number of points")
+        label.grid(row=0, column=0, padx=5, pady=5, sticky='w')
+        self.numberOfPointsVar = tk.StringVar(value=str(self.numberOfPoints))
+        nPointsEntry = tk.Entry(buttonsFrame, textvariable=self.numberOfPointsVar ,
+                                width=3, bg='white')
+        nPointsEntry.grid(row=0, column=1, pady=5)
+        setNPointsBtn = Button(buttonsFrame, text='Set', state=tk.NORMAL,
+                                tooltip='Set the number of points for the trajectory', command=self._onSetNPoints)
+        setNPointsBtn.grid(row=0, column=2, padx=5)
+
 
         buttonsFrame2 = tk.Frame(frame)
-        buttonsFrame2.grid(row=0, column=0,
+        buttonsFrame2.grid(row=1, column=0,
                           sticky='w', padx=5, pady=5)
         buttonsFrame2.columnconfigure(0, weight=1)
         self.trajSimBtn = Button(buttonsFrame2, text='Generate points', state=tk.NORMAL,
@@ -194,15 +225,15 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
                                                             , "Gaussian betmeen min and max", "Gaussian betmeen -2*std and +2*std"])
         self.trajTypeBtn.grid(row=0, column=2, padx=(5, 5))
 
-        buttonsFrame = tk.Frame(frame)
-        buttonsFrame.grid(row=1, column=0,
+        buttonsFrame3 = tk.Frame(frame)
+        buttonsFrame3.grid(row=2, column=0,
                           sticky='w', padx=5, pady=5)
-        buttonsFrame.columnconfigure(0, weight=1)
-        self.generateBtn = Button(buttonsFrame, text='Show in VMD', state=tk.DISABLED,
+        buttonsFrame3.columnconfigure(0, weight=1)
+        self.generateBtn = Button(buttonsFrame3, text='Show in VMD', state=tk.NORMAL,
                                      tooltip='Select trajectory points to generate the animations',
                                      imagePath='fa-plus-circle.png', command=self._onCreateClick)
         self.generateBtn.grid(row=0, column=0, padx=5)
-        self.comboBtn = ComboBox(buttonsFrame, choices=["Inverse transformation", "cluster average"])
+        self.comboBtn = ComboBox(buttonsFrame3, choices=["Inverse transformation", "cluster average"])
         self.comboBtn.grid(row=0, column=1, padx=(5, 10))
 
         frame.grid(row=2, column=0, sticky='new', padx=5, pady=(5, 10))
@@ -215,8 +246,38 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         if self.saveCallback:
             self.saveCallback(self)
 
-    def _onSimClick(self):
-        self._onResetClick()
+    def _onSetNPoints(self):
+        try :
+            self.numberOfPoints = int(self.numberOfPointsVar.get())
+        except:
+            self.showError("Can not read number of points.")
+
+    def _onKMeansCluster(self):
+        try :
+            n_clusters = int(self.numPointsKmean.get())
+        except:
+            return self.showError("Can not read number of clusters")
+        self._onUpdateClick()
+
+        k_means = KMeans(init='k-means++', n_clusters=n_clusters)
+        selection = np.array(self.listbox.curselection())
+        print("selection" )
+        print(selection.shape)
+        data_arr = np.array([p.getData()[selection] for p in self.data])
+        print("data_arr" )
+        print(data_arr.shape)
+        k_means.fit(data_arr)
+
+        classes = k_means.labels_ + 1
+        i=0
+        for point in self.data:
+            point._weight = classes[i]
+            i+=1
+        self._onUpdateClick()
+        self.setClusterNumber(3)
+
+    def _onSimClick(self, e=None):
+        TrajectoriesWindow._onResetClick(self, e)
         traj_axis = self.trajAxisBtn.getValue()
         traj_type = self.trajTypeBtn.getValue()
 
@@ -297,6 +358,8 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         for point in self.data:
             point._weight = 0
         TrajectoriesWindow._onResetClick(self, e)
+        self.generateBtn.config(state=tk.NORMAL)
+
 
     def getClusterName(self):
         return self.clusterName.get().strip()

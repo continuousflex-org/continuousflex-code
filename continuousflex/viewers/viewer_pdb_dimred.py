@@ -101,9 +101,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                       help='Open a GUI to analyze the PCA space'
                            ' to draw and adjust trajectories and create clusters.')
 
-        group.addParam('numberOfPoints', IntParam, default=5,
-                       label='Number of points in trajectory', )
-
         group.addParam('inputSet', PointerParam, pointerClass ='SetOfParticles,SetOfVolumes',
                       label='(Optional) Em data for cluster animation',  allowsNull=True,
                       help="Provide a EM data set that match the PDB data set to visualize animation on 3D reconstructions")
@@ -195,7 +192,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                                                 loadCallback=self._loadAnimation,
                                                 saveCallback=self._saveAnimation,
                                                 saveClusterCallback=self.saveClusterCallback,
-                                                numberOfPoints=self.numberOfPoints.get(),
+                                                numberOfPoints=5,
                                                 limits_mode=0,
                                                 LimitL=None,
                                                 LimitH=None,
@@ -252,8 +249,9 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         # Get animation root
         animation = self.trajectoriesWindow.getClusterName()
         animationPath = prot._getExtraPath('animation_%s' % animation)
-        cleanPath(animationPath)
-        makePath(animationPath)
+        if not os.path.isdir:
+            cleanPath(animationPath)
+            makePath(animationPath)
         animationRoot = os.path.join(animationPath, '')
 
         # get trajectory coordinates
@@ -261,6 +259,8 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         coords_list = []
         if animtype ==ANIMATION_INV:
             trajectoryPoints = np.array([p.getData() for p in self.trajectoriesWindow.pathData])
+            if trajectoryPoints.shape[0] == 0 :
+                return self.trajectoriesWindow.showError("No animation to show.")
             np.savetxt(animationRoot + 'trajectory.txt', trajectoryPoints)
             pca = load(prot._getExtraPath('pca_pickled.joblib'))
             deformations = pca.inverse_transform(trajectoryPoints)
@@ -314,7 +314,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
     def saveClusterCallback(self, tkWindow):
         # get cluster name
-        clusterName = "cluster_" + tkWindow.getClusterName()
+        clusterName = "animation_" + tkWindow.getClusterName()
 
         # get input metadata
         inputSet = self.inputSet.get()
@@ -367,6 +367,8 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         project.launchProtocol(newProt)
         project.getRunsGraph()
 
+        tkWindow.showInfo("Successfully exported clustering.")
+
     def _loadAnimation(self):
         browser = FileBrowserWindow("Select animation directory",
                                     self.getWindow(), self.protocol._getExtraPath(),
@@ -376,27 +378,31 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
     def _loadAnimationData(self, obj):
 
         if not obj.isDir() :
-            return self.errorMessage('Not a directory')
+            return self.trajectoriesWindow.showError('Not a directory')
 
+        loaded = []
         trajPath = obj.getPath()
         trajFile = os.path.join(trajPath,'trajectory.txt')
-        if not os.path.exists(trajFile):
-            return self.errorMessage('Animation file "%s" not found. ' % trajFile)
+        if os.path.isfile(trajFile) and os.path.getsize(trajFile) != 0:
+            trajectoryPoints = np.loadtxt(trajFile)
+            data = PathData(dim=trajectoryPoints.shape[1])
+            for i, row in enumerate(trajectoryPoints):
+                data.addPoint(Point(pointId=i + 1, data=list(row), weight=0))
+            loaded.append("trajectory.txt")
+
         clusterFile = os.path.join(trajPath,'clusters.txt')
-        if not os.path.exists(clusterFile):
-            return self.errorMessage('Animation file "%s" not found. ' % clusterFile)
+        if os.path.isfile(clusterFile) and os.path.getsize(clusterFile) != 0:
+            clusterPoints = np.loadtxt(clusterFile)
+            i=0
+            for p in self.trajectoriesWindow.data:
+                p._weight = clusterPoints[i]
+                i+=1
+            loaded.append("clusters.txt")
+        if len(loaded) ==0:
+            return self.trajectoriesWindow.showError('Animation files not found. ')
+        else:
+            self.trajectoriesWindow.showInfo('Successfully loaded : %s.' %str(loaded))
 
-        # Load animation trajectory points
-        trajectoryPoints = np.loadtxt(trajFile)
-        data = PathData(dim=trajectoryPoints.shape[1])
-        for i, row in enumerate(trajectoryPoints):
-            data.addPoint(Point(pointId=i + 1, data=list(row), weight=0))
-
-        clusterPoints = np.loadtxt(clusterFile)
-        i=0
-        for p in self.trajectoriesWindow.data:
-            p._weight = clusterPoints[i]
-            i+=1
         self.trajectoriesWindow.setPathData(data)
         self.trajectoriesWindow._onUpdateClick()
         self.trajectoriesWindow._checkNumberOfPoints()
@@ -404,17 +410,27 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
     def _saveAnimation(self, tkWindow):
         # get cluster name
         animationPath = self.protocol._getExtraPath("animation_" + tkWindow.getClusterName())
-        cleanPath(animationPath)
-        makePath(animationPath)
+        if not os.path.isdir:
+            cleanPath(animationPath)
+            makePath(animationPath)
         animationRoot = os.path.join(animationPath, '')
         trajectoryPoints = np.array([p.getData() for p in self.trajectoriesWindow.pathData])
-        np.savetxt(animationRoot + 'trajectory.txt', trajectoryPoints)
+        saved=[]
+        if trajectoryPoints.shape[0] != 0:
+            np.savetxt(animationRoot + 'trajectory.txt', trajectoryPoints)
+            saved.append('trajectory.txt')
 
         classID=[]
         for p in tkWindow.data:
             classID.append(int(p._weight))
+        if set(classID) != {0}:
+            np.savetxt(animationRoot + 'clusters.txt', np.array(classID))
+            saved.append('clusters.txt')
 
-        np.savetxt(animationRoot + 'clusters.txt', np.array(classID))
+        if len(saved) != 0:
+            self.trajectoriesWindow.showInfo('Successfully saved : %s.' % str(saved))
+        else:
+            self.trajectoriesWindow.showError('No animation state to save.')
 
 
 class VolumeTrajectoryViewer(ProtocolViewer):
