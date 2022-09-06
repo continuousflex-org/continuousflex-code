@@ -136,8 +136,8 @@ class FlexAlignmentNMAViewer(ProtocolViewer):
         group.addParam('SynthesisProject', params.PointerParam, pointerClass='FlexProtSynthesizeImages',
                        condition='GroundTruth==%d' % METADATA_PROJECT,
                        allowsNull=True,
-                       label="Project for volume synthesize",
-                       help='Select a previous run for subtomogram synthesize.')
+                       label="Project for image synthesize",
+                       help='Select a previous run for image synthesize.')
         group.addParam('MetadataFile', params.FileParam,
                        pointerClass='params.FileParam', allowsNull=True,
                        condition='GroundTruth==%d' % METADATA_FILE,

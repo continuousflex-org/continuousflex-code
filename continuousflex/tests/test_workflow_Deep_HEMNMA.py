@@ -71,20 +71,20 @@ class TestDeepHEMNMA1(TestWorkflow):
         protImportParts.setObjLabel('Particles')
         self.launchProtocol(protImportParts)
 
-        # protResizeParts= self.newProtocol(XmippProtCropResizeParticles)
-        # protResizeParts.doResize.set(True)
-        # protResizeParts.resizeOption.set(2) # this corresponds to factor
-        # protResizeParts.resizeFactor.set(0.25)
-        # protResizeParts.inputParticles.set(protImportParts.outputParticles)
-        # protResizeParts.setObjLabel('Resizing (factor 0.25)')
-        # self.launchProtocol(protResizeParts)
+        protResizeParts= self.newProtocol(XmippProtCropResizeParticles)
+        protResizeParts.doResize.set(True)
+        protResizeParts.resizeOption.set(2) # this corresponds to factor
+        protResizeParts.resizeFactor.set(0.25)
+        protResizeParts.inputParticles.set(protImportParts.outputParticles)
+        protResizeParts.setObjLabel('Resizing (factor 0.25)')
+        self.launchProtocol(protResizeParts)
 
         protSubset1 = self.newProtocol(ProtSubSet,
                                       objLabel='Training set',
                                       chooseAtRandom=True,
-                                      nElements=3)
-        protSubset1.inputFullSet.set(protImportParts.outputParticles)
-        # protSubset1.inputFullSet.set(protResizeParts.outputParticles)
+                                      nElements=4)
+        # protSubset1.inputFullSet.set(protImportParts.outputParticles)
+        protSubset1.inputFullSet.set(protResizeParts.outputParticles)
         self.launchProtocol(protSubset1)
 
 
@@ -92,8 +92,8 @@ class TestDeepHEMNMA1(TestWorkflow):
                                          objLabel='Inference set',
                                          chooseAtRandom=False,
                                          setOperation=1)
-        # protSubset2.inputFullSet.set(protResizeParts.outputParticles)
-        protSubset2.inputFullSet.set(protImportParts.outputParticles)
+        protSubset2.inputFullSet.set(protResizeParts.outputParticles)
+        # protSubset2.inputFullSet.set(protImportParts.outputParticles)
         protSubset2.inputSubSet.set(protSubset1.outputParticles)
         self.launchProtocol(protSubset2)
 
