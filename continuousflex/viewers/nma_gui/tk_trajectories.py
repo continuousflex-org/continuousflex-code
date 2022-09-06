@@ -67,6 +67,7 @@ class TrajectoriesWindow(gui.Window):
         self.s = kwargs.get('s')
         self.alpha = kwargs.get('alpha')
         self.deep = kwargs.get('deepHEMNMA')
+        self.cbar_label = kwargs.get('cbar_label')
         self.plotter = None
 
         content = tk.Frame(self.root)
@@ -219,14 +220,14 @@ class TrajectoriesWindow(gui.Window):
                                                 xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                 ylim_low=self.ylim_low, ylim_high=self.ylim_high,
                                                 zlim_low=self.zlim_low, zlim_high=self.zlim_high,
-                                                alpha=self.alpha, s=self.s)
+                                                alpha=self.alpha, s=self.s, cbar_label=self.cbar_label)
                 else:
                     self.plotter = FlexNmaPlotter(data=self.data,
                                                 LimitL=self.LimitLow, LimitH=self.LimitHigh,
                                                 xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                 ylim_low=self.ylim_low, ylim_high=self.ylim_high,
                                                 zlim_low=self.zlim_low, zlim_high=self.zlim_high,
-                                                alpha=self.alpha, s=self.s)
+                                                alpha=self.alpha, s=self.s, cbar_label=self.cbar_label)
 
                 doShow = True
                 # self.plotter.useLastPlot = True

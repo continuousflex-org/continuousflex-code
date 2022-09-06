@@ -3,12 +3,10 @@ import tkinter as tk
 from pyworkflow.gui.widgets import Button, HotButton, ComboBox
 from tkinter import Radiobutton
 
-from pyworkflow.utils.properties import Icon
 import numpy as np
 import scipy as sp
 from continuousflex.protocols.data import Point, Data, PathData
 
-import pyworkflow.gui as gui
 
 TOOL_TRAJECTORY = 1
 TOOL_CLUSTERING = 2
@@ -18,19 +16,35 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
     def __init__(self, **kwargs):
         TrajectoriesWindow.__init__(self, **kwargs)
         self.saveClusterCallback = kwargs.get('saveClusterCallback', None)
+        self.saveCallback = kwargs.get('saveCallback', None)
         self.numberOfPoints = kwargs.get('numberOfPoints', 10)
-        print( kwargs.get('numberOfPoints'))
         self._alpha=self.alpha
         self._s=self.s
         self._clusterNumber = 0
 
     def _createContent(self, content):
-        TrajectoriesWindow._createContent(self, content)
+        self._createModeBox(content)
+        self._createFigureBox(content)
+        self._createTrajectoriesBox(content)
         self._createClusteringBox(content)
         self._exportBox(content)
 
+    def _createModeBox(self, content):
+        frame = tk.LabelFrame(content, text='Interactive mode', font=self.fontBold)
+
+        selFrame = tk.Frame(frame)
+        self.selectTool = tk.IntVar()
+        r1 = Radiobutton(selFrame, text="Trajectory Mode", variable=self.selectTool, value=TOOL_TRAJECTORY, command=self._onUpdateClick)
+        r1.grid(row=0, column=0, padx=5)
+        r2 = Radiobutton(selFrame, text="Selection Mode", variable=self.selectTool, value=TOOL_CLUSTERING, command=self._onUpdateClick)
+        r2.grid(row=0, column=1, padx=5)
+        self.selectTool.set(TOOL_TRAJECTORY)
+        selFrame.grid(row=0, column=0)
+        frame.grid(row=0, column=0, sticky='new', padx=5, pady=(10, 5))
+
+
     def _createFigureBox(self, content):
-        frame = tk.LabelFrame(content, text='Figure')
+        frame = tk.LabelFrame(content, text='Figure', font=self.fontBold)
         frame.columnconfigure(0, minsize=50)
         frame.columnconfigure(1, weight=1)  # , minsize=30)
         # Create the 'Axes' label
@@ -72,19 +86,7 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
                            command=self._onUpdateClick)
         updateBtn.grid(row=0, column=1, sticky='ne', padx=5)
 
-
-        selFrame = tk.Frame(frame)
-        selFrame.grid(row=6, column=1, sticky='w', pady=(10, 5), padx=5)
-        tk.Label(selFrame, text="Interactive mode", font=self.fontBold).grid(row=0, column=0)
-
-        self.selectTool = tk.IntVar()
-        r1 = Radiobutton(selFrame, text="Trajectory", variable=self.selectTool, value=TOOL_TRAJECTORY, command=self._onUpdateClick)
-        r1.grid(row=0, column=1, padx=5)
-        r2 = Radiobutton(selFrame, text="Clustering", variable=self.selectTool, value=TOOL_CLUSTERING, command=self._onUpdateClick)
-        r2.grid(row=0, column=2, padx=5)
-        self.selectTool.set(TOOL_TRAJECTORY)
-
-        frame.grid(row=0, column=0, sticky='new', padx=5, pady=(10, 5))
+        frame.grid(row=1, column=0, sticky='new', padx=5, pady=(10, 5))
 
     def _onUpdateClick(self,e=None):
         if self.selectTool.get() == TOOL_TRAJECTORY :
@@ -104,51 +106,77 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
             self.eraseBtn.config(state=tk.NORMAL)
 
     def _exportBox(self,content):
-        frame = tk.LabelFrame(content, text='Export')
+        frame = tk.LabelFrame(content, text='Import/Export', font=self.fontBold)
 
-        self._addLabel(frame, 'Name', 0, 0)
+        nameFrame = tk.Frame(frame)
+        nameFrame.grid(row=0, column=0, sticky='w', pady=(10, 5))
+
+        label = tk.Label(nameFrame, text="Name", font=self.fontBold)
+        label.grid(row=0, column=0, padx=5, pady=5, sticky='w')
         self.clusterName = tk.StringVar()
-        clusterEntry = tk.Entry(frame, textvariable=self.clusterName,
+        clusterEntry = tk.Entry(nameFrame, textvariable=self.clusterName,
                                 width=30, bg='white')
-        clusterEntry.grid(row=0, column=1, pady=5)
+        clusterEntry.grid(row=0, column=2, pady=5)
 
-        self.saveClusterBtn = Button(frame, text='Export', state=tk.DISABLED,
+
+        buttonFrame = tk.Frame(frame)
+        buttonFrame.grid(row=1, column=0, sticky='w', pady=(10, 5))
+
+        self.saveClusterBtn = Button(buttonFrame, text='Export to EM dataset', state=tk.DISABLED,
                               tooltip='export clusters to scipion', command=self._onSaveClusterClick)
         self.saveClusterBtn.grid(row=0, column=2, padx=5)
 
+        self.saveBtn = Button(buttonFrame, text='Save animation state',
+                              tooltip='Save the trajectory', command=self._onSaveClick)
+        self.saveBtn.grid(row=0, column=3)
 
-        self.loadBtn = Button(frame, text='Load', imagePath='fa-folder-open.png',
+        self.loadBtn = Button(buttonFrame, text='Load animation state', imagePath='fa-folder-open.png',
                               tooltip='Load a previous PCA clustering', command=self._onLoadClick)
-        self.loadBtn.grid(row=0, column=3)
+        self.loadBtn.grid(row=0, column=4)
 
 
-        frame.grid(row=3, column=0, sticky='new', padx=5, pady=(10, 5))
+        frame.grid(row=4, column=0, sticky='new', padx=5, pady=(10, 5))
 
 
 
     def _createClusteringBox(self, content):
-        frame = tk.LabelFrame(content, text='Clustering')
+        frame = tk.LabelFrame(content, text='Clustering', font=self.fontBold)
         frame.columnconfigure(0, minsize=50)
         frame.columnconfigure(1, weight=1)
 
 
         buttonsFrame = tk.Frame(frame)
-        buttonsFrame.grid(row=1, column=0,
-                          sticky='se', padx=5, pady=5)
-        buttonsFrame.columnconfigure(0, weight=1)
+        buttonsFrame.grid(row=0, column=0,
+                          sticky='new', padx=5, pady=5)
 
-        self.createClusterBtn = HotButton(buttonsFrame, text='New cluster', state=tk.DISABLED,
+        label = tk.Label(buttonsFrame, text="Clustering from trajectory", font = self.fontItalic)
+        label.grid(row=0, column=0, padx=5, pady=5, sticky='w')
+
+        self.updateClusterBtn = Button(buttonsFrame, text='Cluster from traj', state=tk.DISABLED,
                                      tooltip='Create new cluster',
+                                     imagePath='fa-plus-circle.png', command=self._onUpdateCluster)
+        self.updateClusterBtn.grid(row=0, column=1, padx=5)
+
+
+        buttonsFrame = tk.Frame(frame)
+        buttonsFrame.grid(row=1, column=0,
+                          sticky='new', padx=5, pady=5)
+
+        label = tk.Label(buttonsFrame, text="Clustering from selection", font = self.fontItalic)
+        label.grid(row=0, column=0, padx=5, pady=5, sticky='w')
+
+        self.createClusterBtn = Button(buttonsFrame, text='New cluster from sel', state=tk.DISABLED,
+                                     tooltip='New clutser from sel',
                                      imagePath='fa-plus-circle.png', command=self._onCreateCluster)
         self.createClusterBtn.grid(row=0, column=1, padx=5)
-        self.eraseBtn = Button(buttonsFrame, text='Erase',  tooltip='Erase cluster', command=self._onErase)
+
+        self.eraseBtn = Button(buttonsFrame, text='Erase sel',  tooltip='Erase selection', command=self._onErase)
         self.eraseBtn.grid(row=0, column=2, padx=5)
 
-
-        frame.grid(row=2, column=0, sticky='new', padx=5, pady=(10, 5))
+        frame.grid(row=3, column=0, sticky='new', padx=5, pady=(10, 5))
 
     def _createTrajectoriesBox(self, content):
-        frame = tk.LabelFrame(content, text='Trajectories')
+        frame = tk.LabelFrame(content, text='Trajectories', font=self.fontBold, highlightcolor="cyan")
         # frame.columnconfigure(0, minsize=50)
         # frame.columnconfigure(1, weight=1)  # , minsize=30)
 
@@ -170,27 +198,22 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         buttonsFrame.grid(row=1, column=0,
                           sticky='w', padx=5, pady=5)
         buttonsFrame.columnconfigure(0, weight=1)
-        self.generateBtn = HotButton(buttonsFrame, text='Show in VMD', state=tk.DISABLED,
+        self.generateBtn = Button(buttonsFrame, text='Show in VMD', state=tk.DISABLED,
                                      tooltip='Select trajectory points to generate the animations',
                                      imagePath='fa-plus-circle.png', command=self._onCreateClick)
         self.generateBtn.grid(row=0, column=0, padx=5)
         self.comboBtn = ComboBox(buttonsFrame, choices=["Inverse transformation", "cluster average", "cluster PCA"])
         self.comboBtn.grid(row=0, column=1, padx=(5, 10))
 
-
-        buttonsFrame2 = tk.Frame(frame)
-        buttonsFrame2.grid(row=2, column=0,
-                          sticky='w', padx=5, pady=5)
-        self.updateClusterBtn = HotButton(buttonsFrame2, text='Update cluster', state=tk.DISABLED,
-                                     tooltip='Create new cluster',
-                                     imagePath='fa-plus-circle.png', command=self._onUpdateCluster)
-        self.updateClusterBtn.grid(row=0, column=0, padx=5)
-
-        frame.grid(row=1, column=0, sticky='new', padx=5, pady=(5, 10))
+        frame.grid(row=2, column=0, sticky='new', padx=5, pady=(5, 10))
 
     def _onSaveClusterClick(self, e=None):
         if self.saveClusterCallback:
             self.saveClusterCallback(self)
+
+    def _onSaveClick(self, e=None):
+        if self.saveCallback:
+            self.saveCallback(self)
 
     def _onSimClick(self):
         self._onResetClick()
