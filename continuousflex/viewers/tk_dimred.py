@@ -134,7 +134,6 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
                               tooltip='Load a previous PCA clustering', command=self._onLoadClick)
         self.loadBtn.grid(row=0, column=4)
 
-
         frame.grid(row=4, column=0, sticky='new', padx=5, pady=(10, 5))
 
 
@@ -273,6 +272,7 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         for point in self.data:
             point._weight = classes[i]
             i+=1
+        self.saveClusterBtn.config(state=tk.NORMAL)
         self._onUpdateClick()
         self.setClusterNumber(3)
 
