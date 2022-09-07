@@ -134,7 +134,6 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
                               tooltip='Load a previous PCA clustering', command=self._onLoadClick)
         self.loadBtn.grid(row=0, column=4)
 
-
         frame.grid(row=4, column=0, sticky='new', padx=5, pady=(10, 5))
 
 
@@ -261,11 +260,7 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
 
         k_means = KMeans(init='k-means++', n_clusters=n_clusters)
         selection = np.array(self.listbox.curselection())
-        print("selection" )
-        print(selection.shape)
         data_arr = np.array([p.getData()[selection] for p in self.data])
-        print("data_arr" )
-        print(data_arr.shape)
         k_means.fit(data_arr)
 
         classes = k_means.labels_ + 1
@@ -273,6 +268,7 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         for point in self.data:
             point._weight = classes[i]
             i+=1
+        self.saveClusterBtn.config(state=tk.NORMAL)
         self._onUpdateClick()
         self.setClusterNumber(3)
 

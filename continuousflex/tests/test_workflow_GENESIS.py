@@ -30,10 +30,7 @@ from continuousflex.protocols.protocol_generate_topology import ProtGenerateTopo
 from continuousflex.protocols import FlexProtNMA, NMA_CUTOFF_ABS, FlexProtSynthesizeImages
 from continuousflex.viewers.viewer_genesis import *
 from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
-import os
-import multiprocessing
 
-NUMBER_OF_CPU = int(np.min([multiprocessing.cpu_count(),4]))
 
 class testGENESIS(TestWorkflow):
     """ Test Class for GENESIS. """
@@ -87,6 +84,7 @@ class testGENESIS(TestWorkflow):
             pairlist_dist = 15.0,
 
             numberOfThreads = NUMBER_OF_CPU,
+            numberOfMpi = 1,
 
        )
 
@@ -152,6 +150,7 @@ class testGENESIS(TestWorkflow):
           centerOrigin=True,
 
           numberOfThreads=NUMBER_OF_CPU,
+          numberOfMpi=1,
           )
         protGenesisFitNMMD.setObjLabel('NMMD Flexible Fitting CHARMM')
 
@@ -212,8 +211,8 @@ class testGENESIS(TestWorkflow):
             cutoff_dist = 12.0,
             pairlist_dist = 15.0,
 
-            numberOfThreads = NUMBER_OF_CPU,
-
+          numberOfThreads=NUMBER_OF_CPU,
+          numberOfMpi=1,
        )
         protGenesisMin.setObjLabel('Energy Minimization CAGO')
         # Launch minimisation
@@ -329,8 +328,8 @@ class testGENESIS(TestWorkflow):
                                               voxel_size=2.0,
                                               centerOrigin=True,
 
-                                              numberOfThreads=1,
-                                              numberOfMpi=4,
+                                                  numberOfThreads=1,
+                                                  numberOfMpi=NUMBER_OF_CPU,
                                               )
             protGenesisFitREUS.setObjLabel('NMMD + REUS Flexible Fitting CAGO')
 

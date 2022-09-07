@@ -23,17 +23,12 @@
 # **************************************************************************
 import os.path
 import subprocess
-from pyworkflow.utils.path import createLink
 import pyworkflow.protocol.params as params
 from pwem.protocols import EMProtocol
 from pwem.objects.data import AtomStruct, SetOfAtomStructs, SetOfPDBs, SetOfVolumes,SetOfParticles, Volume
-import numpy as np
 import mrcfile
-from pwem.emlib.image import ImageHandler
 from pwem.utils import runProgram
 from pyworkflow.utils import getListFromRangeString
-import xmipp3.convert
-import multiprocessing
 
 from .utilities.genesis_utilities import *
 from .utilities.pdb_handler import ContinuousFlexPDBHandler
@@ -308,7 +303,7 @@ class ProtGenesis(EMProtocol):
                       label="projection angle image set  ", help='Image set containing projection alignement parameters',
                       condition="EMfitChoice==2 and projectAngleChoice==%i"%(PROJECTION_ANGLE_IMAGE))
 
-        form.addParallelSection(threads=1, mpi=multiprocessing.cpu_count()//2-1)
+        form.addParallelSection(threads=1, mpi=NUMBER_OF_CPU)
         # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
