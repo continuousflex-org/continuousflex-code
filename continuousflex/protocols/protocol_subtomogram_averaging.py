@@ -25,13 +25,15 @@
 
 import os
 from pwem.protocols import ProtAnalysis3D
-from xmipp3.convert import writeSetOfVolumes, xmippToLocation, createItemMatrix, setXmippAttributes
-import pwem as em
+from xmipp3.convert import writeSetOfVolumes, xmippToLocation
 from pwem.objects import Volume
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
 from pwem.utils import runProgram
 from pwem import Domain
+from .convert import eulerAngles2matrix, matrix2eulerAngles
+import numpy as np
+import multiprocessing
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -48,7 +50,12 @@ IMPORT_DYNAMO_TBL = 1
 IMPORT_TOMBOX_MTV = 2
 
 class FlexProtSubtomogramAveraging(ProtAnalysis3D):
-    """ Protocol for subtomogram averaging. """
+    """ Protocol for subtomogram averaging. This protocol has two modes of operation.
+     the first is to perform subtomogram averaging using Fast Rotational Matching.
+     The second mode is to import a previously performed alignment using this protocol, Dynamo, or Artiatomi.
+     If an alignment is imported, the rigid-body parameters will be used to re-create the average structure.
+     """
+
     _label = 'subtomogram averaging'
 
     # --------------------------- DEFINE param functions --------------------------------------------
@@ -150,7 +157,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         line.addParam('frm_maxshift', params.IntParam, default=10,
                       label='Maximum shift search (in pixels)',
                       help='')
-        form.addParallelSection(threads=0, mpi=5)
+        form.addParallelSection(threads=0, mpi=multiprocessing.cpu_count()//2-1)
 
     # --------------------------- INSERT steps functions --------------------------------------------
 
@@ -239,9 +246,32 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                         env = Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
 
             # By now, the alignment is done, the averaging should take place
+            # However, if the alignemnt has missing wedge compensation, we shall update the metadata:
+            if self.WedgeMode == WEDGE_MASK_THRE:
+                mdImgs = md.MetaData(md_itr)
+                for objId in mdImgs:
+                    rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+                    tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+                    psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+                    x = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+                    y = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+                    z = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+                    T = eulerAngles2matrix(rot, tilt, psi, x, y, z)
+                    # Rotate 90 degrees (compensation for missing wedge)
+                    T0 = eulerAngles2matrix(0, 90, 0, 0, 0, 0)
+                    T = np.linalg.inv(np.matmul(T, T0))
+                    rot, tilt, psi, x, y, z = matrix2eulerAngles(T)
+                    mdImgs.setValue(md.MDL_ANGLE_ROT, rot, objId)
+                    mdImgs.setValue(md.MDL_ANGLE_TILT, tilt, objId)
+                    mdImgs.setValue(md.MDL_ANGLE_PSI, psi, objId)
+                    mdImgs.setValue(md.MDL_SHIFT_X, x, objId)
+                    mdImgs.setValue(md.MDL_SHIFT_Y, y, objId)
+                    mdImgs.setValue(md.MDL_SHIFT_Z, z, objId)
+                    mdImgs.setValue(md.MDL_ANGLE_Y, 0.0, objId)
+                mdImgs.write(md_itr)
+
             mdImgs = md.MetaData(md_itr)
             counter = 0
-            first = True
 
             for objId in mdImgs:
                 counter = counter + 1
@@ -255,28 +285,11 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                 y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
                 z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
 
-                flip = mdImgs.getValue(md.MDL_ANGLE_Y, objId)
                 tempVol = self._getExtraPath('temp.mrc')
                 extra = self._getExtraPath()
 
-                if flip == 0:
-                    if first:
-                        print("THERE IS NO COMPENSATION FOR THE MISSING WEDGE")
-                        first = False
-
-                    params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
-                             ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
-
-                else:
-                    if first:
-                        print("THERE IS A COMPENSATION FOR THE MISSING WEDGE")
-                        first = False
-                    # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
-                    params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
-                    runProgram('xmipp_transform_geometry', params)
-                    params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
-                             ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
-
+                params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
                 runProgram('xmipp_transform_geometry', params)
 
                 if counter == 1:
@@ -296,13 +309,9 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         outputMD = self.outputMD
         os.system("cp %(avr_itr)s %(outputVolume)s " % locals())
         os.system("cp %(md_itr)s %(outputMD)s " % locals())
-
         # Averaging is done
-
-
         inputSet = md.MetaData(self.imgsFn)
         mdImgs = md.MetaData(self.outputMD)
-
         # setting item_id (lost due to mpi usually)
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
@@ -313,10 +322,10 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                 if (NewImgPath == imgPath):
                     target_ID = inputSet.getValue(md.MDL_ITEM_ID, objId2)
                     break
-
             mdImgs.setValue(md.MDL_ITEM_ID, target_ID, objId)
-
+        mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.outputMD)
+
 
     def adaptDynamoStep(self, dynamoTable):
         volumes_in = self.imgsFn
@@ -325,8 +334,6 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         from continuousflex.protocols.utilities.dynamo import tbl2metadata
         tbl2metadata(dynamoTable, volumes_in, md_out)
 
-
-        ### here:
         mdImgs = md.MetaData(md_out)
         counter = 0
         first = True
@@ -338,32 +345,20 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
             tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
             psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
-
             x_shift = mdImgs.getValue(md.MDL_SHIFT_X, objId)
             y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
             z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
 
-            flip = mdImgs.getValue(md.MDL_ANGLE_Y, objId)
             tempVol = self._getExtraPath('temp.mrc')
             extra = self._getExtraPath()
 
-            if flip == 0:
-                if first:
-                    print("Averaging based on Dynamo parameters")
-                    first = False
 
-                params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
-                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
+            if first:
+                print("Averaging based on Dynamo parameters")
+                first = False
 
-            else:
-                if first:
-                    print("THERE IS A COMPENSATION FOR THE MISSING WEDGE")
-                    first = False
-                # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
-                params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
-                runProgram('xmipp_transform_geometry', params)
-                params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
-                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
+            params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                     ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
 
             runProgram('xmipp_transform_geometry', params)
 
@@ -377,9 +372,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
         runProgram('xmipp_image_operate', params)
         os.system("rm -f %(tempVol)s" % locals())
-         # Averaging is done
 
-        pass
 
     def adaptTomboxStep(self, Table):
         volumes_in = self.imgsFn
@@ -404,7 +397,6 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
             z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
 
-            flip = mdImgs.getValue(md.MDL_ANGLE_Y, objId)
             tempVol = self._getExtraPath('temp.mrc')
             extra = self._getExtraPath()
 
@@ -426,6 +418,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
          # Averaging is done
         pass
 
+
     def adaptXmippStep(self, Table):
         volumes_in = self.imgsFn
         volume_out = self.outputVolume
@@ -433,6 +426,36 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
 
         # Averaging based on the metadata:
         mdImgs = md.MetaData(md_out)
+
+        # if the volumes were aligned with angle_y=90 degrees, then rotate by 90 and inverse, then set angle y to 0
+        flag = None
+        try:
+            flag = mdImgs.getValue(md.MDL_ANGLE_Y, 1)
+        except:
+            pass
+
+        if flag == 90:
+            mdImgs = md.MetaData(self.imgsFn)
+            for objId in mdImgs:
+                rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+                tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+                psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+                x = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+                y = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+                z = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+                T = eulerAngles2matrix(rot, tilt, psi, x, y, z)
+                # Rotate 90 degrees (compensation for missing wedge)
+                T0 = eulerAngles2matrix(0, 90, 0, 0, 0, 0)
+                T = np.linalg.inv(np.matmul(T, T0))
+                rot, tilt, psi, x, y, z = matrix2eulerAngles(T)
+                mdImgs.setValue(md.MDL_ANGLE_ROT, rot, objId)
+                mdImgs.setValue(md.MDL_ANGLE_TILT, tilt, objId)
+                mdImgs.setValue(md.MDL_ANGLE_PSI, psi, objId)
+                mdImgs.setValue(md.MDL_SHIFT_X, x, objId)
+                mdImgs.setValue(md.MDL_SHIFT_Y, y, objId)
+                mdImgs.setValue(md.MDL_SHIFT_Z, z, objId)
+                mdImgs.setValue(md.MDL_ANGLE_Y, 0.0, objId)
+
         mdImgs.write(self._getExtraPath('final_md.xmd'))
         counter = 0
 
@@ -448,20 +471,11 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
             z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
 
-            flip = mdImgs.getValue(md.MDL_ANGLE_Y, objId)
             tempVol = self._getExtraPath('temp.mrc')
             extra = self._getExtraPath()
 
-            if flip == 0 or flip is None:
-                params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
-                     ' --shift %(x_shift)s %(y_shift)s %(z_shift)s' % locals()
-            else:
-                # First got to rotate each volume 90 degrees about the y axis, align it, then sum it
-                params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
-                runProgram('xmipp_transform_geometry', params)
-                params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
-                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
-
+            params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                 ' --shift %(x_shift)s %(y_shift)s %(z_shift)s' % locals()
 
             runProgram('xmipp_transform_geometry', params)
 
@@ -475,24 +489,15 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
         runProgram('xmipp_image_operate', params)
         os.system("rm -f %(tempVol)s" % locals())
-         # Averaging is done
-        pass
+
 
     def createOutputStep(self):
-        # TODO: this is not needed any more, if no issue is reported then deleted it
         inputSet = self.inputVolumes.get()
-        # partSet = self._createSetOfVolumes()
-        # partSet.copyInfo(inputSet)
-        # partSet.setAlignmentProj()
-        # partSet.copyItems(inputSet,
-        #                   updateItemCallback=self._updateParticle,
-        #                   itemDataIterator=md.iterRows(self.imgsFn, sortByLabel=md.MDL_ITEM_ID))
         outvolume = Volume()
         outvolume.setSamplingRate(inputSet.getSamplingRate())
         outvolume.setFileName(self.outputVolume)
         self._defineOutputs(SubtomogramAverage=outvolume)
-        # self._defineOutputs(outputParticles=partSet, outputvolume=outvolume)
-        # self._defineTransformRelation(self.inputVolumes, partSet)
+
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
@@ -500,21 +505,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         return summary
 
     def _citations(self):
-        return []
+        return ['CHEN2013235']
 
     def _methods(self):
         pass
-
-    # --------------------------- UTILS functions --------------------------------------------
-    def _printWarnings(self, *lines):
-        """ Print some warning lines to 'warnings.xmd',
-        the function should be called inside the working dir."""
-        fWarn = open("warnings.xmd", 'w')
-        for l in lines:
-            print >> fWarn, l
-        fWarn.close()
-
-    def _updateParticle(self, item, row):
-        setXmippAttributes(item, row, md.MDL_ANGLE_ROT, md.MDL_ANGLE_TILT, md.MDL_ANGLE_PSI, md.MDL_SHIFT_X,
-                           md.MDL_SHIFT_Y, md.MDL_SHIFT_Z, md.MDL_MAXCC, md.MDL_ANGLE_Y)
-        createItemMatrix(item, row, align=em.ALIGN_PROJ)

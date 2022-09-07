@@ -32,7 +32,8 @@ from pyworkflow.utils import replaceBaseExt
 import numpy as np
 from pwem.utils import runProgram
 from pwem.emlib.image import ImageHandler
-from skimage.exposure import match_histograms
+# TODO: return the matching histograms once conflics with pillow are solved
+#from skimage.exposure import match_histograms
 
 class FlexProtHistogramMatch(ProtAnalysis3D):
     """ Protocol for volume histogram matching. """
@@ -101,8 +102,9 @@ class FlexProtHistogramMatch(ProtAnalysis3D):
             else:
                 v = ImageHandler().read(temp_path).getData()
                 v = np.squeeze(v)
-                map = match_histograms(v, ref)
-                save_volume(np.float32(map), new_imgPath)
+                # TODO: return mathcing histograms
+                #map = match_histograms(v, ref)
+                #save_volume(np.float32(map), new_imgPath)
             # update the name in the metadata file
             mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
         mdImgs.write(self.imgsFn)

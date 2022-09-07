@@ -30,7 +30,7 @@
 
 from pwem import *
 from pwem.emlib import (MetaData, MDL_X, MDL_COUNT, MDL_NMA_MODEFILE, MDL_ORDER,
-                        MDL_ENABLED, MDL_NMA_COLLECTIVITY, MDL_NMA_SCORE)
+                        MDL_ENABLED, MDL_NMA_COLLECTIVITY, MDL_NMA_SCORE, MDL_NMA_EIGENVAL)
 from pwem.protocols import EMProtocol
 from pyworkflow.protocol.params import IntParam, FloatParam, EnumParam
 from pyworkflow.utils import *
@@ -215,6 +215,8 @@ class FlexProtNMABase(EMProtocol):
         mdOut = MetaData()
         collectivityList = []
 
+        ids, eigvals = self._get_eigval()
+        print(eigvals)
         for n in range(len(fnVec)):
             line = fh.readline()
             collectivity = float(line.split()[1])
@@ -229,8 +231,11 @@ class FlexProtNMABase(EMProtocol):
                 mdOut.setValue(MDL_ENABLED, 1, objId)
             else:
                 mdOut.setValue(MDL_ENABLED, -1, objId)
+            try:
+                mdOut.setValue(MDL_NMA_EIGENVAL, eigvals[n] , objId)
+            except:
+                pass
             mdOut.setValue(MDL_NMA_COLLECTIVITY, collectivity, objId)
-
             if collectivity < collectivityThreshold:
                 mdOut.setValue(MDL_ENABLED, -1, objId)
         fh.close()
@@ -258,6 +263,21 @@ class FlexProtNMABase(EMProtocol):
         cleanPath("Chkmod.res")
 
         self._leaveWorkingDir()
+
+    def _get_eigval(self):
+        # We are inside the working directory
+        fn = 'logs/run.stdout'
+        # fn = 'run.stdout'
+        content = open(fn, 'r')
+        Lines = content.readlines()
+        ids = []
+        eigval = []
+        for line in Lines:
+            if line.startswith(' Rdmodfacs> Eigenvector number:'):
+                ids.append(int(line[32:]))
+            if line.startswith(' Rdmodfacs> Corresponding eigenvalue:'):
+                eigval.append(float(line[37:]))
+        return ids, eigval
 
     def _validate(self):
         errors = []

@@ -96,19 +96,19 @@ class TestHEMNMA3D_1(TestWorkflow):
         protDimRed.setObjLabel('HEMNMA-3D dimred')
         self.launchProtocol(protDimRed)
 
-        newProt = self.newProtocol(FlexBatchProtNMAClusterVol)
-        newProt.setObjLabel('Cluster: x1 <- 100')
-        newProt.inputNmaDimred.set(protDimRed)
-        fnSqlite = self.ds.getFile('HEMNMA_3D/clusters/atomic_left.sqlite')
-        newProt.sqliteFile.set(fnSqlite)
-        self.launchProtocol(newProt)
-
-        newProt = self.newProtocol(FlexBatchProtNMAClusterVol)
-        newProt.setObjLabel('Cluster: x1 > 100')
-        newProt.inputNmaDimred.set(protDimRed)
-        fnSqlite = self.ds.getFile('HEMNMA_3D/clusters/atomic_right.sqlite')
-        newProt.sqliteFile.set(fnSqlite)
-        self.launchProtocol(newProt)
+        # newProt = self.newProtocol(FlexBatchProtNMAClusterVol)
+        # newProt.setObjLabel('Cluster: x1 <- 100')
+        # newProt.inputNmaDimred.set(protDimRed)
+        # fnSqlite = self.ds.getFile('HEMNMA_3D/clusters/atomic_left.sqlite')
+        # newProt.sqliteFile.set(fnSqlite)
+        # self.launchProtocol(newProt)
+        #
+        # newProt = self.newProtocol(FlexBatchProtNMAClusterVol)
+        # newProt.setObjLabel('Cluster: x1 > 100')
+        # newProt.inputNmaDimred.set(protDimRed)
+        # fnSqlite = self.ds.getFile('HEMNMA_3D/clusters/atomic_right.sqlite')
+        # newProt.sqliteFile.set(fnSqlite)
+        # self.launchProtocol(newProt)
 
         # ------------------------------------------------
         # Case 2. Import Vol -> Pdb -> NMA
@@ -150,19 +150,19 @@ class TestHEMNMA3D_1(TestWorkflow):
         protDimRed.setObjLabel('HEMNMA-3D dimred')
         self.launchProtocol(protDimRed)
 
-        newProt = self.newProtocol(FlexBatchProtNMAClusterVol)
-        newProt.setObjLabel('Cluster: x1 <- 100')
-        newProt.inputNmaDimred.set(protDimRed)
-        fnSqlite = self.ds.getFile('HEMNMA_3D/clusters/pseudo_left.sqlite')
-        newProt.sqliteFile.set(fnSqlite)
-        self.launchProtocol(newProt)
-
-        newProt = self.newProtocol(FlexBatchProtNMAClusterVol)
-        newProt.setObjLabel('Cluster: x1 > 100')
-        newProt.inputNmaDimred.set(protDimRed)
-        fnSqlite = self.ds.getFile('HEMNMA_3D/clusters/pseudo_right.sqlite')
-        newProt.sqliteFile.set(fnSqlite)
-        self.launchProtocol(newProt)
+        # newProt = self.newProtocol(FlexBatchProtNMAClusterVol)
+        # newProt.setObjLabel('Cluster: x1 <- 100')
+        # newProt.inputNmaDimred.set(protDimRed)
+        # fnSqlite = self.ds.getFile('HEMNMA_3D/clusters/pseudo_left.sqlite')
+        # newProt.sqliteFile.set(fnSqlite)
+        # self.launchProtocol(newProt)
+        #
+        # newProt = self.newProtocol(FlexBatchProtNMAClusterVol)
+        # newProt.setObjLabel('Cluster: x1 > 100')
+        # newProt.inputNmaDimred.set(protDimRed)
+        # fnSqlite = self.ds.getFile('HEMNMA_3D/clusters/pseudo_right.sqlite')
+        # newProt.sqliteFile.set(fnSqlite)
+        # self.launchProtocol(newProt)
 
 
 class TestHEMNMA3D_2(TestWorkflow):

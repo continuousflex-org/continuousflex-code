@@ -90,19 +90,19 @@ class TestHEMNMA_1(TestWorkflow):
         protDimRed.setObjLabel('HEMNMA dimred')
         self.launchProtocol(protDimRed)
 
-        newProt = self.newProtocol(FlexBatchProtNMACluster)
-        newProt.setObjLabel('Cluster: x1 <- 30')
-        newProt.inputNmaDimred.set(protDimRed)
-        fnSqlite = self.ds.getFile('clusters/atomic/left.sqlite')
-        newProt.sqliteFile.set(fnSqlite)
-        self.launchProtocol(newProt)
-
-        newProt = self.newProtocol(FlexBatchProtNMACluster)
-        newProt.setObjLabel('Cluster: x1 > 30')
-        newProt.inputNmaDimred.set(protDimRed)
-        fnSqlite = self.ds.getFile('clusters/atomic/right.sqlite')
-        newProt.sqliteFile.set(fnSqlite)
-        self.launchProtocol(newProt)
+        # newProt = self.newProtocol(FlexBatchProtNMACluster)
+        # newProt.setObjLabel('Cluster: x1 <- 30')
+        # newProt.inputNmaDimred.set(protDimRed)
+        # fnSqlite = self.ds.getFile('clusters/atomic/left.sqlite')
+        # newProt.sqliteFile.set(fnSqlite)
+        # self.launchProtocol(newProt)
+        #
+        # newProt = self.newProtocol(FlexBatchProtNMACluster)
+        # newProt.setObjLabel('Cluster: x1 > 30')
+        # newProt.inputNmaDimred.set(protDimRed)
+        # fnSqlite = self.ds.getFile('clusters/atomic/right.sqlite')
+        # newProt.sqliteFile.set(fnSqlite)
+        # self.launchProtocol(newProt)
 
 
         #------------------------------------------------        
@@ -149,19 +149,19 @@ class TestHEMNMA_1(TestWorkflow):
         protDimRed.setObjLabel('HEMNMA dimred')
         self.launchProtocol(protDimRed)
 
-        newProt = self.newProtocol(FlexBatchProtNMACluster)
-        newProt.setObjLabel('Cluster: x1 <- 15')
-        newProt.inputNmaDimred.set(protDimRed)
-        fnSqlite = self.ds.getFile('clusters/pseudo/left.sqlite')
-        newProt.sqliteFile.set(fnSqlite)
-        self.launchProtocol(newProt)
-
-        newProt = self.newProtocol(FlexBatchProtNMACluster)
-        newProt.setObjLabel('Cluster: x1 > 15')
-        newProt.inputNmaDimred.set(protDimRed)
-        fnSqlite = self.ds.getFile('clusters/pseudo/right.sqlite')
-        newProt.sqliteFile.set(fnSqlite)
-        self.launchProtocol(newProt)
+        # newProt = self.newProtocol(FlexBatchProtNMACluster)
+        # newProt.setObjLabel('Cluster: x1 <- 15')
+        # newProt.inputNmaDimred.set(protDimRed)
+        # fnSqlite = self.ds.getFile('clusters/pseudo/left.sqlite')
+        # newProt.sqliteFile.set(fnSqlite)
+        # self.launchProtocol(newProt)
+        #
+        # newProt = self.newProtocol(FlexBatchProtNMACluster)
+        # newProt.setObjLabel('Cluster: x1 > 15')
+        # newProt.inputNmaDimred.set(protDimRed)
+        # fnSqlite = self.ds.getFile('clusters/pseudo/right.sqlite')
+        # newProt.sqliteFile.set(fnSqlite)
+        # self.launchProtocol(newProt)
 
 
 

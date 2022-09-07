@@ -66,6 +66,8 @@ class TrajectoriesWindow(gui.Window):
         self.zlim_high = kwargs.get('zlim_high')
         self.s = kwargs.get('s')
         self.alpha = kwargs.get('alpha')
+        self.deep = kwargs.get('deepHEMNMA')
+        self.cbar_label = kwargs.get('cbar_label')
         self.plotter = None
 
         content = tk.Frame(self.root)
@@ -218,14 +220,14 @@ class TrajectoriesWindow(gui.Window):
                                                 xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                 ylim_low=self.ylim_low, ylim_high=self.ylim_high,
                                                 zlim_low=self.zlim_low, zlim_high=self.zlim_high,
-                                                alpha=self.alpha, s=self.s)
+                                                alpha=self.alpha, s=self.s, cbar_label=self.cbar_label)
                 else:
                     self.plotter = FlexNmaPlotter(data=self.data,
                                                 LimitL=self.LimitLow, LimitH=self.LimitHigh,
                                                 xlim_low=self.xlim_low, xlim_high=self.xlim_high,
                                                 ylim_low=self.ylim_low, ylim_high=self.ylim_high,
                                                 zlim_low=self.zlim_low, zlim_high=self.zlim_high,
-                                                alpha=self.alpha, s=self.s)
+                                                alpha=self.alpha, s=self.s, cbar_label=self.cbar_label)
 
                 doShow = True
                 # self.plotter.useLastPlot = True
@@ -249,16 +251,24 @@ class TrajectoriesWindow(gui.Window):
                     self._updateSelectionLabel()
                     # ax = self.plotter.createSubPlot("Click and drag to add points to the Cluster",
                     #                                 *baseList)
-                    ax = self.plotter.plotArray2D("Click and drag to add points to the Cluster",
+                    if self.deep:
+                        ax = self.plotter.plotArray2D_xy("Click and drag to add points to the Cluster",
+                                                      *baseList)
+                    else:
+                        ax = self.plotter.plotArray2D("Click and drag to add points to the Cluster",
                                                     *baseList)
+
                     self.ps = PointPath(ax, self.data, self.pathData,
-                                        callback=self._checkNumberOfPoints,
+                                        callback=self._checkNumberOfPoints, maxPoints=self.numberOfPoints,
                                         LimitL = self.LimitLow, LimitH = self.LimitHigh,
                                         alpha=self.alpha.get(), s = self.s.get())
                 elif dim == 3:
                     # del self.ps # Remove PointSelector
                     self.setDataIndex('ZIND', modeList[2])
-                    self.plotter.plotArray3D("%s %s %s" % tuple(baseList), *baseList)
+                    if self.deep:
+                        self.plotter.plotArray3D_xyz("%s %s %s" % tuple(baseList), *baseList)
+                    else:
+                        self.plotter.plotArray3D("%s %s %s" % tuple(baseList), *baseList)
 
             if doShow:
                 self.plotter.show()
