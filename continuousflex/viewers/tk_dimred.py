@@ -260,11 +260,7 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
 
         k_means = KMeans(init='k-means++', n_clusters=n_clusters)
         selection = np.array(self.listbox.curselection())
-        print("selection" )
-        print(selection.shape)
         data_arr = np.array([p.getData()[selection] for p in self.data])
-        print("data_arr" )
-        print(data_arr.shape)
         k_means.fit(data_arr)
 
         classes = k_means.labels_ + 1
