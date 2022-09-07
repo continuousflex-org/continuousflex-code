@@ -121,10 +121,12 @@ class Plugin(pwem.Plugin):
                                   % env.getLibFolder(), 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
-        target_branch = "nmmd"
+        target_branch = "merge_genesis_1.4"
+
         env.addPackage('MD-NMMD-Genesis', version='1.0', deps=[lapack],
                        buildDir='MD-NMMD-Genesis', tar="void.tgz",
                        commands=[('git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; '
+                                  'autoreconf -fi ;'
                                   './configure LDFLAGS=-L%s ;'
                                   'make install;' % (target_branch,env.getLibFolder()), "bin/atdyn")],
                        neededProgs=['mpif90'], default=False)
