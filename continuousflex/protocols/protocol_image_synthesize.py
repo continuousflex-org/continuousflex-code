@@ -41,6 +41,8 @@ import glob
 from joblib import dump
 from math import cos, sin, pi
 import xmippLib
+import math
+from continuousflex.protocols.convert import matrix2eulerAngles
 
 NMA_ALIGNMENT_WAV = 0
 NMA_ALIGNMENT_PROJ = 1
@@ -51,8 +53,8 @@ MODE_RELATION_MESH = 2
 MODE_RELATION_RANDOM = 3
 MODE_RELATION_PARABOLA = 4
 
-MISSINGWEDGE_YES = 0
-MISSINGWEDGE_NO = 1
+LOWPASS_YES = 0
+LOWPASS_NO = 1
 
 ROTATION_SHIFT_YES = 0
 ROTATION_SHIFT_NO = 1
@@ -195,6 +197,24 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                       condition='noiseCTFChoice==%d' % NOISE_CTF_YES,
                       label='CTF Q0',
                       help='Microscope attribute')
+
+        form.addSection(label='Low pass filtering')
+        form.addParam('lowPassChoice', params.EnumParam, default=LOWPASS_NO,
+                      choices=['Add extra dose accumulation', 'Stay with only CTF'],
+                      label='Use low pass filtering',
+                      help='The generated volumes will be low pass filtered before projection to images.'
+                           ' This simulates extra distortions similar to dose accumulation.'
+                           ' However, CTF will already have such an effect.')
+        line = form.addLine('Frequency (normalized)',
+                            condition='lowPassChoice==%d' % LOWPASS_YES,
+                            help='The cufoff frequency and raised coside width of the low pass filter.'
+                                 ' For details: see "xmipp_transform_filter --fourier low_pass"')
+        line.addParam('w1', params.FloatParam, default=0.25,
+                      condition='lowPassChoice==%d' % LOWPASS_YES,
+                      label='Cutoff frequency (0 -> 0.5)')
+        line.addParam('raisedw', params.FloatParam, default=0.02,
+                      condition='lowPassChoice==%d' % LOWPASS_YES,
+                      label='Raised cosine width')
 
         form.addSection('Rigid body variability')
         form.addParam('rotationShiftChoice', params.EnumParam, default=ROTATION_SHIFT_YES,
@@ -438,6 +458,14 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
             params += " -v 0 --centerPDB "
             runProgram('xmipp_volume_from_pdb', params)
 
+        if self.lowPassChoice.get() is LOWPASS_YES:
+            cutoff = self.w1.get()
+            raisedw = self.raisedw.get()
+            for i in range(numberOfVolumes):
+                params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_df.vol')
+                params += " --fourier low_pass " + str(cutoff) + ' ' + str(raisedw)
+                runProgram('xmipp_transform_filter', params)
+
     def generate_rotation_and_shift(self):
         subtomogramMD = md.MetaData(self._getExtraPath('GroundTruth.xmd'))
         numberOfVolumes = self.get_number_of_volumes()
@@ -464,6 +492,29 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
                 psi1 = np.random.uniform(self.LowPsi.get(), self.HighPsi.get())
             else:
                 psi1 = np.random.normal(self.MeanPsi.get(), self.StdPsi.get())
+
+            # uniform over the sphere
+            if (self.psi.get() == ROTATION_UNIFORM) and\
+                (self.tilt.get()==ROTATION_UNIFORM) and \
+                    (self.rot.get()==ROTATION_UNIFORM) and \
+                    self.LowRot.get() == 0.0 and self.HighRot.get() == 360.0 and \
+                    self.LowTilt.get() == 0.0 and self.HighTilt.get() == 180.0 and \
+                    self.LowPsi.get() == 0.0 and self.HighPsi.get() == 360.0:
+                x1,x2,x3 = np.random.uniform(0,1,3)
+                R = np.array([
+                    [np.cos(2*np.pi*x1), np.sin(2*np.pi*x1), 0],
+                    [-np.sin(2*np.pi*x1), np.cos(2*np.pi*x1), 0],
+                    [0, 0, 1]
+                ])
+                v = np.array([[np.cos(2*np.pi*x2)*np.sqrt(x3),
+                              np.sin(2*np.pi*x2)*np.sqrt(x3),
+                              np.sqrt(1-x3)]])
+                H = np.eye(3) - 2*np.dot(v.T,v)
+                M = -np.dot(H,R)
+                trans_mat = np.zeros((4,4))
+                trans_mat[:3,:3] = M
+                rot1,tilt1,psi1,_,_,_ = matrix2eulerAngles(trans_mat)
+
             subtomogramMD.setValue(md.MDL_SHIFT_X, shift_x1, i + 1)
             subtomogramMD.setValue(md.MDL_SHIFT_Y, shift_y1, i + 1)
             subtomogramMD.setValue(md.MDL_ANGLE_ROT, rot1, i + 1)
@@ -631,7 +682,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
         runProgram('xmipp_metadata_selfile_create', command)
         # now creating the output set of images as output:
         partSet = self._createSetOfParticles('images')
-        xmipp3.convert.readSetOfParticles(out_mdfn, partSet)
+        xmipp3.convert.readSetOfParticles(self._getExtraPath('GroundTruth.xmd'), partSet)
         if (self.refVolume.get()):
             sr = self.refVolume.get().getSamplingRate()
         else:

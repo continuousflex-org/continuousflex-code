@@ -59,7 +59,7 @@ class FlexProtSynthesizeSubtomoViewer(ProtocolViewer):
         form.addSection(label='Visualization')
         form.addParam('displayRawDeformation', StringParam, default='7 8',
                       condition=self.protocol.confVar.get() == NMA_YES,
-                      label='Display the computed normal-mode amplitudes',
+                      label='Display normal-mode amplitudes relationship',
                       help='Type 7 to see the histogram of amplitudes along mode 7; \n'
                            'type 8 to see the histogram of amplitudes along mode 8, etc.\n'
                            'Type 7 8 to see the 2D plot of amplitudes along modes 7 and 8.\n'
